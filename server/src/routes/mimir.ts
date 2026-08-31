@@ -70,10 +70,20 @@ export function mimirRoutes(ctx: Ctx): Router {
     '..',
     'mimir-prompt.default.md',
   );
+  // Deployment-private annex: the facilitator's own event-concept corpus
+  // (e.g. non-conference method), appended to the doctrine. Lives in /data,
+  // never in the repo.
+  const annexPath = dataDir ? join(dataDir, 'mimir-annex.md') : null;
   const loadPrompt = (): string | null => {
-    if (promptPath && existsSync(promptPath)) return readFileSync(promptPath, 'utf8');
-    if (existsSync(defaultPromptPath)) return readFileSync(defaultPromptPath, 'utf8');
-    return null;
+    const base =
+      promptPath && existsSync(promptPath)
+        ? readFileSync(promptPath, 'utf8')
+        : existsSync(defaultPromptPath)
+          ? readFileSync(defaultPromptPath, 'utf8')
+          : null;
+    if (base === null) return null;
+    const annex = annexPath && existsSync(annexPath) ? readFileSync(annexPath, 'utf8') : '';
+    return annex ? `${base}\n\n${annex}` : base;
   };
 
   const EMPTY = { version: 1, dynamics: [] as unknown[] };
@@ -130,6 +140,29 @@ export function mimirRoutes(ctx: Ctx): Router {
         eventId: req.event.id,
         action: 'update',
         entity: 'mimir_prompt',
+        entityId: 0,
+      });
+      res.json({ ok: true, bytes: Buffer.byteLength(body.prompt) });
+    },
+  );
+
+  /** Deployment annex upload (admin): the facilitator's event-concept corpus. */
+  router.put(
+    '/mimir/annex',
+    requireRole(ctx.db, 'admin'),
+    limit(ctx.limiter, 'write'),
+    (req, res) => {
+      const body = parse(mimirPromptSchema, req.body);
+      if (!annexPath) {
+        res.status(503).json({ error: { message: 'No data directory on this deployment' } });
+        return;
+      }
+      writeFileSync(annexPath, body.prompt, 'utf8');
+      audit(ctx.db, {
+        identityId: req.identity.id,
+        eventId: req.event.id,
+        action: 'update',
+        entity: 'mimir_annex',
         entityId: 0,
       });
       res.json({ ok: true, bytes: Buffer.byteLength(body.prompt) });

@@ -10,7 +10,17 @@ import { PrimaryButton, Spinner, useToast } from './ui';
 export const mimirChip =
   'inline-flex items-center gap-1 rounded-full border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 text-[11px] font-medium text-indigo-700 dark:text-indigo-300';
 
-export function MimirChat({ slug, compact = false }: { slug: string; compact?: boolean }) {
+export function MimirChat({
+  slug,
+  compact = false,
+  seed,
+}: {
+  slug: string;
+  compact?: boolean;
+  /** Optional kickoff instruction, auto-sent once when the engine is armed —
+   *  used to start a live interview. Shown as a normal message: transparent. */
+  seed?: string;
+}) {
   const [engine, setEngine] = useState<boolean | null>(null);
   const [model, setModel] = useState('');
   const [keyDraft, setKeyDraft] = useState('');
@@ -55,6 +65,32 @@ export function MimirChat({ slug, compact = false }: { slug: string; compact?: b
       setSavingKey(false);
     }
   }, [keyDraft, refresh, slug, toast]);
+
+  const sendText = useCallback(
+    async (content: string) => {
+      const next = [...messages, { role: 'user' as const, content }];
+      setMessages(next);
+      setBusy(true);
+      try {
+        const res = await api.mimirChat(slug, next);
+        setMessages([...next, { role: 'assistant', content: res.reply }]);
+      } catch (err) {
+        toast.show((err as Error).message);
+        setMessages(messages);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [messages, slug, toast],
+  );
+
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (engine && seed && messages.length === 0 && !seededRef.current) {
+      seededRef.current = true;
+      void sendText(seed);
+    }
+  }, [engine, seed, messages.length, sendText]);
 
   const send = useCallback(async () => {
     const content = draft.trim();

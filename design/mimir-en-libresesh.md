@@ -148,6 +148,43 @@ borrar una fuente es del dueño del proceso y borra también sus derivados.
 **Infra:** transcripción vía el ecosistema existente (n8n + Groq Whisper ya
 operativo en el VPS, o Hermes/DGX en local); el análisis, el motor Mímir (v2+).
 
+## 3d · Perfiles de organización (visión del facilitador, 2026-09-01 — pendiente de construir)
+
+Además de eventos, el sistema conoce **organizaciones**: perfiles con parámetros que
+Mímir usa al diseñar procesos para ellas.
+
+- **Parámetros del perfil**: visión común · objetivo/producción · sistema organizativo ·
+  sistema de toma de decisiones · roles y competencias · valores.
+- **Sistema organizativo como elección informada**: Mímir ofrece el abanico —
+  sociocracia · holacracia · jerarquía tradicional · cooperativa/asamblea · otro ·
+  "aún no lo sabemos" — con documentación de cada modelo (el corpus del facilitador ya
+  tiene sociocracia/consentimiento, eines de gestió col·lectiva, modelo de efectividad).
+  **Opcional siempre**: si la organización ya tiene su manera, se registra y se respeta.
+- **Efecto**: al diseñar un evento para una organización con perfil, Mímir considera su
+  sistema (p. ej., no proponer votación por mayoría a una sociocracia; encajar los
+  momentos de decisión en su proceso propio). La pregunta ya está en la entrevista de
+  evento (paso "Organisation"); el perfil persistente es el siguiente paso.
+- **Regla de siempre**: Mímir documenta y propone; la organización elige.
+
+## 9 · Spin-off: "Mímir Orgs" — app de modelos organizativos (SEMILLA, proyecto aparte)
+
+Idea del facilitador (2026-09-01): además del bot en el sistema de eventos, una **app
+propia** — una especie de "LinkedIn de organizaciones" con servicio de "haz tu
+organización":
+
+- Diseñador guiado de modelo organizativo: **visión común → organización → roles y
+  competencias → valores → workflow → sistema de decisión** (mismo patrón de entrevista
+  que aquí, mismo motor Mímir).
+- Mapa navegable de modelos organizativos y sistemas de decisión (con la documentación
+  del corpus).
+- Sistema de **valor real por contribución** (a explorar).
+- Mímir propone **flujos de reunión** y puntos organizativos según el modelo elegido.
+- Calendario/eventos usando LibreSesh como modelo/base.
+
+⚠️ Es un PROYECTO NUEVO del ecosistema, no una feature de este fork: debe pasar por su
+alta formal (clasificación Tronco/Ramas, hogar en el vault, plan propio). Esta sección
+es solo la semilla para no perder la idea.
+
 ## 4 · Chat por proceso
 
 Un chat **por proceso abierto** (no un chat global): cada sesión o evento en diseño

@@ -21,12 +21,18 @@ export function MimirPage() {
   const [status, setStatus] = useState<Status>('loading');
   const [error, setError] = useState<string | null>(null);
   const [tool, setTool] = useState<Tool>('hub');
+  const [chatSeed, setChatSeed] = useState<string | undefined>();
+  const [engine, setEngine] = useState(false);
 
   useEffect(() => {
     void (async () => {
       try {
-        setBundle(await api.bundle(slug));
+        const b = await api.bundle(slug);
+        setBundle(b);
         setStatus('ready');
+        if (b.role === 'admin') {
+          api.mimirStatus(slug).then((s) => setEngine(s.engine)).catch(() => setEngine(false));
+        }
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) setStatus('gate');
         else {
@@ -55,6 +61,11 @@ export function MimirPage() {
   const isAdmin = role === 'admin';
   const canUse = role !== 'viewer';
 
+  const goLive = (seed: string) => {
+    setChatSeed(seed);
+    setTool('chat');
+  };
+
   return (
     <div className="min-h-screen bg-stone-100 dark:bg-stone-950 text-stone-900 dark:text-stone-100">
       <header className="border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900">
@@ -82,12 +93,22 @@ export function MimirPage() {
         {tool === 'hub' && (
           <Hub bundle={bundle} canUse={canUse} isAdmin={isAdmin} onOpen={setTool} slug={slug} />
         )}
-        {tool === 'interview' && <SessionInterview slug={slug} onDone={() => setTool('hub')} />}
-        {tool === 'eventInterview' && isAdmin && <EventInterview bundle={bundle} />}
+        {tool === 'interview' && (
+          <>
+            {isAdmin && engine && <LiveOffer onLive={() => goLive(SESSION_SEED)} />}
+            <SessionInterview slug={slug} onDone={() => setTool('hub')} />
+          </>
+        )}
+        {tool === 'eventInterview' && isAdmin && (
+          <>
+            {engine && <LiveOffer onLive={() => goLive(EVENT_SEED)} />}
+            <EventInterview bundle={bundle} />
+          </>
+        )}
         {tool === 'catalog' && <Catalog slug={slug} />}
         {tool === 'rhythm' && <Rhythm bundle={bundle} />}
         {tool === 'infographic' && <Infographic bundle={bundle} />}
-        {tool === 'chat' && isAdmin && <MimirChat slug={slug} />}
+        {tool === 'chat' && isAdmin && <MimirChat slug={slug} seed={chatSeed} />}
       </main>
     </div>
   );
@@ -174,6 +195,33 @@ function Hub({
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ------------- live interview seeds ------------- */
+
+const SESSION_SEED =
+  'Run the session-design interview with me, live. Start by asking me to describe, in my own words, what I want to do in my session. Extract what my answer already contains and NEVER re-ask it; then ask only what is missing (purpose, movement, voices, format, time) — one true question at a time, in the tone of powerful questions. When we reach format, propose a fan of options with discard conditions, aligned with the non-conference / spontaneous-community event model in your corpus. Finish by drafting the pitch text for me to copy. I decide everything.';
+
+const EVENT_SEED =
+  'Run the event-process interview (Loop A) with me, live: commission, purpose, affected voices and ghost role, what is out of scope, meta-decision. One true question at a time; never re-ask what I already said. Also ask — optional — whether the commissioning organisation has its own organisational system (sociocracy, holacracy, traditional hierarchy, other) and decision process, and take it into account in the design. The event model is the non-conference / spontaneous-community concept in your corpus. Finish with a process charter I can copy. I decide everything.';
+
+function LiveOffer({ onLive }: { onLive: () => void }) {
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-indigo-300 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 p-3 text-sm">
+      <span className={mimirChip}>◆ engine armed</span>
+      <span className="text-stone-600 dark:text-stone-300">
+        Mímir can run this interview live — understanding your answers, skipping what you already
+        said.
+      </span>
+      <button
+        type="button"
+        onClick={onLive}
+        className="ml-auto rounded-lg border border-indigo-400 bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500"
+      >
+        Run it live with Mímir →
+      </button>
     </div>
   );
 }
@@ -397,6 +445,12 @@ const EVENT_QUESTIONS = [
     label: 'Meta-decision',
     q: 'Who decides that something has been decided — and how will you all know?',
     why: 'A6 · The question groups forget until it hurts.',
+  },
+  {
+    key: 'organisation',
+    label: 'Organisation',
+    q: 'Does the commissioning organisation have its own organisational system — sociocracy, holacracy, traditional hierarchy, something else — and how do they take decisions today? ("Unknown" is a valid answer.)',
+    why: 'An event designed against the grain of how they already organise will be fought by the field.',
   },
 ] as const;
 
