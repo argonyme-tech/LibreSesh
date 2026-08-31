@@ -17,6 +17,7 @@ import {
   toContributionDto,
   toEventDto,
   toPersonDto,
+  personRosterFacts,
   toRoomDto,
   toSessionDto,
   toTagDto,
@@ -27,6 +28,8 @@ import {
 import { getPermissions } from '../permissions.js';
 import { limit } from '../ratelimit.js';
 import { getSession } from '../sessionRules.js';
+
+const UNCLAIMED = { role: null, codePending: false } as const;
 
 /** Read endpoints. The whole event fits comfortably in one JSON payload, so the
  *  client fetches a bundle once and patches it from the SSE stream. */
@@ -68,6 +71,7 @@ export function bundleRoutes(ctx: Ctx): Router {
     );
     const names = new NameResolver(ctx.db, eventId);
     const speakers = speakerNames(ctx.db, eventId);
+    const roster = req.role === 'admin' ? personRosterFacts(ctx.db, eventId) : undefined;
 
     // Admins see hidden contributions in the count; everyone else does not.
     const counts = ctx.db
@@ -96,7 +100,16 @@ export function bundleRoutes(ctx: Ctx): Router {
           s.speaker_id === null ? '' : (speakers.get(s.speaker_id) ?? ''),
         ),
       ),
-      people: people.map((p) => toPersonDto(p, req.identity.id)),
+      // Who holds each profile, and whether they have ever used it, is for
+      // organisers: an attendee has no business being handed a list of who
+      // runs the event. `roster` is undefined for everyone else, and the
+      // fields are then absent rather than null — "not disclosed to you", not
+      // "nobody holds this". A person the query missed simply has no identity.
+      people: people.map((p) =>
+        roster === undefined
+          ? toPersonDto(p, req.identity.id)
+          : toPersonDto(p, req.identity.id, roster.get(p.id) ?? UNCLAIMED),
+      ),
       proposals: loadProposalDtos(ctx.db, eventId, req.identity.id),
       starredSessionIds: ctx.db
         .prepare<[number, number], { session_id: number }>(

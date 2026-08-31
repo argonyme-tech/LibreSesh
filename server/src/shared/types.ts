@@ -90,6 +90,19 @@ export interface PersonDto {
   isMine: boolean;
   /** True when some attendee owns it, so only they and organisers may edit. */
   claimed: boolean;
+  /**
+   * Organisers only — absent for everyone else, who have no business knowing
+   * who runs the event. The role held by the identity that claims this
+   * profile, or null when nobody claims it.
+   */
+  role?: Role | null;
+  /**
+   * Organisers only. True when a speaker code minted for this profile has
+   * never been redeemed — the phrase is still sitting in an unread email.
+   * `claimed` cannot tell an organiser that, because minting attaches an
+   * identity at mint time and so claims the profile immediately.
+   */
+  codePending?: boolean;
   updatedAt: string;
 }
 

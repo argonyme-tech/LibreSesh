@@ -252,4 +252,64 @@ describe('speaker profiles', () => {
       await user.patch('/api/e/testconf/me/profile').send({ bio: 'x' }).expect(409);
     });
   });
+
+  /**
+   * The roster an organiser acts on: who holds each profile, at what role, and
+   * whether the phrase they were sent has ever been used. `claimed` alone
+   * cannot answer the last one, because minting a speaker code attaches an
+   * identity at mint time.
+   */
+  describe('the roster an organiser sees', () => {
+    const peopleFor = async (agent: Agent) =>
+      (await agent.get('/api/e/testconf/bundle').expect(200)).body.people as {
+        name: string;
+        claimed: boolean;
+        role?: string | null;
+        codePending?: boolean;
+      }[];
+
+    it('marks a profile nobody holds', async () => {
+      await makeSession(admin, { speakerName: 'Ada Lovelace' }).expect(201);
+      const [ada] = await peopleFor(admin);
+      expect(ada).toMatchObject({ name: 'Ada Lovelace', claimed: false, role: null });
+      expect(ada?.codePending).toBe(false);
+    });
+
+    it('gives the role of whoever holds it', async () => {
+      await user.patch('/api/e/testconf/me/profile').send({ name: 'Grace' });
+      const [grace] = await peopleFor(admin);
+      expect(grace).toMatchObject({ name: 'Grace', claimed: true, role: 'user' });
+      expect(grace?.codePending).toBe(false);
+    });
+
+    it('flags a speaker code that nobody has redeemed yet', async () => {
+      const res = await makeSession(admin, { speakerName: 'Ada Lovelace' }).expect(201);
+      const personId = res.body.speakerId as number;
+      const code = await admin
+        .post(`/api/e/testconf/people/${personId}/speaker-code`)
+        .expect(200);
+
+      // Claimed on paper — an identity exists — but nobody has turned up.
+      const before = await peopleFor(admin);
+      expect(before[0]).toMatchObject({ claimed: true, role: 'speaker', codePending: true });
+
+      const phone = await actorWithRole(harness, 'testconf', 'viewer-pw');
+      await phone.post('/api/me/link').send({ phrase: code.body.phrase }).expect(200);
+      await phone.get('/api/e/testconf/bundle').expect(200);
+
+      const after = await peopleFor(admin);
+      expect(after[0]).toMatchObject({ claimed: true, role: 'speaker', codePending: false });
+    });
+
+    it('tells nobody else who runs the event', async () => {
+      await user.patch('/api/e/testconf/me/profile').send({ name: 'Grace' });
+      for (const agent of [user, viewer]) {
+        const [grace] = await peopleFor(agent);
+        // Absent, not null: "not disclosed to you" rather than "unclaimed".
+        expect(grace).not.toHaveProperty('role');
+        expect(grace).not.toHaveProperty('codePending');
+        expect(grace?.claimed).toBe(true);
+      }
+    });
+  });
 });

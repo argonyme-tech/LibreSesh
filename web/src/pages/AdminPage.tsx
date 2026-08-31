@@ -18,6 +18,7 @@ import {
   FormStack,
   IconButton,
   PrimaryButton,
+  RoleBadge,
   SecondaryButton,
   Section,
   Spinner,
@@ -711,7 +712,7 @@ export function AdminPage() {
         <div role="tabpanel" id="admin-panel-people" aria-labelledby="admin-tab-people">
           <Section
             title="People"
-            description="Speaker and host profiles. Anyone can claim their own from the schedule."
+            description="Speaker and host profiles, with the role each holder has at this event. Anyone can claim their own from the schedule; organisers hand out a speaker code for the rest."
           >
             <ul className="mb-4 space-y-2">
               {bundle.people.map((person) => (
@@ -720,9 +721,25 @@ export function AdminPage() {
                   className="flex flex-wrap items-center gap-2 rounded-lg bg-stone-50 dark:bg-stone-800 px-3 py-2"
                 >
                   <span className="min-w-32 flex-1 text-sm font-medium">{person.name}</span>
-                  {person.claimed && (
-                    <span className="rounded-full bg-stone-200 dark:bg-stone-700 px-2 py-0.5 text-xs text-stone-600 dark:text-stone-300">
-                      claimed
+                  {/* Three things an organiser acts on differently: nobody
+                      has this profile; somebody has it, at some role; or the
+                      code minted for it has never been redeemed — which
+                      `claimed` cannot say, since minting claims the profile
+                      the moment the phrase is printed. */}
+                  {person.role != null && (
+                    <RoleBadge role={person.role} userLabel={event.userRoleLabel} />
+                  )}
+                  {!person.claimed && (
+                    <span className="rounded-full border border-dashed border-stone-300 px-2 py-0.5 text-xs text-stone-500 dark:border-stone-600 dark:text-stone-400">
+                      unclaimed
+                    </span>
+                  )}
+                  {person.codePending === true && (
+                    <span
+                      title="A speaker code was minted for them and has never been redeemed."
+                      className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                    >
+                      code unused
                     </span>
                   )}
                   <Link

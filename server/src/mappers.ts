@@ -1,5 +1,6 @@
 import type {
   ContributionDto,
+  Role,
   EventDto,
   EventSummary,
   PersonDto,
@@ -79,15 +80,56 @@ export function parseLinks(raw: string): PersonLink[] {
   }
 }
 
-export const toPersonDto = (row: PersonRow, viewerIdentityId: number): PersonDto => ({
+/** Extra columns only organisers are shown; see `PersonDto`. */
+export interface PersonRosterFacts {
+  role: Role | null;
+  codePending: boolean;
+}
+
+export const toPersonDto = (
+  row: PersonRow,
+  viewerIdentityId: number,
+  facts?: PersonRosterFacts,
+): PersonDto => ({
   id: row.id,
   name: row.name,
   bio: row.bio,
   links: parseLinks(row.links),
   isMine: row.identity_id !== null && row.identity_id === viewerIdentityId,
   claimed: row.identity_id !== null,
+  ...(facts === undefined ? {} : { role: facts.role, codePending: facts.codePending }),
   updatedAt: row.updated_at,
 });
+
+/**
+ * Who holds each profile, and whether the phrase they were sent has ever been
+ * used.
+ *
+ * `codePending` reads the code itself — a `link_codes` row for this person with
+ * no `used_at`. The tempting signal, `identities.last_seen_at`, does not work:
+ * the identity middleware throttles that write to once a minute, so a speaker
+ * who redeems their code and starts reading straight away still looks as though
+ * they never arrived.
+ *
+ * Re-minting a code for someone who already has a device sets this again, and
+ * that is right — the new phrase is outstanding until it is used.
+ */
+export function personRosterFacts(db: Db, eventId: number): Map<number, PersonRosterFacts> {
+  const rows = db
+    .prepare<[number, number], { id: number; role: Role | null; code_pending: number }>(
+      // `link_codes.person_id` is unique where set, so this joins at most one
+      // code per person.
+      `SELECT p.id AS id,
+              r.role AS role,
+              CASE WHEN lc.id IS NOT NULL AND lc.used_at IS NULL THEN 1 ELSE 0 END AS code_pending
+         FROM people p
+    LEFT JOIN roles r ON r.identity_id = p.identity_id AND r.event_id = ?
+    LEFT JOIN link_codes lc ON lc.person_id = p.id
+        WHERE p.event_id = ? AND p.deleted_at IS NULL`,
+    )
+    .all(eventId, eventId);
+  return new Map(rows.map((r) => [r.id, { role: r.role, codePending: r.code_pending === 1 }]));
+}
 
 export function tagIdsBySession(db: Db, sessionIds: number[]): Map<number, number[]> {
   const out = new Map<number, number[]>();

@@ -170,7 +170,7 @@ Display names are unique within an event, so nobody can take an organiser's.
 | Tab | What it holds |
 | --- | --- |
 | Programme | Rooms, tracks and tags |
-| People | Speaker and host profiles, and the codes that claim them |
+| People | Speaker and host profiles: who holds each, at what role, and whether their code is still unused |
 | Permissions | Which roles may do what at this event |
 | Settings | Name, dates, day bounds, passwords, audit retention, duplicate, archive |
 | Trash | Deleted sessions and contributions, with restore |

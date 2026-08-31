@@ -6,6 +6,16 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **The People roster says who holds each profile.** Manage Event → People
+  showed a name and, at most, the word "claimed". Each row now carries the role
+  its holder has at this event, an **unclaimed** marker when nobody holds it,
+  and **code unused** when a speaker code was minted for it and never redeemed
+  — which "claimed" cannot express, because minting attaches an identity the
+  moment the phrase is printed, so a profile can read as claimed by someone who
+  has never opened the link. Organisers only: the fields are absent from the
+  bundle for everyone else rather than null, so an attendee is not handed a
+  list of who runs the event.
+
 - **The audit log prunes itself, at a size you choose.** New events and every
   existing one start at **1000 entries** (migration 016), settable per event in
   Manage Event → Settings; 0 keeps everything. Past the cap the oldest go as
