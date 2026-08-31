@@ -50,12 +50,78 @@ All notable changes to this project are documented here.
     credential: it carries every identity token in clear and the hashes of
     every device and speaker code.
 
+
+- **Event passwords can be left blank.** Inventing three passwords at the
+  moment of creating an event is a chore that invites bad ones, so a blank
+  field is filled in rather than rejected. A real instance generates a
+  four-word phrase per role and shows it once on creation — it is stored
+  hashed and unreadable afterwards. A demo instance (`DEMO_MODE=1`) uses the
+  published DemoConf values instead, where the gate ignores passwords anyway
+  and predictable ones keep the docs and screenshots honest; it falls back to
+  generating one if a published value would collide with something the
+  creator typed.
+
+
+- **The demo event ships in production.** The DemoConf fixture moved from
+  `scripts/seed.ts` into `server/src/seed.ts`, so it is compiled into the
+  build and exists in the runtime image, where `scripts/` and `tsx` are pruned
+  away. The server creates it at boot when it is missing — only when missing,
+  so a redeploy never wipes what people added to it, and deleting it stays
+  deleted. `SEED_DEMO_EVENT=0` turns it off. `npm run seed` is now a thin
+  wrapper over the same fixture and still replaces the event, as before.
+
+- **A one-file Railway deploy.** `railway.json` points Railway at
+  `deploy/Dockerfile` instead of letting its Node autodetection guess. The guess
+  was fatal: a plain `npm ci` honours the repo's `.npmrc` (`ignore-scripts=true`),
+  which skips `better-sqlite3`'s install step, so the native addon is never
+  fetched or built and the app dies at boot with `Could not locate the bindings
+  file`. The Dockerfile already ran `npm ci --ignore-scripts=false` for exactly
+  this reason. Hosting notes gained a PaaS section covering the `/data` volume
+  the SQLite file needs to survive a redeploy.
+
+- **A speaker role.** Fourth role, between attendee and organiser. Speakers
+  inherit every attendee default in the permission matrix and may rewrite the
+  description of sessions they hold — the words, not the slot: moving or
+  deleting an official session stays with organisers. Granted by speaker
+  codes, never by a shared password.
+
+- **Speaker codes.** From a profile page, organisers mint a four-word phrase
+  bound to that person. Typing it at any event gate signs the device in *as*
+  that person, speaker role included — the "session created on their behalf,
+  speaker arrives later" flow without an email/password account. Works from
+  any number of devices, shown once, stored hashed, revocable.
+
+- **Hardened migrations for running instances.** The server now refuses to
+  boot a database migrated by a newer build, takes a `VACUUM INTO` backup
+  before applying pending migrations to an established database, and can run
+  table-rebuild migrations (how SQLite widens a CHECK) safely, verifying
+  foreign keys before each commit.
+
+- **Link another device.** The menu behind your name mints a three-word phrase
+  (`pine-otter-lantern`); typing it at the gate on another device makes that
+  device *you* — same name, role, stars and sessions — closing the "my phone
+  is a stranger" hole. Phrases are single-use, expire after ten minutes, are
+  stored hashed, and guesses share the password rate-limit budget.
+
+- **Speaker search instead of a dropdown.** The speaker field on sessions and
+  pitches is now a combobox that searches the roster case- and
+  whitespace-insensitively; creating a person is an explicit "Add … as someone
+  new" action, never the silent result of a typo. The server matches the same
+  way (and prefers a claimed profile over an unclaimed twin), so "ada lovelace"
+  no longer spawns a duplicate of "Ada Lovelace".
+
+- **Merge duplicate people.** Organisers can fold one profile into another from
+  the profile page: sessions and pitches are repointed, blanks fill from the
+  duplicate, a claim on the duplicate moves to the survivor, and the duplicate
+  is soft-deleted. Audited; not undoable via /trash, hence admin-only.
+
 ### Changed
 
-- **Manage Event is five tabs instead of one long page.** Rooms, tracks and
-  tags sit under **Programme**; people, permissions, event settings and the bin
-  each get their own tab. Nine stacked panels meant scrolling past four
-  unrelated jobs to reach the fifth. The open tab lives in the URL (`?tab=`),
+- **Manage Event is tabbed instead of one long page.** Rooms, tracks and tags
+  sit under **Programme**; people, permissions, event settings and the bin each
+  get their own tab, and Backup and Audit joined them later in this release —
+  seven in all. Nine stacked panels meant scrolling past four unrelated jobs to
+  reach the fifth. The open tab lives in the URL (`?tab=`),
   so a reload or a link to a co-organiser lands on the same one, and the bin is
   only fetched when its tab is opened. The header's **Proposal pool** link is
   gone — the pitch board is a click away on the schedule, where people actually
@@ -78,6 +144,13 @@ All notable changes to this project are documented here.
   `sm`, which is what actually buys the space; every one carries a real label
   for assistive tech and a tooltip. The events list keeps its own theme
   switcher, having no profile menu to hide it in.
+
+
+- **The event-creation form explains the instance password.** It is the
+  server's password, not an event's, and the page never said so — a new
+  organiser had no way to tell which of the four password fields in front of
+  them was which. The form now names the two kinds and says where to get the
+  instance one; the README gained a section on the same distinction.
 
 ### Fixed
 
@@ -145,7 +218,6 @@ All notable changes to this project are documented here.
   weekends — was missing from deployed demos, and with it every screen only
   that event reaches. `DEMO_MODE=1` now seeds both.
 
-### Fixed
 
 - **A production instance checks its whole deployment at boot, once.**
   `loadConfig` threw on the first missing variable it met, so a fresh deploy
@@ -173,27 +245,6 @@ All notable changes to this project are documented here.
   parent's) and exits with instructions if it is not. `ALLOW_EPHEMERAL_DB=1`
   opts a deliberately disposable instance out; development is unaffected.
 
-### Changed
-
-- **The event-creation form explains the instance password.** It is the
-  server's password, not an event's, and the page never said so — a new
-  organiser had no way to tell which of the four password fields in front of
-  them was which. The form now names the two kinds and says where to get the
-  instance one; the README gained a section on the same distinction.
-
-### Added
-
-- **Event passwords can be left blank.** Inventing three passwords at the
-  moment of creating an event is a chore that invites bad ones, so a blank
-  field is filled in rather than rejected. A real instance generates a
-  four-word phrase per role and shows it once on creation — it is stored
-  hashed and unreadable afterwards. A demo instance (`DEMO_MODE=1`) uses the
-  published DemoConf values instead, where the gate ignores passwords anyway
-  and predictable ones keep the docs and screenshots honest; it falls back to
-  generating one if a published value would collide with something the
-  creator typed.
-
-### Fixed
 
 - **An event's three passwords must now be different from each other.** They
   are the only thing telling the roles apart, and `roleForPassword` checks
@@ -203,61 +254,6 @@ All notable changes to this project are documented here.
   in settings all reject a collision now; the settings check compares against
   the stored hashes too, so a new password cannot quietly land on a role that
   is staying put. Swapping two passwords in a single request still works.
-
-### Added
-
-- **The demo event ships in production.** The DemoConf fixture moved from
-  `scripts/seed.ts` into `server/src/seed.ts`, so it is compiled into the
-  build and exists in the runtime image, where `scripts/` and `tsx` are pruned
-  away. The server creates it at boot when it is missing — only when missing,
-  so a redeploy never wipes what people added to it, and deleting it stays
-  deleted. `SEED_DEMO_EVENT=0` turns it off. `npm run seed` is now a thin
-  wrapper over the same fixture and still replaces the event, as before.
-
-- **A one-file Railway deploy.** `railway.json` points Railway at
-  `deploy/Dockerfile` instead of letting its Node autodetection guess. The guess
-  was fatal: a plain `npm ci` honours the repo's `.npmrc` (`ignore-scripts=true`),
-  which skips `better-sqlite3`'s install step, so the native addon is never
-  fetched or built and the app dies at boot with `Could not locate the bindings
-  file`. The Dockerfile already ran `npm ci --ignore-scripts=false` for exactly
-  this reason. Hosting notes gained a PaaS section covering the `/data` volume
-  the SQLite file needs to survive a redeploy.
-
-- **A speaker role.** Fourth role, between attendee and organiser. Speakers
-  inherit every attendee default in the permission matrix and may rewrite the
-  description of sessions they hold — the words, not the slot: moving or
-  deleting an official session stays with organisers. Granted by speaker
-  codes, never by a shared password.
-
-- **Speaker codes.** From a profile page, organisers mint a four-word phrase
-  bound to that person. Typing it at any event gate signs the device in *as*
-  that person, speaker role included — the "session created on their behalf,
-  speaker arrives later" flow without an email/password account. Works from
-  any number of devices, shown once, stored hashed, revocable.
-
-- **Hardened migrations for running instances.** The server now refuses to
-  boot a database migrated by a newer build, takes a `VACUUM INTO` backup
-  before applying pending migrations to an established database, and can run
-  table-rebuild migrations (how SQLite widens a CHECK) safely, verifying
-  foreign keys before each commit.
-
-- **Link another device.** The menu behind your name mints a three-word phrase
-  (`pine-otter-lantern`); typing it at the gate on another device makes that
-  device *you* — same name, role, stars and sessions — closing the "my phone
-  is a stranger" hole. Phrases are single-use, expire after ten minutes, are
-  stored hashed, and guesses share the password rate-limit budget.
-
-- **Speaker search instead of a dropdown.** The speaker field on sessions and
-  pitches is now a combobox that searches the roster case- and
-  whitespace-insensitively; creating a person is an explicit "Add … as someone
-  new" action, never the silent result of a typo. The server matches the same
-  way (and prefers a claimed profile over an unclaimed twin), so "ada lovelace"
-  no longer spawns a duplicate of "Ada Lovelace".
-
-- **Merge duplicate people.** Organisers can fold one profile into another from
-  the profile page: sessions and pitches are repointed, blanks fill from the
-  duplicate, a claim on the duplicate moves to the survivor, and the duplicate
-  is soft-deleted. Audited; not undoable via /trash, hence admin-only.
 
 ## [0.2.0] — 2026-08-30
 

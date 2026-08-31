@@ -278,6 +278,26 @@ key. The alternative is to make merging an **adoption** the way device linking
 is, and adoption cannot be done *to* someone: it swaps a cookie, and only the
 holder of that browser can do it.
 
+### The audit log, and what "append-only" means here
+
+Every write appends a row: identity, event, action, entity, entity id, time.
+Nothing in the app updates or deletes one — there is no edit path, for
+organisers either — and `GET /e/:slug/audit` reads it back into Manage Event →
+Audit, keyset-paged because the log only ever grows at the head.
+
+It is bounded, though, and the distinction matters. `events.audit_keep`
+(migration 016, default 1000, 0 for unlimited) caps how many rows an event
+keeps; past that the oldest are dropped, checked once every hundred writes
+rather than on each one. So the log is append-only in the sense that nobody can
+rewrite history, and *not* in the sense that history is kept forever: an
+organiser who sets a low cap and then makes a great many edits can push an
+earlier action off the end. The alternative was unbounded growth on an instance
+meant to run for years, and the trade is stated in the UI rather than buried.
+
+Rows with no `event_id` — a whole-database backup, an event created from the
+landing page — belong to the instance rather than any event. They are never
+pruned by an event's cap, and no screen shows them yet.
+
 ### Migrations
 
 Numbered `.sql` files in `server/migrations/`, applied at boot, each in its
@@ -347,7 +367,7 @@ explicitly *not* built to withstand a targeted attacker with time.
 | --- | --- |
 | Guessing an event password | bcrypt (cost 10); 5 attempts per 15 min per identity **and** per IP, `Retry-After` on the 6th |
 | Guessing a link phrase | Same 5-per-15-min budget as passwords; stored hashed. Device phrases are single-use and die in 10 minutes; speaker codes are four words (~37 bits) and revocable |
-| Casual vandalism of the programme | Soft deletes + restore; append-only `audit` log with identity id, readable by admins at Manage Event → Audit; `hidden` flag for contributions |
+| Casual vandalism of the programme | Soft deletes + restore; `audit` log with identity id, readable by admins at Manage Event → Audit; `hidden` flag for contributions |
 | Spam / flooding | Token buckets per identity and per IP on every write class; server-enforced max lengths |
 | XSS via session or profile text | HTML escaped before markdown parsing; URL scheme allowlist; no `dangerouslySetInnerHTML` on unescaped input |
 | Open redirect | Every client navigation is prefixed with a literal `/e/` |

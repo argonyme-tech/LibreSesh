@@ -39,7 +39,7 @@ server/            Express app, DB layer, SSE, auth, rate limiting
   migrations/      numbered .sql files, applied at boot
   src/shared/      types + timezone helpers, imported by the web app too
 web/               Vite React app
-scripts/           seed.ts, create-event.ts
+scripts/           seed.ts, create-event.ts, decrypt-backup.ts
 assets/            brand source SVGs (the app builds from copies under web/)
 tests/             Vitest suites
 deploy/            Dockerfile, compose, Caddyfile, systemd unit, backup script
@@ -162,6 +162,30 @@ administered at all:
 
 Viewing an event requires the viewer password — schedules are never public.
 Display names are unique within an event, so nobody can take an organiser's.
+
+## Managing an event
+
+**Manage Event** — the link beside your name, organisers only — is seven tabs:
+
+| Tab | What it holds |
+| --- | --- |
+| Programme | Rooms, tracks and tags |
+| People | Speaker and host profiles, and the codes that claim them |
+| Permissions | Which roles may do what at this event |
+| Settings | Name, dates, day bounds, passwords, audit retention, duplicate, archive |
+| Trash | Deleted sessions and contributions, with restore |
+| Backup | The event as JSON, and the encrypted whole-instance download |
+| Audit | Who created, edited, deleted or restored what |
+
+The open tab lives in the URL as `?tab=`, so a link lands a co-organiser on the
+same one.
+
+The **audit log** records every write, plus failed password and device-phrase
+attempts, and nobody can edit it — organisers included. It keeps the newest
+1000 entries per event by default; past that the oldest are dropped as new ones
+arrive. Settings changes the number, and 0 keeps everything. That is a real
+trade rather than a detail: a low cap means someone making a great many edits
+can push an earlier action off the end.
 
 ## Configuration
 

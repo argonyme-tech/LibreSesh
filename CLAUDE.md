@@ -17,7 +17,9 @@ Testing policy: tests-with-features
 
 ## Architecture
 
-<!-- Add project structure and key patterns here as they take shape. -->
+See `ARCHITECTURE.md`. Read **§What a cookie is, exactly** before touching
+anything to do with identity, sign-in or `COOKIE_SECRET` — it is the concept
+the rest hangs off, and the one most easily got wrong.
 
 ## Current Status
 

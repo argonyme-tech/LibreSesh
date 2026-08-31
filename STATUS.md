@@ -18,8 +18,10 @@ CHANGELOG.md under `[0.2.0]`, and what has landed since is under
   Tour (1) and Gate (1, the "already here on another device" link added with
   device linking). The count excludes the `[&_a]:underline` in prose wrappers —
   links inside rendered markdown keep their underline deliberately — and the
-  five in `ui.tsx`, which are the primitives themselves. Re-counted 2026-08-31:
-  unchanged, since the new Backup tab uses `no-underline` on its download link.
+  five in `ui.tsx`, which are the primitives themselves. Re-counted 2026-08-31
+  after the Backup and Audit tabs and the gate's name-collision link: still 21,
+  because all three use the primitives (`secondaryButtonClass`, `linkClass`)
+  rather than a bare `underline`.
 - **ARCHITECTURE.md concurrency paragraph.** §Realtime documents broadcast and
   heartbeats but never states the model: last-write-wins, `assertNotStale`
   409 on an `updated_at` mismatch, no CRDT by design.
@@ -81,6 +83,15 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   decision about what to do with authorship names that belong to identities the
   target instance has never seen.
 
+- **Compact button overrides do nothing.** `SecondaryButton className="py-1"`
+  and the `py-1.5` variants in DetailSheet, ProfilePage, ProposalBoard and
+  AdminPermissions are dead: Tailwind emits `.py-1` and `.py-1.5` *before* the
+  primitives' `.py-2.5`, so the base always wins and those buttons are full
+  height. Verified in the built CSS on 2026-08-31. Predates the button-height
+  fix — that change kept the situation identical rather than creating it. Wants
+  either a real `size` prop on the button primitives or `tailwind-merge`; a
+  call site cannot win this with a class name.
+
 - **Number fields accept nonsense.** Room capacity is `type="number" min={0}`,
   which the browser enforces on the spinner but not on typing or paste; the
   client strips a minus sign and `parseCapacity` floors it, and the server
@@ -119,9 +130,24 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   clone route so the two creation paths stop disagreeing.
 
 - **Manual browser pass — now with a specific backlog.** Automated coverage is
-  server-side, so four UI changes shipped on 2026-08-30 on a read-through
-  alone (no browser in this dev container, no component tests). Each wants a
-  real look, ideally on a phone:
+  server-side, so everything below shipped on a read-through alone (no browser
+  in this dev container, no component tests). Each wants a real look, ideally
+  on a phone. From 2026-08-31:
+  - **Manage Event is seven tabs now** (Programme / People / Permissions /
+    Settings / Trash / Backup / Audit) with the choice in `?tab=`. Check the
+    tab strip wraps sanely on a narrow screen, and that arrow-key navigation
+    moves focus as a `tablist` should;
+  - the **Audit** list: long names and long titles on one line, the filter box,
+    "Load older entries" at the page boundary;
+  - the **Backup** tab: the passphrase mismatch warning, and that the encrypted
+    download actually saves with its `.lsbk` name from a real browser rather
+    than supertest;
+  - the gate's **"Enter as Ada 2"** link, which is only reachable by taking a
+    name that is already held;
+  - buttons are 38px tall now, matching the inputs beside them — worth one
+    sweep for anything that looked balanced at 32px.
+
+  From 2026-08-30:
   - the `Modal` rewrite — overlay scrolls, `dvh` cap — against the tallest
     modal there is, and the one it was reported on ("Link another device");
   - the schedule header on a narrow screen: theme now lives in the profile
