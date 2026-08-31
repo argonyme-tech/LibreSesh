@@ -22,6 +22,7 @@ const ACTIONS: Record<string, string> = {
   merge: 'merged',
   clone: 'duplicated',
   export: 'exported',
+  import: 'imported',
   backup: 'backed up',
   auth_demo: 'entered (demo)',
   auth_failed: 'failed a password attempt on',

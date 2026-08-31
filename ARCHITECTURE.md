@@ -359,6 +359,42 @@ Rows with no `event_id` — a whole-database backup, an event created from the
 landing page — belong to the instance rather than any event. They are never
 pruned by an event's cap, and no screen shows them yet.
 
+### Importing a schedule, and why it is not the export read backwards
+
+`POST /api/events/import` (`server/src/importEvent.ts`) creates an event with
+its rooms, tracks, tags and sessions from one JSON document. The obvious design
+would have been to accept what `GET /e/:slug/export.json` produces, and it is
+the wrong one. An export is a record of a database: numeric ids, UTC instants,
+authorship names belonging to identities the reader has never seen. An import
+is a description of a schedule, and the thing being described is almost never
+another LibreSesh instance — it is a printed programme, a conference website, a
+photograph of a wall. So the document has room names where the export has room
+ids, and the wall-clock times that are printed on the schedule where the export
+has instants; the event's own timezone is what turns one into the other.
+
+Three consequences worth knowing:
+
+- **Names are the only handle, so they are checked hard.** Rooms, tracks and
+  tags are declared once each and referred to by name (matched case- and
+  whitespace-insensitively, because transcription is not consistent). A session
+  naming an undeclared room is refused rather than quietly creating it: an
+  invented column is far harder to notice in a grid than an error naming the
+  row, and a document that is run twice should fail the same way both times.
+- **One transaction.** A document that fails on its last session leaves no
+  half-built event, which is what makes "fix the file and run it again" a
+  complete recovery story. `dryRun` uses the same path and rolls back at the
+  end, so a rehearsal exercises every check a real import would.
+- **Errors and warnings are different things.** A session outside the event's
+  own declared dates is a contradiction inside one document and is refused. A
+  session outside the *day viewport* is not — it is in the database and off the
+  top of the grid, which reads as a failed import, so it comes back as a
+  warning naming the row and pointing at Settings. Double bookings warn too:
+  admins are allowed them, and the grid badges them.
+
+Nothing reads an export back. Doing so would need decisions this route does not
+have to make — a new slug, fresh ids, and what to do with authorship that names
+identities the target instance has never met.
+
 ### Migrations
 
 Numbered `.sql` files in `server/migrations/`, applied at boot, each in its own

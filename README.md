@@ -193,6 +193,75 @@ arrive. Settings changes the number, and 0 keeps everything. That is a real
 trade rather than a detail: a low cap means someone making a great many edits
 can push an earlier action off the end.
 
+### Importing a schedule from JSON
+
+`POST /api/events/import` builds a whole event — rooms, tracks, tags and a full
+grid of sessions — from one JSON document. It is guarded by the instance
+password, like creating an event by hand, because it makes an event rather than
+editing one.
+
+```bash
+# Rehearse first: this validates everything and writes nothing.
+curl -X POST 'https://your-host/api/events/import?dryRun=1' \
+  -H "X-Instance-Key: $INSTANCE_ADMIN_PASSWORD" \
+  -H 'Content-Type: application/json' --data @schedule.json
+
+# Then drop the ?dryRun=1 to keep it.
+```
+
+The document is written the way a schedule is printed — room names and
+wall-clock times, no ids — so it can be typed by hand or transcribed from a
+photo of a programme:
+
+```json
+{
+  "event": {
+    "name": "Photo Conf",
+    "slug": "photoconf",
+    "timezone": "Europe/Berlin",
+    "startDate": "2026-06-01",
+    "endDate": "2026-06-02"
+  },
+  "rooms": [{ "name": "Main hall", "capacity": 200 }, { "name": "Side room" }],
+  "tracks": [{ "name": "Design" }],
+  "tags": [{ "name": "beginner" }],
+  "sessions": [
+    {
+      "room": "Main hall",
+      "track": "Design",
+      "tags": ["beginner"],
+      "title": "Opening keynote",
+      "speaker": "Ada Lovelace",
+      "date": "2026-06-01",
+      "start": "09:00",
+      "end": "10:00"
+    }
+  ]
+}
+```
+
+- **Rooms, tracks and tags are declared once and referred to by name.** A
+  session naming one that is not declared is refused rather than invented — a
+  typo growing a fourth column is much harder to spot in a grid than an error.
+  Room order is column order.
+- **Times are local to the event's timezone.** `date`/`start`/`end` as printed;
+  `24:00` is a valid end. A document a program wrote may use `startsAt`/`endsAt`
+  ISO instants instead, but not both forms in one session.
+- **Passwords are optional.** Leave them out and a phrase is generated per role
+  and returned once in the response, exactly as when an event is created in the
+  UI. The importer is *not* made an admin by password — whoever holds the admin
+  phrase is.
+- **All or nothing.** Everything lands in one transaction, so a document that
+  fails on its last row leaves nothing behind. Fix the file and run it again.
+- **Errors versus warnings.** Contradictions are refused with the row that
+  caused them (`sessions[3] "Opening keynote": …`). Things that are merely
+  suspicious — a session outside the hours the schedule shows, two sessions
+  double-booked in one room — come back in `warnings` and are still imported.
+
+An event's own `export.json` is *not* an import document: it is a record of
+ids, and this is a description of a schedule. There is still no route that
+reads an export back.
+
 ## Configuration
 
 | Variable                  | Default          | Notes                                              |
