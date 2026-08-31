@@ -6,6 +6,25 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **A track can keep hours.** "Workshops run in the mornings" was a rule that
+  lived in the organiser's head and was enforced by watching the grid; a track
+  now says it once — a window of the local clock — and the schedule holds
+  attendees and speakers to it. A session that starts before the track opens or
+  runs past its close is refused, naming the window. Days that differ are said
+  as days: a date with its own hours *replaces* the usual ones rather than
+  trimming them, so "except the Saturday, when they have the afternoon" is one
+  row and not a special case. Organisers are exempt, because the grid is their
+  instrument and someone has to be able to place the exception. Setting or
+  narrowing a window moves nothing that is already scheduled and badges nothing
+  — it is a rule about what may be booked next — and a session that predates
+  the window stays editable by whoever owns it. The hours show under the track's
+  column on the schedule and in the session form's track picker for the day
+  being placed, with an ⓘ beside the track's name for what the times cannot say
+  themselves — that they are a rule, who it binds, and which other days differ;
+  they travel
+  through export and import (`"start": "09:00", "end": "13:00"`, plus
+  `windows`). Every existing track keeps no hours and behaves exactly as before.
+
 - **Importing a schedule no longer needs a terminal.** `POST /api/events/import`
   has been able to build a whole event from one JSON document for a while, but
   only through curl, which serves the person running the server and not the
@@ -348,6 +367,19 @@ All notable changes to this project are documented here.
   is soft-deleted. Audited; not undoable via /trash, hence admin-only.
 
 ### Changed
+
+- **A room card says what the room is, not what the database lacks.** Every
+  room without a capacity announced "no capacity set" under its name on the
+  schedule — a note about an empty column, told to attendees, on most rooms of
+  most events, since capacity is optional by design. The card now shows what
+  the room actually has: the seat count when there is one, and the booking
+  permission when it has one. The organiser's directions — which floor, which
+  door, what to bring, editable in the room editor and visible nowhere else on
+  the schedule until now — sit behind a small ⓘ beside the room's name, which
+  appears **only** when there are directions to read. The panel holds what the
+  card cannot, and nothing the card already says: a hover that repeats the line
+  above it is noise twice. A room with nothing set shows its name alone and
+  offers no button.
 
 - **The last hand-rolled modals moved onto the primitive.** Six callers still
   built their own intro paragraph and button row rather than passing

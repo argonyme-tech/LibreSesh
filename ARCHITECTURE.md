@@ -145,6 +145,45 @@ exactly where it is and reverts to being an ordinary session, rather than being
 guessed into a break: the flag's rows are instants, and turning one back into
 "12:00 every day" needs a timezone SQLite does not have.
 
+### Track hours
+
+A track can state the hours it accepts sessions in — "workshops run in the
+mornings" — and migration 005 gives it two columns (`tracks.start_min`,
+`tracks.end_min`) plus a `track_windows` table for days that differ. Both
+columns null is the default and means the track takes a session at any hour,
+which is what every track did before the feature existed.
+
+- **Local minutes of day, like breaks and unlike sessions.** "Mornings" is a
+  wall-clock claim; storing instants would break it at a clock change. The pair
+  is written together and never half-set — the schema refuses one end without
+  the other, because a rule with one bound is a rule the enforcement cannot
+  read.
+- **A day in `track_windows` replaces the window, it does not narrow it.**
+  "Workshops run 09:00–13:00, except the Saturday, when they have the
+  afternoon" is one row. An override that could only ever cut a day shorter
+  could not say that sentence, and a unique index on `(track_id, date)` keeps a
+  date from saying two things.
+- **It binds `user` and `speaker`; admins pass.** This is one notch stricter
+  than the blocking-session rule, which lets speakers through. Running against
+  a plenary is a judgement call about the programme; a track's hours are what
+  the strand *is*, so a talk outside them is on the wrong strand rather than an
+  awkward one. Organisers keep the grid as their instrument and place the
+  exceptions.
+- **Setting the hours moves nothing.** Narrowing a window leaves every session
+  already on the track exactly where it is, unbadged: the window is a rule
+  about what may be booked next, not an instruction to reshuffle a programme
+  that already exists. The PATCH route re-checks only a placement that actually
+  changes — retimed, or moved onto a different track — so the owner of a
+  session that predates the window can still fix a typo in it.
+- **A deleted track drops its overrides**, and a revived one states its hours
+  afresh. They are read only through their track, so an orphan row would be
+  invisible and would surprise whoever revived the name.
+
+The resolution itself — which window applies on which day — lives in
+`server/src/shared/trackHours.ts` so the client draws the hours from the same
+function the server refuses by. A grid that disagreed with the rule about which
+day is which would be worse than showing nothing.
+
 ### One database, many events
 
 Every event lives in the same SQLite file, scoped by `event_id`. The obvious

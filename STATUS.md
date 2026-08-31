@@ -295,6 +295,35 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   whole suite stayed green — is what the gap costs. A React error boundary
   would have contained it; there is still none.
 
+## Medium Priority
+
+- **Strip the `Claude-Session:` links out of the git history.** Every commit
+  Claude Code made carries a `Claude-Session: https://claude.ai/code/session_…`
+  trailer, added by the harness unless told otherwise. Audited 2026-08-31:
+  **158 commits across all refs** — 140 of 169 on `main`, 141 of 170 on `dev` —
+  spanning 2026-08-28 (`7692079`) to today, naming four distinct sessions. The
+  string is in commit messages only: it appears in no tracked file and `git log
+  -S` finds it in no historical blob, so there is nothing to clean in the tree.
+
+  Not urgent, and not a leak: fetching one of the URLs anonymously returns
+  **403**, so the transcripts are not readable by anyone who is not signed in
+  with access. What the links do expose is that the work was AI-assisted, the
+  session ids and their timing — permanently, in a public repo. That is the
+  reason to do it eventually, and the reason it gets more expensive with every
+  clone and fork.
+
+  Doing it means `git filter-branch --msg-filter` (no `git-filter-repo` here and
+  no `pip3` to install it) over ~170 commits, then a force-push of `main`, `dev`
+  **and both tags** (`v0.1.0`, `v0.2.0`). Before starting, decide two things:
+  whether the `Co-Authored-By: Claude …` trailers go too (158 of those, 115 Opus
+  5 / 44 Fable 5 — worth keeping, they are honest attribution), and how to
+  coordinate with the `upstream` remote (`Valley-of-the-Commons/LibreSesh`) and
+  anyone holding a clone, since every merged PR's SHAs become orphans. Work on
+  a backup ref and show a before/after diff of a few commits before any push.
+
+  New commits are already clean: `.claude/CLAUDE.md` §Git Conventions now
+  forbids the trailer.
+
 ## Low Priority / Ideas
 
 - **A real series, and a root event other events inherit from.** Deferred

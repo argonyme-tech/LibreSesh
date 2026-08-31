@@ -156,13 +156,76 @@ export const authSchema = z.object({
   displayName: displayNameSchema.optional(),
 });
 
-export const trackSchema = z.object({
-  name: trimmed(60),
-  color: colorSchema.optional(),
+/** One day keeping different hours from its track's. */
+const trackWindowSchema = z.object({
+  date: dateSchema,
+  startMin: minuteOfDaySchema,
+  endMin: minuteOfDaySchema,
 });
+
+/**
+ * The hours half of a track, shared by POST and PATCH. `startMin`/`endMin` go
+ * together or not at all — a half-set window has no meaning, and storing one
+ * would leave the rule reading a null it cannot act on. Sending null for both
+ * is how an organiser takes the limit off again.
+ */
+const trackHoursShape = {
+  startMin: minuteOfDaySchema.nullable().optional(),
+  endMin: minuteOfDaySchema.nullable().optional(),
+  /** The whole list, every time: what is sent replaces what is stored. */
+  windows: z.array(trackWindowSchema).max(60).optional(),
+};
+
+const checkTrackHours = (
+  v: { startMin?: number | null; endMin?: number | null; windows?: z.infer<typeof trackWindowSchema>[] },
+  ctx: z.RefinementCtx,
+): void => {
+  const half =
+    (v.startMin === null || v.startMin === undefined) !==
+    (v.endMin === null || v.endMin === undefined);
+  if (half) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['endMin'],
+      message: 'Give both ends of the window, or neither',
+    });
+  }
+  const spans: [string, number, number][] = [];
+  if (typeof v.startMin === 'number' && typeof v.endMin === 'number') {
+    spans.push(['endMin', v.startMin, v.endMin]);
+  }
+  for (const [i, w] of (v.windows ?? []).entries()) {
+    spans.push([`windows.${i}.endMin`, w.startMin, w.endMin]);
+  }
+  for (const [path, startMin, endMin] of spans) {
+    if (startMin % 5 !== 0 || endMin % 5 !== 0) {
+      ctx.addIssue({ code: 'custom', path: [path], message: 'Times land on a 5-minute step' });
+    }
+    if (endMin <= startMin) {
+      ctx.addIssue({ code: 'custom', path: [path], message: 'A window must end after it starts' });
+    }
+  }
+  const dates = (v.windows ?? []).map((w) => w.date);
+  if (new Set(dates).size !== dates.length) {
+    ctx.addIssue({ code: 'custom', path: ['windows'], message: 'One window per day' });
+  }
+};
+
+export const trackSchema = z
+  .object({
+    name: trimmed(60),
+    color: colorSchema.optional(),
+    ...trackHoursShape,
+  })
+  .superRefine(checkTrackHours);
 export const trackPatchSchema = z
-  .object({ name: trimmed(60).optional(), color: colorSchema.optional() })
-  .refine((v) => Object.keys(v).length > 0, { message: 'Nothing to update' });
+  .object({
+    name: trimmed(60).optional(),
+    color: colorSchema.optional(),
+    ...trackHoursShape,
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: 'Nothing to update' })
+  .superRefine(checkTrackHours);
 export const trackOrderSchema = z.object({
   ids: z.array(z.number().int().positive()).min(1).max(60),
 });

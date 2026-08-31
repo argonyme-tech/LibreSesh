@@ -135,7 +135,21 @@ export interface TrackRow {
   name: string;
   color: string;
   sort_order: number;
+  /** Local minutes-of-day the track accepts sessions between. Both null = any
+   *  hour; the pair is written together and never half-set. */
+  start_min: number | null;
+  end_min: number | null;
   deleted_at: string | null;
+}
+
+/** One day of the event where a track keeps different hours from its own. */
+export interface TrackWindowRow {
+  id: number;
+  track_id: number;
+  date: string;
+  start_min: number;
+  end_min: number;
+  created_at: string;
 }
 
 export interface ContributionRow {

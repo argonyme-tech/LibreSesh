@@ -29,6 +29,7 @@ import {
 } from '../mappers.js';
 import { getPermissions } from '../permissions.js';
 import { limit } from '../ratelimit.js';
+import { trackWindowsFor } from '../trackHours.js';
 import { getSession } from '../sessionRules.js';
 
 const UNCLAIMED = { role: null, holderUid: null, codePending: false } as const;
@@ -63,6 +64,10 @@ export function bundleRoutes(ctx: Ctx): Router {
         'SELECT * FROM breaks WHERE event_id = ? ORDER BY start_min, date IS NOT NULL, id',
       )
       .all(eventId);
+    const trackWindowRows = trackWindowsFor(
+      ctx.db,
+      tracks.map((t) => t.id),
+    );
     const sessions = ctx.db
       .prepare<[number], SessionRow>(
         'SELECT * FROM sessions WHERE event_id = ? AND deleted_at IS NULL ORDER BY starts_at',
@@ -101,7 +106,7 @@ export function bundleRoutes(ctx: Ctx): Router {
         eventDisplayName(ctx.db, eventId, req.identity.id) ?? req.identity.display_name,
       rooms: rooms.map(toRoomDto),
       tags: tags.map(toTagDto),
-      tracks: tracks.map(toTrackDto),
+      tracks: tracks.map((t) => toTrackDto(t, trackWindowRows.get(t.id) ?? [])),
       breaks: breaks.map(toBreakDto),
       sessions: sessions.map((s) =>
         toSessionDto(

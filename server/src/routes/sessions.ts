@@ -18,6 +18,7 @@ import {
   assertTrackBelongs,
   assertValidTimes,
   assertWithinEventWindow,
+  assertWithinTrackHours,
   getRoom,
   getSession,
 } from '../sessionRules.js';
@@ -65,6 +66,7 @@ export function sessionRoutes(ctx: Ctx): Router {
     assertTagsBelong(ctx.db, req.event.id, tagIds);
     const trackId = body.trackId ?? null;
     assertTrackBelongs(ctx.db, req.event.id, trackId);
+    assertWithinTrackHours(ctx.db, req.event, req.role, trackId, window);
 
     const now = new Date().toISOString();
     const id = ctx.db.transaction((): number => {
@@ -287,6 +289,17 @@ export function sessionRoutes(ctx: Ctx): Router {
     // `undefined` leaves the track alone; an explicit `null` clears it.
     const nextTrackId = body.trackId === undefined ? existing.track_id : body.trackId;
     assertTrackBelongs(ctx.db, req.event.id, nextTrackId);
+    // Only a placement that actually changes is held to the track's hours.
+    // Narrowing a window leaves the sessions already inside it alone, so the
+    // one thing that must keep working is editing them: a title fixed on a
+    // session that predates the window is not a booking being made.
+    const replaced =
+      nextTrackId !== existing.track_id ||
+      window.startsAt.toISOString() !== existing.starts_at ||
+      window.endsAt.toISOString() !== existing.ends_at;
+    if (replaced) {
+      assertWithinTrackHours(ctx.db, req.event, req.role, nextTrackId, window);
+    }
 
     const now = new Date().toISOString();
     ctx.db.transaction(() => {

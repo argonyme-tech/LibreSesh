@@ -8,6 +8,7 @@ import {
 } from 'react';
 import type { BreakDto, SessionDto, TagDto } from '@shared/types';
 import { fmtMin, place } from '../lib/format';
+import { InfoIcon } from './icons';
 
 export const PX_PER_MIN = 1.6;
 export const COL_W = 176;
@@ -199,6 +200,87 @@ export interface CalendarColumn {
   color: string;
   /** Second line on the column card: seats, booking permission, session count. */
   detail?: ReactNode;
+  /** What the card has no room for — where the room is, what its hours mean.
+   *  Present only when there is something the card does not already say; the
+   *  info button appears with it and is absent without it. */
+  info?: ReactNode;
+}
+
+/**
+ * A column's header card, and the panel behind its info button.
+ *
+ * The card is 176px wide, so what it shows has to be the short version: a name
+ * and a line that truncates. Anything longer — how to find the room, what a
+ * track's hours mean — sits behind the ⓘ, and *only* what the card does not
+ * already say goes there. A panel that repeats the line above it is noise
+ * twice. The button appears only when a column has something more to give, so
+ * its presence is itself the signal that there is more.
+ *
+ * Hover and focus open it for mouse and keyboard; a click opens it on touch,
+ * where there is no hover at all.
+ */
+function ColumnCard({ column, alignEnd }: { column: CalendarColumn; alignEnd: boolean }) {
+  const [open, setOpen] = useState(false);
+  const hasInfo = column.info != null;
+  const panelId = `column-info-${column.id}`;
+
+  return (
+    <div className="shrink-0 px-1" style={{ width: COL_W }}>
+      {/* The panel hangs off *this* box, not the flex item around it: column
+          cards are different heights, the flex item stretches to the tallest,
+          and anchoring to that dropped the panel a card's height below the one
+          it belongs to. */}
+      <div
+        className="relative rounded-lg border border-stone-200/80 px-3 py-2 dark:border-stone-700"
+        // The palette is already washed out; 'cc'/'22' keep it that way
+        // in light and dark without maintaining two palettes.
+        style={{ background: `${column.color}cc`, borderColor: column.color }}
+        // Closing on the button's own mouseleave put the panel out of reach:
+        // moving the pointer towards it left the icon and dismissed it. The
+        // card is what the pointer has to leave, and the panel is inside it.
+        onMouseLeave={() => setOpen(false)}
+      >
+        <div className="flex items-center gap-1">
+          <div className="min-w-0 flex-1 truncate text-xs font-semibold text-stone-900">
+            {column.name}
+          </div>
+          {hasInfo && (
+            <button
+              type="button"
+              aria-label={`About ${column.name}`}
+              aria-expanded={open}
+              aria-describedby={open ? panelId : undefined}
+              className="-m-1 shrink-0 rounded-full p-1 text-stone-600 hover:text-stone-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-stone-500"
+              onMouseEnter={() => setOpen(true)}
+              onFocus={() => setOpen(true)}
+              onBlur={() => setOpen(false)}
+              onClick={() => setOpen((v) => !v)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setOpen(false);
+              }}
+            >
+              <InfoIcon className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        {column.detail}
+        {hasInfo && open && (
+          <div
+            id={panelId}
+            role="tooltip"
+            // Flush to the card's own edge, one step below it. Anchored to the
+            // last column, a left-aligned panel would hang off the end of the
+            // grid and be clipped by the scroller.
+            className={`absolute top-full z-30 mt-1 w-60 rounded-lg border border-stone-200 bg-white p-3 text-xs leading-relaxed text-stone-600 shadow-lg dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300 ${
+              alignEnd ? 'right-0' : 'left-0'
+            }`}
+          >
+            {column.info}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export interface CalendarProps {
@@ -488,18 +570,12 @@ export function Calendar({
               </span>
             </div>
           </div>
-          {columns.map((column) => (
-            <div key={column.id} className="shrink-0 px-1" style={{ width: COL_W }}>
-              <div
-                className="rounded-lg border border-stone-200/80 px-3 py-2 dark:border-stone-700"
-                // The palette is already washed out; 'cc'/'22' keep it that way
-                // in light and dark without maintaining two palettes.
-                style={{ background: `${column.color}cc`, borderColor: column.color }}
-              >
-                <div className="truncate text-xs font-semibold text-stone-900">{column.name}</div>
-                {column.detail}
-              </div>
-            </div>
+          {columns.map((column, i) => (
+            <ColumnCard
+              key={column.id}
+              column={column}
+              alignEnd={i > 0 && i === columns.length - 1}
+            />
           ))}
         </div>
 

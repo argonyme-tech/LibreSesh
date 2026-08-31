@@ -7,6 +7,7 @@ import { badRequest, conflict, notFound } from '../errors.js';
 import { toTrackDto } from '../mappers.js';
 import { limit } from '../ratelimit.js';
 import { nextRoomColor } from '../shared/roomColors.js';
+import { replaceTrackWindows, trackWindows, trackWindowsFor } from '../trackHours.js';
 import { parse, trackOrderSchema, trackPatchSchema, trackSchema } from '../validation.js';
 
 /**
@@ -28,6 +29,11 @@ export function trackRoutes(ctx: Ctx): Router {
     return row;
   };
 
+  /** A track always travels with its overrides — the client draws the hours
+   *  from the DTO, so a reply without them would read as "limit lifted". */
+  const dtoOf = (eventId: number, id: number) =>
+    toTrackDto(load(eventId, id), trackWindows(ctx.db, id));
+
   /** Names are unique per event, and the index counts soft-deleted rows too —
    *  so revive rather than clash, exactly as tags do. */
   const nameClash = (eventId: number, name: string, excludeId?: number): TrackRow | undefined =>
@@ -47,23 +53,35 @@ export function trackRoutes(ctx: Ctx): Router {
     const color = body.color ?? nextRoomColor(live.map((t) => t.color));
     const clash = nameClash(req.event.id, body.name);
 
+    // A window is a pair or nothing; the schema has already refused a half.
+    const startMin = body.startMin ?? null;
+    const endMin = body.endMin ?? null;
+
     let id: number;
     if (clash && clash.deleted_at !== null) {
       ctx.db
-        .prepare('UPDATE tracks SET color = ?, deleted_at = NULL, sort_order = ? WHERE id = ?')
-        .run(body.color ?? clash.color, live.length, clash.id);
+        .prepare(
+          `UPDATE tracks SET color = ?, deleted_at = NULL, sort_order = ?, start_min = ?, end_min = ?
+            WHERE id = ?`,
+        )
+        .run(body.color ?? clash.color, live.length, startMin, endMin, clash.id);
       id = clash.id;
     } else if (clash) {
       throw conflict('A track with that name already exists', 'track_exists');
     } else {
       id = Number(
         ctx.db
-          .prepare('INSERT INTO tracks (event_id, name, color, sort_order) VALUES (?, ?, ?, ?)')
-          .run(req.event.id, body.name, color, live.length).lastInsertRowid,
+          .prepare(
+            `INSERT INTO tracks (event_id, name, color, sort_order, start_min, end_min)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+          )
+          .run(req.event.id, body.name, color, live.length, startMin, endMin).lastInsertRowid,
       );
     }
+    // A revived track keeps nothing of the hours it kept before it was deleted.
+    replaceTrackWindows(ctx.db, id, body.windows ?? []);
 
-    const dto = toTrackDto(load(req.event.id, id));
+    const dto = dtoOf(req.event.id, id);
     audit(ctx.db, {
       identityId: req.identity.id,
       eventId: req.event.id,
@@ -81,11 +99,19 @@ export function trackRoutes(ctx: Ctx): Router {
     if (body.name && nameClash(req.event.id, body.name, existing.id)) {
       throw conflict('A track with that name already exists', 'track_exists');
     }
+    // `startMin: null` lifts the limit; omitting it leaves the stored one
+    // alone, so renaming a track never quietly opens its hours.
+    const startMin = body.startMin === undefined ? existing.start_min : body.startMin;
+    const endMin = body.endMin === undefined ? existing.end_min : body.endMin;
     ctx.db
-      .prepare('UPDATE tracks SET name = ?, color = ? WHERE id = ?')
-      .run(body.name ?? existing.name, body.color ?? existing.color, existing.id);
+      .prepare('UPDATE tracks SET name = ?, color = ?, start_min = ?, end_min = ? WHERE id = ?')
+      .run(body.name ?? existing.name, body.color ?? existing.color, startMin, endMin, existing.id);
+    if (body.windows) replaceTrackWindows(ctx.db, existing.id, body.windows);
 
-    const dto = toTrackDto(load(req.event.id, existing.id));
+    // Sessions already on the track are left exactly where they are, whatever
+    // the new hours say. Narrowing a window is a statement about what may be
+    // booked next, not an instruction to move a programme that already exists.
+    const dto = dtoOf(req.event.id, existing.id);
     audit(ctx.db, {
       identityId: req.identity.id,
       eventId: req.event.id,
@@ -115,12 +141,16 @@ export function trackRoutes(ctx: Ctx): Router {
     const update = ctx.db.prepare('UPDATE tracks SET sort_order = ? WHERE id = ?');
     ctx.db.transaction(() => ids.forEach((id, i) => update.run(i, id)))();
 
-    const ordered = ctx.db
+    const rows = ctx.db
       .prepare<[number], TrackRow>(
         'SELECT * FROM tracks WHERE event_id = ? AND deleted_at IS NULL ORDER BY sort_order, id',
       )
-      .all(req.event.id)
-      .map(toTrackDto);
+      .all(req.event.id);
+    const windows = trackWindowsFor(
+      ctx.db,
+      rows.map((t) => t.id),
+    );
+    const ordered = rows.map((t) => toTrackDto(t, windows.get(t.id) ?? []));
     audit(ctx.db, {
       identityId: req.identity.id,
       eventId: req.event.id,
@@ -139,6 +169,8 @@ export function trackRoutes(ctx: Ctx): Router {
     // refusing, which is how tags behave too.
     ctx.db.transaction(() => {
       ctx.db.prepare('UPDATE sessions SET track_id = NULL WHERE track_id = ?').run(track.id);
+      // The overrides go with it: a revived track states its hours afresh.
+      ctx.db.prepare('DELETE FROM track_windows WHERE track_id = ?').run(track.id);
       ctx.db
         .prepare('UPDATE tracks SET deleted_at = ? WHERE id = ?')
         .run(new Date().toISOString(), track.id);

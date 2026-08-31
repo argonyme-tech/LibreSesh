@@ -185,6 +185,43 @@ describe('event import from JSON', () => {
     ]);
   });
 
+  it('lands the hours a track keeps, and the days that differ', async () => {
+    const doc = document() as Record<string, unknown>;
+    doc.tracks = [
+      {
+        name: 'Design',
+        start: '09:00',
+        end: '13:00',
+        windows: [{ date: DAY_TWO, start: '14:00', end: '18:00' }],
+      },
+      { name: 'Infrastructure' },
+    ];
+    await post(doc as Parameters<typeof post>[0]);
+
+    const rows = harness.db
+      .prepare<[], { name: string; start_min: number | null; end_min: number | null }>(
+        'SELECT name, start_min, end_min FROM tracks ORDER BY sort_order',
+      )
+      .all();
+    expect(rows).toEqual([
+      { name: 'Design', start_min: 540, end_min: 780 },
+      // A track that says nothing keeps no hours, exactly as before the feature.
+      { name: 'Infrastructure', start_min: null, end_min: null },
+    ]);
+    const windows = harness.db
+      .prepare<[], { date: string; start_min: number; end_min: number }>(
+        'SELECT date, start_min, end_min FROM track_windows',
+      )
+      .all();
+    expect(windows).toEqual([{ date: DAY_TWO, start_min: 840, end_min: 1080 }]);
+  });
+
+  it('refuses track hours that do not close after they open', async () => {
+    const doc = document() as Record<string, unknown>;
+    doc.tracks = [{ name: 'Design', start: '13:00', end: '09:00' }];
+    expect(await failure(doc, 400)).toMatch(/close after it opens/);
+  });
+
   it('imports a session that carried the retired background flag, and says so', async () => {
     const doc = document();
     doc.sessions[0] = { ...doc.sessions[0]!, background: true };

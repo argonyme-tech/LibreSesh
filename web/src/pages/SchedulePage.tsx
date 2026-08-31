@@ -4,9 +4,11 @@ import type {
   ContributionDto,
   ContributionKind,
   SessionDto,
+  TrackDto,
 } from "@shared/types";
 import type { Repeat } from "@shared/repeat";
 import { dateRange, zonedTimeToUtc } from "@shared/time";
+import { windowLabel, windowOn } from "@shared/trackHours";
 import { ApiError, api, type SessionWrite } from "../lib/api";
 import {
   dayLabel,
@@ -19,6 +21,7 @@ import {
 import { useEventData } from "../lib/useEventData";
 import { matchesQuery } from "../lib/search";
 import { useFilters } from "../lib/useFilters";
+import { roomNote, seatsLabel } from "../lib/rooms";
 import { useMe } from "../lib/useMe";
 import { Calendar, PX_PER_MIN, timeClashPairs } from "../components/Calendar";
 import { DetailSheet } from "../components/DetailSheet";
@@ -46,6 +49,29 @@ const NOW_TICK_MS = 30_000;
 /** Column id for sessions with no track. Negative so it cannot collide with a
  *  real track id, and appended last so the programme proper reads first. */
 const UNTRACKED = -1;
+
+/**
+ * What the hours on a track card do not say for themselves: that they are a
+ * rule rather than a description, who it binds, and whether this day keeps its
+ * own window. The times themselves stay on the card and are not repeated here.
+ */
+function TrackInfo({ track, day }: { track: TrackDto; day: string }) {
+  const ownDay = track.windows.some((w) => w.date === day);
+  return (
+    <div className="space-y-1.5">
+      <p>
+        The hours on the card are a rule: a session outside them is refused, unless an organiser
+        places it.
+      </p>
+      {ownDay && <p>Today keeps its own window — other days differ.</p>}
+      {!ownDay && track.windows.length > 0 && (
+        <p>
+          Other days differ: {track.windows.map((w) => `${w.date} ${windowLabel(w)}`).join(", ")}.
+        </p>
+      )}
+    </div>
+  );
+}
 
 export function SchedulePage() {
   const { slug = "", sessionId } = useParams();
@@ -159,33 +185,51 @@ export function SchedulePage() {
    */
   const columns = useMemo(() => {
     if (axis === "room") {
-      return (bundle?.rooms ?? []).map((room) => ({
-        id: room.id,
-        name: room.name,
-        color: room.color,
-        detail: (
-          <div className="truncate text-xs text-stone-600">
-            {room.openBooking && (
-              <span className="font-medium text-stone-800">attendees may book this room</span>
-            )}
-            {room.openBooking && <br />}
-            {room.capacity ? `${room.capacity} seats` : "no capacity set"}
-          </div>
-        ),
-      }));
+      return (bundle?.rooms ?? []).map((room) => {
+        const seats = seatsLabel(room.capacity);
+        // Seats and the booking permission fit on the card; the organiser's
+        // directions do not, so they are the whole of what the button reveals.
+        const note = roomNote(room);
+        return {
+          id: room.id,
+          name: room.name,
+          color: room.color,
+          detail: (
+            <div className="text-xs text-stone-600">
+              {room.openBooking && (
+                <div className="truncate font-medium text-stone-800">
+                  attendees may book this room
+                </div>
+              )}
+              {seats && <div className="truncate">{seats}</div>}
+            </div>
+          ),
+          info: note ? <p className="whitespace-pre-line">{note}</p> : undefined,
+        };
+      });
     }
     const tracks = bundle?.tracks ?? [];
     const sessions = bundle?.sessions ?? [];
-    const cols = tracks.map((track) => ({
-      id: track.id,
-      name: track.name,
-      color: track.color,
-      detail: (
-        <div className="truncate text-xs text-stone-600">
-          {sessions.filter((x) => x.trackId === track.id).length} in the programme
-        </div>
-      ),
-    }));
+    const cols = tracks.map((track) => {
+      // The hours as they apply to the day on screen, not the track's default:
+      // on a day with its own window the default is not the rule, and printing
+      // it under the column would be a lie about what will be accepted.
+      const hours = windowOn(track, day);
+      return {
+        id: track.id,
+        name: track.name,
+        color: track.color,
+        detail: (
+          <div className="text-xs text-stone-600">
+            <div className="truncate">
+              {sessions.filter((x) => x.trackId === track.id).length} in the programme
+            </div>
+            {hours && <div className="truncate tabular-nums">{windowLabel(hours)}</div>}
+          </div>
+        ),
+        info: hours ? <TrackInfo track={track} day={day} /> : undefined,
+      };
+    });
     if (sessions.some((x) => x.trackId === null)) {
       cols.push({
         id: UNTRACKED,
@@ -196,10 +240,11 @@ export function SchedulePage() {
             {sessions.filter((x) => x.trackId === null).length} with no track
           </div>
         ),
+        info: undefined,
       });
     }
     return cols;
-  }, [axis, bundle?.rooms, bundle?.tracks, bundle?.sessions]);
+  }, [axis, bundle?.rooms, bundle?.tracks, bundle?.sessions, day]);
 
   const columnOf = useCallback(
     (session: SessionDto) =>
