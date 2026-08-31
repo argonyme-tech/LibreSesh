@@ -122,7 +122,17 @@ export function ProfilePage() {
 
         <div className="mt-4 rounded-2xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-5 shadow-sm">
           <div className="flex items-start gap-3">
-            <h1 className="flex-1 text-lg font-semibold tracking-tight">{person.name}</h1>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg font-semibold tracking-tight">{person.name}</h1>
+              {/* Profile names are checked for clashes but are not the thing
+                  that identifies anyone — this id is, and it is the one in the
+                  address bar. Per event on purpose: a number that followed a
+                  person between events would tie their names together, which
+                  is exactly what per-event names exist to avoid. */}
+              <p className="mt-0.5 font-mono text-xs text-stone-400 dark:text-stone-500">
+                profile #{person.id}
+              </p>
+            </div>
             {isAdmin && (
               <SecondaryButton className="shrink-0 py-1.5" onClick={() => setMerging(true)}>
                 Merge…

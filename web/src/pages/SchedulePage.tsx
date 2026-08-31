@@ -686,6 +686,7 @@ export function SchedulePage() {
               role={role}
               userLabel={event.userRoleLabel}
               people={bundle.people}
+              identityId={me?.id ?? 0}
               onSignOut={() => {
                 void api.logout(slug).then(() => void data.reload());
               }}

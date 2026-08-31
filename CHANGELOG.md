@@ -6,6 +6,15 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **Profiles carry an id, because names do not identify anyone.** A profile
+  page and each row of the People roster now show `#12` — the id already in the
+  address bar, unique within the event. Deliberately the *profile* id and not
+  the identity id: an identity is the same number at every event on the
+  instance, so printing it beside a name would tie the "Ada" at one event to
+  the "A. Lovelace" at another, which is the precise thing per-event names
+  exist to prevent. Your own identity id is shown to you alone, in the menu
+  behind your name, where you can quote it to an organiser.
+
 - **The People roster says who holds each profile.** Manage Event → People
   showed a name and, at most, the word "claimed". Each row now carries the role
   its holder has at this event, an **unclaimed** marker when nobody holds it,

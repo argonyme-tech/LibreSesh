@@ -720,7 +720,12 @@ export function AdminPage() {
                   key={person.id}
                   className="flex flex-wrap items-center gap-2 rounded-lg bg-stone-50 dark:bg-stone-800 px-3 py-2"
                 >
-                  <span className="min-w-32 flex-1 text-sm font-medium">{person.name}</span>
+                  <span className="min-w-32 flex-1 text-sm font-medium">
+                    {person.name}
+                    <span className="ml-1.5 font-mono text-xs font-normal text-stone-400 dark:text-stone-500">
+                      #{person.id}
+                    </span>
+                  </span>
                   {/* Three things an organiser acts on differently: nobody
                       has this profile; somebody has it, at some role; or the
                       code minted for it has never been redeemed — which
