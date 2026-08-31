@@ -12,7 +12,9 @@ CHANGELOG.md under `[0.2.0]`, and what has landed since is under
 `[Unreleased]`. What is left of the UI-overhaul plan lives in
 `_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
 
-- **Whole-app UI sweep.** The primitives landed and the admin page is done.
+- **Whole-app UI sweep.** The primitives landed, the admin page is done, and
+  as of 2026-08-31 every modal is on the `Modal` primitive — the last six
+  hand-rolled intro paragraphs and button rows are gone (`fb5c759`).
   21 underline usages remain across ProfilePage (5), SchedulePage (4),
   ProposalBoard (4), DetailSheet (4), EventListPage (1), NewEventPage (1),
   Tour (1) and Gate (1, the "already here on another device" link added with
@@ -205,6 +207,19 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
     name that is already held;
   - buttons are 38px tall now, matching the inputs beside them — worth one
     sweep for anything that looked balanced at 32px.
+
+  From 2026-08-31 (`ad00f1e`, `fb5c759`), none of it seen in a browser yet:
+  - the **search popdown**: arrow keys through the five hits and Enter to open
+    one, Enter on an empty selection going to `/e/:slug/search`, `/` focusing
+    the box from anywhere, Escape closing then clearing, and that a tap on a
+    result lands before the blur does;
+  - the **results page** on a multi-day event: day grouping, the highlight
+    marks in both themes, and back/forward moving the box with the URL;
+  - the **Filter panel**: that it wraps on a narrow header, the count badge,
+    and taking one active chip off at a time;
+  - the modals that changed footers — **Link another device**, **Edit
+    profile**, **Merge a duplicate**, the two proposal modals — submitting on
+    Enter and not double-submitting.
 
   From 2026-08-30:
   - the `Modal` rewrite — overlay scrolls, `dvh` cap — against the tallest

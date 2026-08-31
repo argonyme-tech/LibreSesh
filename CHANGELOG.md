@@ -6,6 +6,26 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **Search that finds a session on any day.** The header has a search box that
+  spans the whole programme, not just the day on screen: it drops down the best
+  five hits with the day, time, room and the matched words in bold, the arrow
+  keys open one directly, and Enter takes the query to `/e/:slug/search`, where
+  every hit is grouped by day and the query lives in the URL so a search can be
+  sent to someone. The matcher itself changed with it — the old one was a single
+  `includes` over title, speaker and description joined together, so "lovelace
+  ada" found nothing and every hit ranked the same. Words are matched in any
+  order, accents fold away, and a title hit outranks a speaker hit outranks a
+  description hit, with a bonus when the whole query sits in one title. Typing
+  more always narrows, because every word has to appear somewhere.
+
+- **Filters live behind one button.** Room and tag chips used to share a row
+  with the search box and scroll off the right edge, which on an event with a
+  dozen rooms hid most of them. They are a Filter panel now, with a count on the
+  button and the active ones listed beside it as chips you can take off one at a
+  time. The panel keeps its own mini search, which is the old behaviour — it
+  writes `q` into the URL and narrows the day being drawn. Finding a session and
+  narrowing the grid are two different questions, and they have two controls.
+
 - **Lunch, dinner and coffee belong on the schedule.** An organiser can mark an
   official session a **break**. It leaves the room columns and is drawn greyed
   out across the whole grid, so nobody puts a session over it by accident — but
@@ -311,6 +331,12 @@ All notable changes to this project are documented here.
   is soft-deleted. Audited; not undoable via /trash, hence admin-only.
 
 ### Changed
+
+- **The last hand-rolled modals moved onto the primitive.** Six callers still
+  built their own intro paragraph and button row rather than passing
+  `description` and `footer`; they now match every other modal, and the ones
+  holding a form submit on Enter. The session panel's expand and close controls
+  became shared icons on one 36px target apiece.
 
 - **Arrange is admin-only.** It used to appear for attendees too, whenever the
   event had any open-booking room. Arrange is a whole-grid drag mode, though,
