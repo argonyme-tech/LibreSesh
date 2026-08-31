@@ -6,6 +6,7 @@ import { ApiError, api, type PlaceWrite, type ProposalWrite } from '../lib/api';
 import { dayLabel, todayInZone } from '../lib/format';
 import { renderMarkdown } from '../lib/markdown';
 import { useMe } from '../lib/useMe';
+import { MimirFab } from './MimirChat';
 import { PlaceProposalModal } from './PlaceProposalModal';
 import { ProposalModal } from './ProposalModal';
 import { EmptyState, PrimaryButton, SecondaryButton, Spinner, useToast } from './ui';
@@ -232,6 +233,8 @@ export function ProposalBoard() {
           )}
         </div>
       </header>
+      {/* Mímir add-on: floating presence — the system's main chat. */}
+      <MimirFab slug={slug} role={role} />
 
       <main className="mx-auto max-w-3xl px-4 py-6">
         <p className="mb-4 text-sm text-stone-500 dark:text-stone-400">

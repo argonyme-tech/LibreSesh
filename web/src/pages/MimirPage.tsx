@@ -1,21 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { BundleDto } from '@shared/types';
 import { ApiError, api } from '../lib/api';
+import { MimirChat, mimirChip } from '../components/MimirChat';
 import { rhythmWarnings } from '../components/RhythmCheck';
 import { EmptyState, PrimaryButton, SecondaryButton, Spinner, useToast } from '../components/ui';
 
 /**
  * Mímir add-on: the co-facilitator's own tab (design/mimir-en-libresesh.md).
- * Everything indigo on this page is Mímir speaking; everything the human
- * decides stays unbadged. Mímir proposes — the human decides.
+ * Indigo on this page is Mímir speaking; what the human decides stays
+ * unbadged. Mímir proposes — the human decides.
  */
 
 type Status = 'loading' | 'gate' | 'error' | 'ready';
-type Tool = 'hub' | 'interview' | 'catalog' | 'rhythm' | 'chat' | 'infographic';
-
-const mimirChip =
-  'inline-flex items-center gap-1 rounded-full border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 text-[11px] font-medium text-indigo-700 dark:text-indigo-300';
+type Tool = 'hub' | 'interview' | 'eventInterview' | 'catalog' | 'rhythm' | 'chat' | 'infographic';
 
 export function MimirPage() {
   const { slug = '' } = useParams();
@@ -67,7 +65,7 @@ export function MimirPage() {
           <h1 className="text-lg font-semibold tracking-tight">
             <span className="text-indigo-600 dark:text-indigo-400">◆</span> Mímir
           </h1>
-          <span className={mimirChip}>consejero · no decide</span>
+          <span className={mimirChip}>advises · never decides</span>
           {tool !== 'hub' && (
             <button
               type="button"
@@ -84,11 +82,12 @@ export function MimirPage() {
         {tool === 'hub' && (
           <Hub bundle={bundle} canUse={canUse} isAdmin={isAdmin} onOpen={setTool} slug={slug} />
         )}
-        {tool === 'interview' && <Interview slug={slug} onDone={() => setTool('hub')} />}
+        {tool === 'interview' && <SessionInterview slug={slug} onDone={() => setTool('hub')} />}
+        {tool === 'eventInterview' && isAdmin && <EventInterview bundle={bundle} />}
         {tool === 'catalog' && <Catalog slug={slug} />}
         {tool === 'rhythm' && <Rhythm bundle={bundle} />}
         {tool === 'infographic' && <Infographic bundle={bundle} />}
-        {tool === 'chat' && isAdmin && <Chat slug={slug} />}
+        {tool === 'chat' && isAdmin && <MimirChat slug={slug} />}
       </main>
     </div>
   );
@@ -115,53 +114,62 @@ function Hub({
   return (
     <div className="space-y-6">
       <p className="text-sm text-stone-500 dark:text-stone-400">
-        Herramientas de oficio para diseñar sesiones y procesos. Mímir propone y señala;{' '}
-        <b>decidir es siempre humano.</b>
+        Craft tools for designing sessions and processes. Mímir proposes and flags;{' '}
+        <b>deciding is always human.</b>
       </p>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {canUse && (
           <button type="button" className={tile} onClick={() => onOpen('interview')}>
             <div className="text-2xl">🎤</div>
-            <div className="mt-1 text-sm font-semibold">Diseña tu sesión</div>
+            <div className="mt-1 text-sm font-semibold">Design your session</div>
             <div className="text-xs text-stone-500 dark:text-stone-400">
-              Entrevista guiada → borrador en Pitches
+              Guided interview → draft in Pitches
+            </div>
+          </button>
+        )}
+        {isAdmin && (
+          <button type="button" className={tile} onClick={() => onOpen('eventInterview')}>
+            <div className="text-2xl">🗺</div>
+            <div className="mt-1 text-sm font-semibold">Design the event process</div>
+            <div className="text-xs text-stone-500 dark:text-stone-400">
+              Commission, purpose, voices → process charter
             </div>
           </button>
         )}
         {canUse && (
           <button type="button" className={tile} onClick={() => onOpen('catalog')}>
             <div className="text-2xl">🎲</div>
-            <div className="mt-1 text-sm font-semibold">Catálogo de dinámicas</div>
+            <div className="mt-1 text-sm font-semibold">Dynamics catalog</div>
             <div className="text-xs text-stone-500 dark:text-stone-400">
-              El repertorio del facilitador
+              The facilitator's repertoire
             </div>
           </button>
         )}
         <Link to={`/e/${slug}/proposals`} className={tile}>
           <div className="text-2xl">◇</div>
-          <div className="mt-1 text-sm font-semibold">Decisiones</div>
+          <div className="mt-1 text-sm font-semibold">Decisions</div>
           <div className="text-xs text-stone-500 dark:text-stone-400">
-            Pitches por fases: inquietud → decisión
+            Pitches by phase: concern → decision
           </div>
         </Link>
         <button type="button" className={tile} onClick={() => onOpen('rhythm')}>
           <div className="text-2xl">⏱</div>
-          <div className="mt-1 text-sm font-semibold">Ritmo</div>
+          <div className="mt-1 text-sm font-semibold">Rhythm</div>
           <div className="text-xs text-stone-500 dark:text-stone-400">
-            {warnings.length === 0 ? 'Agenda sana ahora mismo' : `${warnings.length} aviso(s)`}
+            {warnings.length === 0 ? 'Schedule looks healthy' : `${warnings.length} note(s)`}
           </div>
         </button>
         <button type="button" className={tile} onClick={() => onOpen('infographic')}>
-          <div className="text-2xl">🗺</div>
-          <div className="mt-1 text-sm font-semibold">Semana visual</div>
-          <div className="text-xs text-stone-500 dark:text-stone-400">El proceso de un vistazo</div>
+          <div className="text-2xl">📊</div>
+          <div className="mt-1 text-sm font-semibold">Week at a glance</div>
+          <div className="text-xs text-stone-500 dark:text-stone-400">The process, visually</div>
         </button>
         {isAdmin && (
           <button type="button" className={tile} onClick={() => onOpen('chat')}>
             <div className="text-2xl text-indigo-600 dark:text-indigo-400">◆</div>
-            <div className="mt-1 text-sm font-semibold">Chat con Mímir</div>
+            <div className="mt-1 text-sm font-semibold">Chat with Mímir</div>
             <div className="text-xs text-stone-500 dark:text-stone-400">
-              Solo organización · el motor del oficio
+              Organisers only · the craft engine
             </div>
           </button>
         )}
@@ -170,27 +178,63 @@ function Hub({
   );
 }
 
-/* ---------------- interview (deterministic v1 — no engine needed) ---------------- */
+/* ------------- shared interview bits ------------- */
+
+const inputCls =
+  'w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 p-3 text-sm';
+
+function Bubble({ text, why }: { text: string; why?: string }) {
+  return (
+    <div className="mb-4 rounded-xl border border-indigo-200 dark:border-indigo-900 bg-white dark:bg-stone-900 p-4">
+      <span className={mimirChip}>◆ Mímir · proposal</span>
+      <p className="mt-2 text-sm">{text}</p>
+      {why && <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">{why}</p>}
+    </div>
+  );
+}
+
+function Steps({ names, at }: { names: string[]; at: number }) {
+  return (
+    <div className="mb-4 flex gap-1 text-[11px]">
+      {names.map((s, i) => (
+        <div
+          key={s}
+          className={`flex-1 border-t-2 pt-1 text-center ${
+            i === at
+              ? 'border-indigo-500 font-semibold text-indigo-600 dark:text-indigo-400'
+              : i < at
+                ? 'border-green-500 text-stone-500'
+                : 'border-stone-300 dark:border-stone-700 text-stone-400'
+          }`}
+        >
+          {s}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ---------------- session interview ---------------- */
 
 const FORMATS = [
   {
-    name: 'Ronda + tarjetas escritas',
-    how: 'Colecta en silencio, luego una voz por persona.',
-    discard: '<6 personas — sobra estructura.',
+    name: 'Round + written cards',
+    how: 'Silent collection first, then one voice per person.',
+    discard: 'fewer than 6 people — the structure outweighs the group.',
   },
   {
-    name: 'Grupos de 3 → plenario',
-    how: 'Lo tímido habla en pequeño; el plenario solo cosecha.',
-    discard: 'sin tiempo para doble vuelta.',
+    name: 'Trios → plenary',
+    how: 'The quiet speak in small groups; the plenary only harvests.',
+    discard: 'no time for a double pass.',
   },
   {
-    name: 'Colecta previa + priorización',
-    how: 'Aportes antes de la sesión; en sala solo se prioriza.',
-    discard: 'el grupo no usa el tablón antes.',
+    name: 'Pre-collection + dot voting',
+    how: 'Input arrives before the session; the room only prioritises.',
+    discard: 'the group won’t use the board beforehand.',
   },
 ];
 
-function Interview({ slug, onDone }: { slug: string; onDone: () => void }) {
+function SessionInterview({ slug, onDone }: { slug: string; onDone: () => void }) {
   const toast = useToast();
   const [step, setStep] = useState(0);
   const [summary, setSummary] = useState('');
@@ -199,31 +243,23 @@ function Interview({ slug, onDone }: { slug: string; onDone: () => void }) {
   const [minutes, setMinutes] = useState('45');
   const [saving, setSaving] = useState(false);
 
-  const bubble = (text: string, why?: string) => (
-    <div className="mb-4 rounded-xl border border-indigo-200 dark:border-indigo-900 bg-white dark:bg-stone-900 p-4">
-      <span className={mimirChip}>◆ Mímir · propuesta</span>
-      <p className="mt-2 text-sm">{text}</p>
-      {why && <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">{why}</p>}
-    </div>
-  );
-
   const create = async () => {
     setSaving(true);
     try {
       await api.createProposal(slug, {
-        title: purpose.slice(0, 120) || summary.slice(0, 120) || 'Sesión sin título',
+        title: purpose.slice(0, 120) || summary.slice(0, 120) || 'Untitled session',
         description: [
-          summary && `**Resumen:** ${summary}`,
-          format && `**Formato elegido:** ${format}`,
-          `**Duración:** ${minutes} min (corte real a los 90).`,
+          summary && `**Summary:** ${summary}`,
+          format && `**Chosen format:** ${format}`,
+          `**Length:** ${minutes} min (real cut at 90).`,
           '',
-          '_Borrador creado con la entrevista de Mímir — publicarlo y colocarlo es decisión humana._',
+          '_Draft created with Mímir’s interview — publishing and placing it is a human decision._',
         ]
           .filter(Boolean)
           .join('\n'),
         phase: 'proposal',
       });
-      toast.show('Borrador creado en Pitches — Mímir propone, tú publicas');
+      toast.show('Draft created in Pitches — Mímir proposes, you publish');
       onDone();
     } catch (err) {
       toast.show((err as Error).message);
@@ -232,62 +268,44 @@ function Interview({ slug, onDone }: { slug: string; onDone: () => void }) {
     }
   };
 
-  const input =
-    'w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 p-3 text-sm';
-
   return (
     <div className="max-w-xl">
-      <div className="mb-4 flex gap-1 text-[11px]">
-        {['Resumen', 'Propósito', 'Formato', 'Tiempo'].map((s, i) => (
-          <div
-            key={s}
-            className={`flex-1 border-t-2 pt-1 text-center ${
-              i === step
-                ? 'border-indigo-500 font-semibold text-indigo-600 dark:text-indigo-400'
-                : i < step
-                  ? 'border-green-500 text-stone-500'
-                  : 'border-stone-300 dark:border-stone-700 text-stone-400'
-            }`}
-          >
-            {s}
-          </div>
-        ))}
-      </div>
+      <Steps names={['Summary', 'Purpose', 'Format', 'Time']} at={step} />
 
       {step === 0 && (
         <>
-          {bubble(
-            'Cuéntame en resumen qué quieres hacer en tu sesión. Con tus palabras, sin formato.',
-            'Lo ya sabido no se re-pregunta: de tu resumen saco lo que ya está.',
-          )}
+          <Bubble
+            text="Tell me, in short, what you want to do in your session. Your own words, no format."
+            why="What is already known is never asked again: your summary is where I read from."
+          />
           <textarea
-            className={`${input} min-h-24`}
+            className={`${inputCls} min-h-24`}
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
-            placeholder="Ej.: quiero juntar a la gente del comedor y salir con necesidades priorizadas…"
+            placeholder="e.g. I want to get the kitchen crowd together and leave with prioritised needs…"
           />
           <PrimaryButton className="mt-3" onClick={() => setStep(1)} disabled={!summary.trim()}>
-            Continuar →
+            Continue →
           </PrimaryButton>
         </>
       )}
 
       {step === 1 && (
         <>
-          {bubble(
-            '¿Qué tiene que pasar en tu sesión, en una frase — y sin nombrar técnica todavía?',
-            'Si no puedes definir el propósito, la doctrina sugiere no reservar sala aún.',
-          )}
+          <Bubble
+            text="What has to happen in your session, in one sentence — without naming a technique yet?"
+            why="If the purpose won’t come, the doctrine suggests not booking a room yet."
+          />
           <input
-            className={input}
+            className={inputCls}
             value={purpose}
             onChange={(e) => setPurpose(e.target.value)}
-            placeholder="Ej.: pasar de quejas sueltas a tres necesidades priorizadas"
+            placeholder="e.g. go from loose complaints to three prioritised needs"
           />
           <div className="mt-3 flex gap-2">
-            <SecondaryButton onClick={() => setStep(0)}>← Volver</SecondaryButton>
+            <SecondaryButton onClick={() => setStep(0)}>← Back</SecondaryButton>
             <PrimaryButton onClick={() => setStep(2)} disabled={!purpose.trim()}>
-              Continuar →
+              Continue →
             </PrimaryButton>
           </div>
         </>
@@ -295,9 +313,7 @@ function Interview({ slug, onDone }: { slug: string; onDone: () => void }) {
 
       {step === 2 && (
         <>
-          {bubble(
-            'Abanico de formatos que no premian la facilidad de palabra — eliges tú, cada uno con su condición de descarte:',
-          )}
+          <Bubble text="A fan of formats that don’t reward ease of speech — you choose, each with its discard condition:" />
           <div className="space-y-2">
             {FORMATS.map((f) => (
               <button
@@ -313,15 +329,15 @@ function Interview({ slug, onDone }: { slug: string; onDone: () => void }) {
                 <b>{f.name}</b>
                 <div className="text-xs text-stone-500 dark:text-stone-400">{f.how}</div>
                 <div className="mt-1 text-xs text-indigo-700 dark:text-indigo-400">
-                  Descarta si: {f.discard}
+                  Discard if: {f.discard}
                 </div>
               </button>
             ))}
           </div>
           <div className="mt-3 flex gap-2">
-            <SecondaryButton onClick={() => setStep(1)}>← Volver</SecondaryButton>
+            <SecondaryButton onClick={() => setStep(1)}>← Back</SecondaryButton>
             <PrimaryButton onClick={() => setStep(3)} disabled={!format}>
-              Continuar →
+              Continue →
             </PrimaryButton>
           </div>
         </>
@@ -329,10 +345,8 @@ function Interview({ slug, onDone }: { slug: string; onDone: () => void }) {
 
       {step === 3 && (
         <>
-          {bubble(
-            'Último paso: el tiempo. La atención aguanta ~90 minutos con corte real — elige la duración.',
-          )}
-          <select className={input} value={minutes} onChange={(e) => setMinutes(e.target.value)}>
+          <Bubble text="Last step: time. Attention holds ~90 minutes with a real cut — pick the length." />
+          <select className={inputCls} value={minutes} onChange={(e) => setMinutes(e.target.value)}>
             {['30', '45', '60', '90'].map((m) => (
               <option key={m} value={m}>
                 {m} min
@@ -340,9 +354,9 @@ function Interview({ slug, onDone }: { slug: string; onDone: () => void }) {
             ))}
           </select>
           <div className="mt-3 flex gap-2">
-            <SecondaryButton onClick={() => setStep(2)}>← Volver</SecondaryButton>
+            <SecondaryButton onClick={() => setStep(2)}>← Back</SecondaryButton>
             <PrimaryButton onClick={() => void create()} disabled={saving}>
-              {saving ? 'Creando…' : 'Crear borrador en Pitches ✓'}
+              {saving ? 'Creating…' : 'Create draft in Pitches ✓'}
             </PrimaryButton>
           </div>
         </>
@@ -351,11 +365,129 @@ function Interview({ slug, onDone }: { slug: string; onDone: () => void }) {
   );
 }
 
+/* ---------------- event-process interview (admin, Loop A) ---------------- */
+
+const EVENT_QUESTIONS = [
+  {
+    key: 'commission',
+    label: 'Commission',
+    q: 'Who is asking for this process, and what are they after? Has the group taken it as its own?',
+    why: 'A1 · If the commission is unclear, everything after it wobbles.',
+  },
+  {
+    key: 'purpose',
+    label: 'Purpose',
+    q: 'What is the purpose, in one sentence? If you can’t define it — cancel it.',
+    why: 'A2 · The hardest and most protective question in the loop.',
+  },
+  {
+    key: 'voices',
+    label: 'Voices',
+    q: 'Which affected voices must be in the room — and which role is likely to go unclaimed (the ghost role)?',
+    why: 'A3 · If nobody takes a role, whoever facilitates ends up playing it.',
+  },
+  {
+    key: 'scope',
+    label: 'Out of scope',
+    q: 'What is explicitly OUT of this process?',
+    why: 'A1 · What is not named as out will walk in mid-process.',
+  },
+  {
+    key: 'meta',
+    label: 'Meta-decision',
+    q: 'Who decides that something has been decided — and how will you all know?',
+    why: 'A6 · The question groups forget until it hurts.',
+  },
+] as const;
+
+function EventInterview({ bundle }: { bundle: BundleDto }) {
+  const toast = useToast();
+  const [step, setStep] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [draft, setDraft] = useState('');
+  const done = step >= EVENT_QUESTIONS.length;
+
+  const charter = useMemo(() => {
+    if (!done) return '';
+    return [
+      `# Process charter — ${bundle.event.name}`,
+      '',
+      ...EVENT_QUESTIONS.map((q) => `## ${q.label}\n${answers[q.key] ?? '—'}`),
+      '',
+      '_Drafted with Mímir’s Loop A interview. The charter is a working document:_',
+      '_the facilitator owns every final design decision._',
+    ].join('\n');
+  }, [answers, bundle.event.name, done]);
+
+  if (done) {
+    return (
+      <div className="max-w-xl">
+        <Bubble
+          text="Here is your process charter — copy it wherever your team works. What it deliberately does NOT contain: dynamics, agenda, timings. Those come after the charter holds."
+          why="Loop B never starts before Loop A closes."
+        />
+        <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 p-4 text-xs">
+          {charter}
+        </pre>
+        <PrimaryButton
+          className="mt-3"
+          onClick={() => {
+            void navigator.clipboard
+              .writeText(charter)
+              .then(() => toast.show('Charter copied'))
+              .catch(() => toast.show('Could not copy — select the text manually'));
+          }}
+        >
+          Copy charter
+        </PrimaryButton>
+      </div>
+    );
+  }
+
+  const q = EVENT_QUESTIONS[step];
+  return (
+    <div className="max-w-xl">
+      <Steps names={EVENT_QUESTIONS.map((x) => x.label)} at={step} />
+      <Bubble text={q.q} why={q.why} />
+      <textarea
+        className={`${inputCls} min-h-24`}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+      />
+      <div className="mt-3 flex gap-2">
+        {step > 0 && (
+          <SecondaryButton
+            onClick={() => {
+              setStep(step - 1);
+              setDraft(answers[EVENT_QUESTIONS[step - 1].key] ?? '');
+            }}
+          >
+            ← Back
+          </SecondaryButton>
+        )}
+        <PrimaryButton
+          onClick={() => {
+            setAnswers({ ...answers, [q.key]: draft.trim() });
+            setDraft(answers[EVENT_QUESTIONS[step + 1]?.key] ?? '');
+            setStep(step + 1);
+          }}
+          disabled={!draft.trim()}
+        >
+          {step === EVENT_QUESTIONS.length - 1 ? 'Build charter ✓' : 'Continue →'}
+        </PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- catalog ---------------- */
+
+const TIERS = ['all', 'validada', 'destacada', 'cantera'] as const;
 
 function Catalog({ slug }: { slug: string }) {
   const [dynamics, setDynamics] = useState<Record<string, unknown>[] | null>(null);
-  const [filter, setFilter] = useState('Todas');
+  const [filter, setFilter] = useState('All');
+  const [tier, setTier] = useState<(typeof TIERS)[number]>('all');
 
   useEffect(() => {
     void api.mimirCatalog(slug).then((c) => setDynamics(c.dynamics)).catch(() => setDynamics([]));
@@ -363,7 +495,7 @@ function Catalog({ slug }: { slug: string }) {
 
   const categories = useMemo(
     () => [
-      'Todas',
+      'All',
       ...Array.from(new Set((dynamics ?? []).map((d) => String(d.category ?? '')))).filter(Boolean),
     ],
     [dynamics],
@@ -375,33 +507,47 @@ function Catalog({ slug }: { slug: string }) {
     return (
       <EmptyState>
         <div className="text-3xl opacity-60">🏮</div>
-        <b>El catálogo se llena con las dinámicas que vuelca el facilitador.</b>
+        <b>The catalog fills with what the facilitator pours in.</b>
         <p className="mx-auto mt-2 max-w-sm text-sm">
-          Mímir no lo rellena con dinámicas genéricas: si no está en el corpus, no está aquí.
+          Mímir never pads it with generic dynamics: if it is not in the corpus, it is not here.
         </p>
       </EmptyState>
     );
   }
 
-  const shown = dynamics.filter((d) => filter === 'Todas' || String(d.category) === filter);
+  const shown = dynamics.filter(
+    (d) =>
+      (filter === 'All' || String(d.category) === filter) &&
+      (tier === 'all' || String(d.tier) === tier),
+  );
+  const chip = (on: boolean) =>
+    `rounded-full border px-2.5 py-1 text-xs ${
+      on
+        ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 font-semibold text-indigo-700 dark:text-indigo-300'
+        : 'border-stone-300 dark:border-stone-700 text-stone-500 dark:text-stone-400'
+    }`;
+
   return (
     <div>
+      <div className="mb-2 flex flex-wrap gap-1.5">
+        {TIERS.map((t) => (
+          <button key={t} type="button" onClick={() => setTier(t)} className={chip(tier === t)}>
+            {t === 'all' ? `All tiers (${dynamics.length})` : t}
+          </button>
+        ))}
+      </div>
       <div className="mb-4 flex flex-wrap gap-1.5">
         {categories.map((c) => (
-          <button
-            key={c}
-            type="button"
-            onClick={() => setFilter(c)}
-            className={`rounded-full border px-2.5 py-1 text-xs ${
-              filter === c
-                ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 font-semibold text-indigo-700 dark:text-indigo-300'
-                : 'border-stone-300 dark:border-stone-700 text-stone-500 dark:text-stone-400'
-            }`}
-          >
+          <button key={c} type="button" onClick={() => setFilter(c)} className={chip(filter === c)}>
             {c}
           </button>
         ))}
       </div>
+      <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
+        {shown.length} shown · <b>validada</b> = confirmed by the facilitator · <b>destacada</b> ={' '}
+        card-filed in the vault · <b>cantera</b> = quarry from the 700-compendium, metadata only,
+        awaiting human criterion.
+      </p>
       <div className="grid gap-3 sm:grid-cols-2">
         {shown.map((d, i) => (
           <div
@@ -412,34 +558,35 @@ function Catalog({ slug }: { slug: string }) {
               <b className="text-sm">{String(d.name)}</b>
               {Boolean(d.safety) && d.safety !== 'segura' && (
                 <span className="rounded-full border border-amber-400/40 px-2 py-0.5 text-[11px] text-amber-600 dark:text-amber-400">
-                  ⚠ {String(d.safety)}
+                  {String(d.safety)}
                 </span>
               )}
-              {Boolean(d.dominio) && (
-                <span className={mimirChip}>{String(d.dominio)}</span>
-              )}
+              <span className={mimirChip}>{String(d.tier ?? 'cantera')}</span>
+              {Boolean(d.dominio) && <span className={mimirChip}>{String(d.dominio)}</span>}
             </div>
             {Boolean(d.purpose) && (
-              <p className="mt-1 text-xs text-stone-600 dark:text-stone-300">
-                {String(d.purpose)}
-              </p>
+              <p className="mt-1 text-xs text-stone-600 dark:text-stone-300">{String(d.purpose)}</p>
             )}
             <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-stone-500 dark:text-stone-400">
               {Boolean(d.category) && <span>{String(d.category)}</span>}
               {Boolean(d.people) && <span>· 👥 {String(d.people)}</span>}
               {Boolean(d.minutes) && <span>· ⏱ {String(d.minutes)}</span>}
-              {Boolean(d.difficulty) && <span>· {String(d.difficulty)}</span>}
             </div>
             {Boolean(d.discardIf) && (
               <p className="mt-2 border-t border-dashed border-stone-300 dark:border-stone-700 pt-2 text-xs text-indigo-700 dark:text-indigo-400">
-                Descarta si: {String(d.discardIf)}
+                Discard if: {String(d.discardIf)}
+              </p>
+            )}
+            {Boolean(d.stepsRef) && !d.discardIf && (
+              <p className="mt-2 border-t border-dashed border-stone-300 dark:border-stone-700 pt-2 text-[11px] text-stone-400">
+                Steps: {String(d.stepsRef)}
               </p>
             )}
           </div>
         ))}
       </div>
       <p className="mt-4 text-xs text-stone-500 dark:text-stone-400">
-        La elección de dinámica es siempre humana — Mímir solo asegura que el abanico esté delante.
+        Choosing a dynamic is always human — Mímir only makes sure the fan is on the table.
       </p>
     </div>
   );
@@ -450,11 +597,7 @@ function Catalog({ slug }: { slug: string }) {
 function Rhythm({ bundle }: { bundle: BundleDto }) {
   const warnings = rhythmWarnings(bundle.sessions, bundle.rooms);
   if (warnings.length === 0) {
-    return (
-      <EmptyState>
-        ⏱ Nada que señalar: ningún bloque supera los ~90 min sin pausa real.
-      </EmptyState>
-    );
+    return <EmptyState>⏱ Nothing to flag: no block runs past ~90 min without a real pause.</EmptyState>;
   }
   return (
     <div className="space-y-3">
@@ -468,13 +611,13 @@ function Rhythm({ bundle }: { bundle: BundleDto }) {
         </div>
       ))}
       <p className="text-xs text-stone-500 dark:text-stone-400">
-        Avisa, nunca bloquea — reordena, o ignora.
+        Advisory, never blocking — rearrange, or ignore.
       </p>
     </div>
   );
 }
 
-/* ---------------- infographic: the week at a glance ---------------- */
+/* ---------------- week at a glance ---------------- */
 
 function Infographic({ bundle }: { bundle: BundleDto }) {
   const days = useMemo(() => {
@@ -498,14 +641,16 @@ function Infographic({ bundle }: { bundle: BundleDto }) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="mb-2 text-sm font-semibold">Carga por día</h2>
+        <h2 className="mb-2 text-sm font-semibold">Load per day</h2>
         <div className="space-y-2">
           {days.length === 0 && (
-            <p className="text-sm text-stone-500 dark:text-stone-400">Sin sesiones aún.</p>
+            <p className="text-sm text-stone-500 dark:text-stone-400">No sessions yet.</p>
           )}
           {days.map(([day, d]) => (
             <div key={day} className="flex items-center gap-3 text-xs">
-              <span className="w-20 shrink-0 text-stone-500 dark:text-stone-400">{day.slice(5)}</span>
+              <span className="w-20 shrink-0 text-stone-500 dark:text-stone-400">
+                {day.slice(5)}
+              </span>
               <div className="h-3 flex-1 overflow-hidden rounded bg-stone-200 dark:bg-stone-800">
                 <div
                   className="h-full rounded bg-indigo-400/70"
@@ -513,21 +658,22 @@ function Infographic({ bundle }: { bundle: BundleDto }) {
                 />
               </div>
               <span className="w-28 shrink-0 text-stone-500 dark:text-stone-400">
-                {d.count} ses · {Math.round(d.minutes / 60)}h{d.minutes % 60 ? ` ${d.minutes % 60}m` : ''}
+                {d.count} sess · {Math.round(d.minutes / 60)}h
+                {d.minutes % 60 ? ` ${d.minutes % 60}m` : ''}
               </span>
             </div>
           ))}
         </div>
       </div>
       <div>
-        <h2 className="mb-2 text-sm font-semibold">Decisiones en curso (pitches por fase)</h2>
+        <h2 className="mb-2 text-sm font-semibold">Decisions in motion (pitches by phase)</h2>
         <div className="flex flex-wrap gap-2 text-xs">
           {(
             [
-              ['concern', '💭 Inquietud'],
-              ['inquiry', '🔍 Indagación'],
-              ['proposal', '📋 Propuesta'],
-              ['decision', '◇ Decisión'],
+              ['concern', '💭 Concern'],
+              ['inquiry', '🔍 Inquiry'],
+              ['proposal', '📋 Proposal'],
+              ['decision', '◇ Decision'],
             ] as const
           ).map(([k, label]) => (
             <span
@@ -539,125 +685,9 @@ function Infographic({ bundle }: { bundle: BundleDto }) {
           ))}
         </div>
         <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">
-          Una elección nunca se dibuja como paso de agenda: aquí se ve el momento en que está, no
-          un resultado dado por hecho.
+          A choice is never drawn as an agenda step: here you see where it stands, not an outcome
+          taken for granted.
         </p>
-      </div>
-    </div>
-  );
-}
-
-/* ---------------- chat (admin, needs engine) ---------------- */
-
-function Chat({ slug }: { slug: string }) {
-  const [engine, setEngine] = useState<boolean | null>(null);
-  const [model, setModel] = useState('');
-  const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
-  const [draft, setDraft] = useState('');
-  const [busy, setBusy] = useState(false);
-  const endRef = useRef<HTMLDivElement>(null);
-  const toast = useToast();
-
-  useEffect(() => {
-    void api
-      .mimirStatus(slug)
-      .then((s) => {
-        setEngine(s.engine);
-        setModel(s.model);
-      })
-      .catch(() => setEngine(false));
-  }, [slug]);
-
-  useEffect(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), [messages]);
-
-  const send = useCallback(async () => {
-    const content = draft.trim();
-    if (!content || busy) return;
-    const next = [...messages, { role: 'user' as const, content }];
-    setMessages(next);
-    setDraft('');
-    setBusy(true);
-    try {
-      const res = await api.mimirChat(slug, next);
-      setMessages([...next, { role: 'assistant', content: res.reply }]);
-    } catch (err) {
-      toast.show((err as Error).message);
-      setMessages(messages);
-      setDraft(content);
-    } finally {
-      setBusy(false);
-    }
-  }, [busy, draft, messages, slug, toast]);
-
-  if (engine === null) return <Spinner label="Checking engine…" />;
-
-  if (!engine) {
-    return (
-      <div className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-white dark:bg-stone-900 p-5 text-sm">
-        <span className={mimirChip}>◆ motor apagado</span>
-        <p className="mt-3">
-          El chat de Mímir necesita una clave de la API de Claude en el servidor. Para armarlo:
-        </p>
-        <ol className="mt-2 list-decimal space-y-1 pl-5 text-stone-600 dark:text-stone-300">
-          <li>
-            Crea una clave en <code>console.anthropic.com</code> → API keys.
-          </li>
-          <li>
-            En Easypanel, servicio <code>libresesh</code> → Environment: añade{' '}
-            <code>MIMIR_API_KEY=…</code>
-          </li>
-          <li>Reinicia el servicio. Esta pantalla se convierte en el chat.</li>
-        </ol>
-        <p className="mt-3 text-xs text-stone-500 dark:text-stone-400">
-          La clave vive solo en el servidor — nunca llega al navegador. El prompt doctrinal se
-          carga aparte (PUT /mimir/prompt) y también queda en el servidor.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex h-[70vh] flex-col">
-      <div className="mb-2 text-xs text-stone-500 dark:text-stone-400">
-        Motor: <code>{model}</code> · el prompt es la doctrina volcada del facilitador · nada de
-        Mímir llega al grupo sin aprobación humana.
-      </div>
-      <div className="flex-1 space-y-3 overflow-y-auto rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-4">
-        {messages.length === 0 && (
-          <p className="text-sm text-stone-400">
-            ◆ Pregunta de proceso, no de contenido: “¿qué voz falta en la agenda del jueves?”,
-            “dame un abanico para abrir el conflicto del comedor”.
-          </p>
-        )}
-        {messages.map((m, i) => (
-          <div key={i} className={m.role === 'user' ? 'text-right' : ''}>
-            {m.role === 'assistant' && <span className={mimirChip}>◆ Mímir · propuesta</span>}
-            <div
-              className={`mt-1 inline-block max-w-[85%] whitespace-pre-wrap rounded-xl p-3 text-left text-sm ${
-                m.role === 'user'
-                  ? 'bg-stone-200 dark:bg-stone-800'
-                  : 'border border-indigo-200 dark:border-indigo-900'
-              }`}
-            >
-              {m.content}
-            </div>
-          </div>
-        ))}
-        {busy && <p className="text-xs text-stone-400">◆ pensando…</p>}
-        <div ref={endRef} />
-      </div>
-      <div className="mt-3 flex gap-2">
-        <input
-          className="flex-1 rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 p-3 text-sm"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && void send()}
-          placeholder="Habla con Mímir…"
-          aria-label="Mensaje para Mímir"
-        />
-        <PrimaryButton onClick={() => void send()} disabled={busy || !draft.trim()}>
-          Enviar
-        </PrimaryButton>
       </div>
     </div>
   );

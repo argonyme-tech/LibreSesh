@@ -24,6 +24,7 @@ import { Gate } from "../components/Gate";
 import { ListView } from "../components/ListView";
 import { Logo } from "../components/Logo";
 import { ProfileMenu } from "../components/ProfileMenu";
+import { MimirFab } from "../components/MimirChat";
 import { RhythmCheck } from "../components/RhythmCheck";
 import { SessionModal } from "../components/SessionModal";
 import { Tour, tourSeen, type TourStep } from "../components/Tour";
@@ -836,6 +837,8 @@ export function SchedulePage() {
           {/* Mímir add-on: advisory rhythm notes. Renders nothing when the
               schedule has nothing to flag. */}
           <RhythmCheck sessions={bundle.sessions} rooms={bundle.rooms} />
+          {/* Mímir add-on: floating presence — the system's main chat. */}
+          <MimirFab slug={slug} role={bundle.role} />
 
           <button
             type="button"

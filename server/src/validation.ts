@@ -267,6 +267,13 @@ export const mimirPromptSchema = z.object({
   prompt: z.string().min(1).max(200_000),
 });
 
+export const mimirKeySchema = z.object({
+  key: z.string().min(4).max(300),
+  /** OpenAI-compatible base URL (…/v1). Absent = Anthropic API. */
+  url: z.string().url().max(300).optional(),
+  model: z.string().min(1).max(120).optional(),
+});
+
 export const mimirChatSchema = z.object({
   messages: z
     .array(

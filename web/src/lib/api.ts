@@ -219,6 +219,8 @@ export const api = {
     request<{ reply: string; model: string }>('POST', `/e/${encode(slug)}/mimir/chat`, {
       messages,
     }),
+  mimirSetKey: (slug: string, body: { key: string; url?: string; model?: string }) =>
+    request<{ ok: boolean; engine: boolean }>('PUT', `/e/${encode(slug)}/mimir/key`, body),
   createProposal: (slug: string, body: ProposalWrite) =>
     request<ProposalDto>('POST', `/e/${encode(slug)}/proposals`, body),
   updateProposal: (slug: string, id: number, body: ProposalWrite) =>
