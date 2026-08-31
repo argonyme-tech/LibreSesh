@@ -21,6 +21,10 @@ Three design pillars:
    1 vCPU VPS and backs up with a single `sqlite3` command.
 3. **Mobile-first.** The schedule has to be readable on a phone in a hallway.
 
+![The LibreSesh schedule: a two-day grid with rooms as columns, sessions as
+blocks, a red now-line across the current time, and the day tabs and filter bar
+above it](assets/screenshot-schedule.png)
+
 ## Tech stack
 
 | Layer     | Choice                                                       |

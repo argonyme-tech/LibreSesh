@@ -188,9 +188,14 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   across pitches, not a click per pitch), so it wants its own schema and its
   own thinking rather than a column bolted onto `proposal_interest`.
 
-- **README screenshot.** Asked for on 2026-08-28 but not possible from the dev
-  container — there is no browser and the Playwright/Puppeteer binaries cannot
-  be fetched through the firewall. Needs a PNG dropped in by hand.
+- **README screenshot — the markup is in, the image is not.** README references
+  `assets/screenshot-schedule.png` after the three pillars, and renders a broken
+  image until that file exists. Still not capturable from the dev container:
+  no browser, and the Playwright/Puppeteer binaries cannot be fetched through
+  the firewall (re-checked 2026-08-31). Capture the schedule grid from the
+  forwarded port at roughly 1400px wide, light theme, on DemoConf where the
+  now-line is visible, and save it to that path. A second phone-width shot
+  would earn its place, given mobile-first is a stated pillar.
 - **Print / PDF grid.** Unconferences put the grid on a wall. A print
   stylesheet would cover most of it.
 - **Restore for rooms and tags.** `/trash` covers sessions and contributions,
