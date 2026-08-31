@@ -311,7 +311,19 @@ function ProfileEditor({
   };
 
   return (
-    <Modal title="Edit profile" onClose={onClose}>
+    <Modal
+      title="Edit profile"
+      onClose={onClose}
+      onSubmit={() => void save()}
+      footer={
+        <>
+          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+          <PrimaryButton type="submit" disabled={busy || !name.trim()}>
+            {busy ? 'Saving…' : 'Save'}
+          </PrimaryButton>
+        </>
+      }
+    >
       <FormStack>
       {mine && (
         <Field
@@ -389,13 +401,6 @@ function ProfileEditor({
         </div>
       </Field>
       </FormStack>
-
-      <div className="mt-4 flex justify-end gap-2">
-        <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-        <PrimaryButton onClick={() => void save()} disabled={busy || !name.trim()}>
-          {busy ? 'Saving…' : 'Save'}
-        </PrimaryButton>
-      </div>
     </Modal>
   );
 }
@@ -436,11 +441,26 @@ function MergeModal({
   };
 
   return (
-    <Modal title="Merge a duplicate" onClose={onClose}>
-      <p className="mb-4 text-sm text-stone-600 dark:text-stone-300">
-        The profile you pick is folded into <span className="font-medium">{survivor.name}</span>:
-        its sessions and pitches move here, then it is removed. This cannot be undone.
-      </p>
+    <Modal
+      title="Merge a duplicate"
+      description={
+        <>
+          The profile you pick is folded into{' '}
+          <span className="font-medium">{survivor.name}</span>: its sessions and pitches move
+          here, then it is removed. This cannot be undone.
+        </>
+      }
+      onClose={onClose}
+      onSubmit={() => void merge()}
+      footer={
+        <>
+          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+          <PrimaryButton type="submit" disabled={busy || fromId === null}>
+            {busy ? 'Merging…' : 'Merge'}
+          </PrimaryButton>
+        </>
+      }
+    >
       {candidates.length === 0 ? (
         <p className="text-sm text-stone-400 dark:text-stone-500">
           There is no other profile to merge.
@@ -464,12 +484,6 @@ function MergeModal({
           </Field>
         </FormStack>
       )}
-      <div className="mt-4 flex justify-end gap-2">
-        <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-        <PrimaryButton onClick={() => void merge()} disabled={busy || fromId === null}>
-          {busy ? 'Merging…' : 'Merge'}
-        </PrimaryButton>
-      </div>
     </Modal>
   );
 }

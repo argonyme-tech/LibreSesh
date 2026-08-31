@@ -1131,13 +1131,27 @@ function TagEditor({
   };
 
   return (
-    <Modal title="Edit tag" onClose={onClose}>
+    <Modal
+      title="Edit tag"
+      onClose={onClose}
+      onSubmit={() => void save()}
+      footer={
+        <>
+          <DangerButton className="mr-auto" onClick={() => void remove()} disabled={busy}>
+            Delete
+          </DangerButton>
+          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+          <PrimaryButton type="submit" disabled={!name.trim() || !dirty || busy}>
+            Save
+          </PrimaryButton>
+        </>
+      }
+    >
       <FormStack>
         <Field label="Name">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && void save()}
             maxLength={40}
             className={inputClass}
             autoFocus
@@ -1158,18 +1172,6 @@ function TagEditor({
           ? 'Nothing carries this tag yet. Deleting it affects nothing.'
           : `Carried by ${plural(sessions, 'session')} and ${plural(pitches, 'pitch', 'pitches')}. Deleting the tag removes it from all of them.`}
       </p>
-
-      <div className="mt-4 flex items-center justify-between gap-2">
-        <DangerButton onClick={() => void remove()} disabled={busy}>
-          Delete
-        </DangerButton>
-        <div className="flex gap-2">
-          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-          <PrimaryButton onClick={() => void save()} disabled={!name.trim() || !dirty || busy}>
-            Save
-          </PrimaryButton>
-        </div>
-      </div>
     </Modal>
   );
 }
@@ -1220,13 +1222,27 @@ function TrackEditor({
   };
 
   return (
-    <Modal title="Edit track" onClose={onClose}>
+    <Modal
+      title="Edit track"
+      onClose={onClose}
+      onSubmit={() => void save()}
+      footer={
+        <>
+          <DangerButton className="mr-auto" onClick={() => void remove()} disabled={busy}>
+            Delete
+          </DangerButton>
+          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+          <PrimaryButton type="submit" disabled={!name.trim() || !dirty || busy}>
+            Save
+          </PrimaryButton>
+        </>
+      }
+    >
       <FormStack>
         <Field label="Name">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && void save()}
             maxLength={60}
             className={inputClass}
             autoFocus
@@ -1247,18 +1263,6 @@ function TrackEditor({
           ? 'No sessions are on this track yet.'
           : `${plural(sessions, 'session')} on this track. Deleting it keeps them — they lose the track, not their room.`}
       </p>
-
-      <div className="mt-4 flex items-center justify-between gap-2">
-        <DangerButton onClick={() => void remove()} disabled={busy}>
-          Delete
-        </DangerButton>
-        <div className="flex gap-2">
-          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-          <PrimaryButton onClick={() => void save()} disabled={!name.trim() || !dirty || busy}>
-            Save
-          </PrimaryButton>
-        </div>
-      </div>
     </Modal>
   );
 }

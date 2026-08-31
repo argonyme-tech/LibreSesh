@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { LinkCodeDto } from '@shared/types';
 import { api } from '../lib/api';
-import { Modal, SecondaryButton, Spinner } from './ui';
+import { FormError, Modal, PrimaryButton, SecondaryButton, Spinner } from './ui';
 
 /**
  * Shows a fresh link phrase (SPEC §3.1 follow-up): type it on another device
@@ -24,14 +24,24 @@ export function DeviceLinkModal({ onClose }: { onClose: () => void }) {
   useEffect(mint, []);
 
   return (
-    <Modal title="Link another device" onClose={onClose}>
-      <p className="mb-4 text-sm text-stone-600 dark:text-stone-300">
-        On your other device, open this event’s password page and choose{' '}
-        <span className="font-medium">“I’m already here on another device”</span>, then type
-        this phrase. That device becomes you — same name, role and starred sessions.
-      </p>
-
-      {error && <p className="mb-3 text-xs text-red-600 dark:text-red-400">{error}</p>}
+    <Modal
+      title="Link another device"
+      description={
+        <>
+          On your other device, open this event’s password page and choose{' '}
+          <span className="font-medium">“I’m already here on another device”</span>, then type
+          this phrase. That device becomes you — same name, role and starred sessions.
+        </>
+      }
+      onClose={onClose}
+      footer={
+        <>
+          <SecondaryButton onClick={mint}>New phrase</SecondaryButton>
+          <PrimaryButton onClick={onClose}>Done</PrimaryButton>
+        </>
+      }
+    >
+      {error && <FormError className="mb-3">{error}</FormError>}
       {!code && !error && <Spinner label="Minting a phrase…" />}
 
       {code && (
@@ -46,10 +56,6 @@ export function DeviceLinkModal({ onClose }: { onClose: () => void }) {
         </>
       )}
 
-      <div className="mt-4 flex justify-end gap-2">
-        <SecondaryButton onClick={mint}>New phrase</SecondaryButton>
-        <SecondaryButton onClick={onClose}>Done</SecondaryButton>
-      </div>
     </Modal>
   );
 }
