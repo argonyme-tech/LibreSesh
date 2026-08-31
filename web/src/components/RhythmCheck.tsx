@@ -74,12 +74,46 @@ export function rhythmWarnings(sessions: SessionDto[], rooms: RoomDto[]): Warnin
   return warnings;
 }
 
+const DISMISS_KEY = 'mimir-rhythm-dismissed';
+const loadDismissed = (): string[] => {
+  // Per-viewer convenience only — storage can be blocked; render fine without.
+  try {
+    return JSON.parse(localStorage.getItem(DISMISS_KEY) ?? '[]') as string[];
+  } catch {
+    return [];
+  }
+};
+
 export function RhythmCheck({ sessions, rooms }: { sessions: SessionDto[]; rooms: RoomDto[] }) {
   const [open, setOpen] = useState(false);
-  const warnings = useMemo(() => rhythmWarnings(sessions, rooms), [sessions, rooms]);
+  const [dismissed, setDismissed] = useState<string[]>(loadDismissed);
+  const all = useMemo(() => rhythmWarnings(sessions, rooms), [sessions, rooms]);
+  const warnings = all.filter((w) => !dismissed.includes(w.key));
+
+  const setAndStore = (keys: string[]) => {
+    setDismissed(keys);
+    try {
+      localStorage.setItem(DISMISS_KEY, JSON.stringify(keys));
+    } catch {
+      /* storage blocked — dismissal just won't persist */
+    }
+  };
 
   // Nothing to say: no chip at all. Vanilla schedules stay untouched.
-  if (warnings.length === 0) return null;
+  if (all.length === 0) return null;
+  if (warnings.length === 0) {
+    // Everything dismissed: a whisper of a chip so the notes can come back.
+    return (
+      <button
+        type="button"
+        onClick={() => setAndStore([])}
+        className="rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 px-3 py-2 text-xs text-stone-400 dark:text-stone-500 hover:border-indigo-400"
+        title="All rhythm notes ignored — click to bring them back"
+      >
+        ◆ {all.length} ignored
+      </button>
+    );
+  }
 
   return (
     <>
@@ -106,12 +140,28 @@ export function RhythmCheck({ sessions, rooms }: { sessions: SessionDto[]; rooms
             {warnings.map((w) => (
               <li key={w.key} className="text-stone-700 dark:text-stone-300">
                 <span className="font-medium">{w.what}.</span> {w.why}{' '}
-                <span className="text-xs text-indigo-700 dark:text-indigo-400">{w.rule}</span>
+                <span className="text-xs text-indigo-700 dark:text-indigo-400">{w.rule}</span>{' '}
+                <button
+                  type="button"
+                  onClick={() => setAndStore([...dismissed, w.key])}
+                  className="ml-1 rounded border border-stone-300 dark:border-stone-600 px-1.5 py-0.5 text-[11px] text-stone-500 dark:text-stone-400 hover:border-indigo-400"
+                >
+                  Ignore
+                </button>
               </li>
             ))}
           </ul>
           <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">
-            Advisory only — nothing here blocks anything. Rearrange, or ignore.
+            Advisory only — nothing here blocks anything. Rearrange, or ignore
+            {dismissed.length > 0 && (
+              <>
+                {' · '}
+                <button type="button" onClick={() => setAndStore([])} className="underline">
+                  bring back {dismissed.length} ignored
+                </button>
+              </>
+            )}
+            .
           </p>
         </div>
       )}
