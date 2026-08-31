@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import type { PersonDto, RoomDto, TagDto, TrackDto } from '@shared/types';
-import { ApiError, api, type TrashDto } from '../lib/api';
+import type { BreakDto, PersonDto, RoomDto, TagDto, TrackDto } from '@shared/types';
+import { ApiError, api, type BreakWrite, type TrashDto } from '../lib/api';
 import { fmtMin, relativeTime, rowId, uid } from '../lib/format';
 import { useEventData } from '../lib/useEventData';
+import { AdminBreaks } from './AdminBreaks';
 import { AdminRooms, type RoomDraft } from './AdminRooms';
 import { AdminPermissions } from './AdminPermissions';
 import { AdminBackup } from './AdminBackup';
@@ -322,6 +323,39 @@ export function AdminPage() {
     }
   };
 
+  const addBreak = async (draft: BreakWrite): Promise<boolean> => {
+    try {
+      data.apply({ type: 'break.created', entity: await api.createBreak(slug, draft) });
+      return true;
+    } catch (err) {
+      fail(err);
+      return false;
+    }
+  };
+
+  const patchBreak = async (item: BreakDto, draft: BreakWrite): Promise<boolean> => {
+    try {
+      data.apply({ type: 'break.updated', entity: await api.updateBreak(slug, item.id, draft) });
+      return true;
+    } catch (err) {
+      fail(err);
+      return false;
+    }
+  };
+
+  // No confirmation: a break is four fields an organiser can type again in
+  // seconds, and it takes nothing else with it when it goes.
+  const removeBreak = async (item: BreakDto): Promise<boolean> => {
+    try {
+      await api.deleteBreak(slug, item.id);
+      data.apply({ type: 'break.deleted', entity: { id: item.id } });
+      return true;
+    } catch (err) {
+      fail(err);
+      return false;
+    }
+  };
+
   const removeTag = async (tag: TagDto): Promise<boolean> => {
     if (!window.confirm(`Delete the “${tag.name}” tag? It will be removed from every session.`)) {
       return false;
@@ -367,6 +401,20 @@ export function AdminPage() {
     const [h, m] = hhmm.split(':').map(Number);
     return (h ?? 0) * 60 + (m ?? 0);
   };
+
+  /** Every date this event covers, for the break day picker. Read from the
+   *  saved event rather than the settings form: a break can only be pinned to
+   *  a day the event actually has. */
+  const dayList = ((): string[] => {
+    const out: string[] = [];
+    const cursor = new Date(`${bundle.event.startDate}T12:00:00Z`);
+    const last = Date.parse(`${bundle.event.endDate}T12:00:00Z`);
+    while (cursor.getTime() <= last && out.length < 400) {
+      out.push(cursor.toISOString().slice(0, 10));
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    return out;
+  })();
 
   // Inclusive, matching dateRange on the schedule.
   const eventDays =
@@ -649,6 +697,14 @@ export function AdminPage() {
               onClose={() => setEditingTrack(null)}
             />
           )}
+
+          <AdminBreaks
+            breaks={bundle.breaks}
+            days={dayList}
+            onCreate={addBreak}
+            onPatch={patchBreak}
+            onDelete={removeBreak}
+          />
 
           <Section
             title="Tags"

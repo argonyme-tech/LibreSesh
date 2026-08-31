@@ -100,14 +100,12 @@ export function SessionModal({
   );
   const [blocksOpenBooking, setBlocksOpenBooking] = useState(session?.blocksOpenBooking ?? false);
   const [blockHelp, setBlockHelp] = useState(false);
-  const [background, setBackground] = useState(session?.background ?? false);
   const [error, setError] = useState<string | null>(null);
 
   // The server refuses a hold on an open session rather than quietly dropping
   // it, so the form never offers the combination: switching the type to open
   // takes the hold with it, visibly, while the box is still on screen.
   const holdsFloor = isAdmin && type === 'official' && blocksOpenBooking;
-  const isBreak = isAdmin && type === 'official' && background;
 
   // Repeating is for building a programme, so it belongs to organisers and to
   // sessions that do not exist yet. Editing one day of a run edits that day:
@@ -168,7 +166,7 @@ export function SessionModal({
     onSave({
       roomId,
       type: isAdmin ? type : undefined,
-      ...(isAdmin ? { blocksOpenBooking: holdsFloor, background: isBreak } : {}),
+      ...(isAdmin ? { blocksOpenBooking: holdsFloor } : {}),
       title: title.trim(),
       ...(speaker.newName ? { speakerName: speaker.newName } : { speakerId: speaker.speakerId }),
       description: description.trim(),
@@ -451,11 +449,6 @@ export function SessionModal({
             <Field label="Attendance">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                 <Toggle
-                  checked={background}
-                  onChange={setBackground}
-                  label="A break — lunch, dinner, coffee"
-                />
-                <Toggle
                   checked={blocksOpenBooking}
                   onChange={setBlocksOpenBooking}
                   label="Everyone should be at this"
@@ -487,13 +480,9 @@ export function SessionModal({
                     afterwards moves and cancels nobody.
                   </p>
                   <p>
-                    <strong className="font-semibold text-stone-800 dark:text-stone-100">
-                      A break
-                    </strong>{' '}
-                    is the quieter one: lunch, dinner, coffee. It leaves the room columns and
-                    is drawn greyed out across the whole schedule, so nobody puts a session
-                    over it by accident — but it stops nothing, and running a session through
-                    lunch is allowed. The room still says where it is.
+                    Lunch, dinner and coffee are not sessions at all — they are breaks, set
+                    up once in Manage Event → Programme and drawn quietly behind every day
+                    they apply to.
                   </p>
                 </HelpNote>
               )}

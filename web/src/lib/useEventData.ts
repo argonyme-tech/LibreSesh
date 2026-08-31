@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import type {
+  BreakDto,
   BundleDto,
   ChangeEvent,
   ContributionDto,
@@ -59,6 +60,17 @@ const byRoomOrder = (rooms: RoomDto[]): RoomDto[] =>
 
 const byTrackOrder = (tracks: TrackDto[]): TrackDto[] =>
   [...tracks].sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
+
+/** Same order the bundle uses: by clock, every-day rows before pinned ones. */
+const byBreakTime = (breaks: BreakDto[]): BreakDto[] =>
+  breaks
+    .slice()
+    .sort(
+      (a, b) =>
+        a.startMin - b.startMin ||
+        Number(a.date !== null) - Number(b.date !== null) ||
+        a.id - b.id,
+    );
 
 const byTagName = (tags: TagDto[]): TagDto[] =>
   tags.slice().sort((a, b) => a.name.localeCompare(b.name));
@@ -194,6 +206,19 @@ function applyChange(state: State, change: ChangeEvent): State {
           sessions: bundle.sessions.map((s) => (s.trackId === id ? { ...s, trackId: null } : s)),
         },
       };
+    }
+    case 'break.created':
+    case 'break.updated':
+      return {
+        ...state,
+        bundle: {
+          ...bundle,
+          breaks: byBreakTime(upsert(bundle.breaks, change.entity as BreakDto)),
+        },
+      };
+    case 'break.deleted': {
+      const { id } = change.entity as { id: number };
+      return { ...state, bundle: { ...bundle, breaks: bundle.breaks.filter((b) => b.id !== id) } };
     }
     case 'person.created':
     case 'person.updated':

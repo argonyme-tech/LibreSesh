@@ -26,17 +26,21 @@ All notable changes to this project are documented here.
   writes `q` into the URL and narrows the day being drawn. Finding a session and
   narrowing the grid are two different questions, and they have two controls.
 
-- **Lunch, dinner and coffee belong on the schedule.** An organiser can mark an
-  official session a **break**. It leaves the room columns and is drawn greyed
-  out across the whole grid, so nobody puts a session over it by accident — but
-  it stops nothing. Running a session through lunch is allowed, and a break
-  never counts as double-booking the room it names, which is exactly what
-  separates it from a session everyone should be at. The room is still
-  recorded, because "lunch, in the Foyer" is worth saying; the grid just does
-  not spend a column on it. The two marks are independent, so a conference
-  dinner can be both a break and something everyone should be at — it gets the
-  one band, and the hold still bites. Repeats put lunch on every day of a run in
-  one row, and the importer takes it as `background`.
+- **Lunch, dinner and coffee belong to the event, not to a room.** Breaks are
+  their own thing now: an organiser types “Lunch, 12:00–14:00, every day” once
+  in Manage Event → Programme → Breaks, and it is drawn as a quiet band behind
+  every day of the schedule. There is nothing to click — it is background
+  information, not a session anyone attends — and it stops nothing: running a
+  session through lunch is still allowed. A break can be pinned to one day
+  instead, which is how the conference dinner on the Wednesday is said.
+
+  This replaces the first attempt, which made a break a flag on an official
+  session. That shape was wrong in a way that showed: it needed a room it did
+  not use, carried a speaker, tags, a description and contributions it would
+  never have, and had to be repeated onto every day like a real session. The
+  flag and its column are gone, and the importer takes a top-level `breaks`
+  list instead. Any session that carried the flag stays exactly where it is as
+  an ordinary session, which the organiser can delete and re-add as a break.
 
 - **A session can hold the floor.** An organiser can mark an official session
   *everyone should be at this* — a keynote, the closing plenary — and while it

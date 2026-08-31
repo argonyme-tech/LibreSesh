@@ -199,13 +199,40 @@ const optionalHttpUrl = z
     }
   }, 'Only http and https links');
 
+/**
+ * A break — lunch, dinner, coffee. Local minutes of day rather than instants,
+ * because "every day at noon" is the thing being said; and on the same
+ * 5-minute grid the calendar snaps sessions to, so the band lines up with the
+ * blocks around it.
+ */
+export const breakSchema = z
+  .object({
+    label: trimmed(60),
+    startMin: minuteOfDaySchema,
+    endMin: minuteOfDaySchema,
+    /** Omit or send null for "every day of the event". */
+    date: dateSchema.nullish(),
+  })
+  .superRefine((v, ctx) => {
+    for (const field of ['startMin', 'endMin'] as const) {
+      if (v[field] % 5 !== 0) {
+        ctx.addIssue({ code: 'custom', path: [field], message: 'Times land on a 5-minute step' });
+      }
+    }
+    if (v.endMin <= v.startMin) {
+      ctx.addIssue({ code: 'custom', path: ['endMin'], message: 'A break must end after it starts' });
+    }
+  });
+
+/** PATCH sends the whole break — there are only four fields, and a partial
+ *  update would still have to re-check end-after-start against the stored row. */
+export const breakPatchSchema = breakSchema;
+
 export const sessionSchema = z.object({
   roomId: z.number().int().positive(),
   type: z.enum(['official', 'open']).optional(),
   /** Organisers only; refused on an open session. */
   blocksOpenBooking: z.boolean().optional(),
-  /** Lunch, dinner, a break: drawn across the schedule. Organisers only. */
-  background: z.boolean().optional(),
   title: trimmed(120),
   description: optionalTrimmed(5000).optional(),
   speakerId: z.number().int().positive().nullable().optional(),

@@ -1,4 +1,5 @@
 import type {
+  BreakDto,
   ContributionDto,
   Role,
   EventDto,
@@ -12,6 +13,7 @@ import type {
   TrackDto,
 } from './shared/types.js';
 import type {
+  BreakRow,
   ContributionRow,
   Db,
   EventRow,
@@ -59,6 +61,14 @@ export const toTrackDto = (t: TrackRow): TrackDto => ({
   name: t.name,
   color: t.color,
   sortOrder: t.sort_order,
+});
+
+export const toBreakDto = (b: BreakRow): BreakDto => ({
+  id: b.id,
+  label: b.label,
+  startMin: b.start_min,
+  endMin: b.end_min,
+  date: b.date,
 });
 
 export const toTagDto = (t: TagRow): TagDto => ({ id: t.id, name: t.name, color: t.color });
@@ -175,7 +185,6 @@ export function toSessionDto(
     trackId: row.track_id,
     type: row.type,
     blocksOpenBooking: row.blocks_open_booking === 1,
-    background: row.background === 1,
     title: row.title,
     description: row.description,
     speaker: speakerName,

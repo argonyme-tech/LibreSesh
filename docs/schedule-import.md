@@ -103,6 +103,30 @@ Array order is column order on the grid: list them the way they are printed.
 
 Both are optional, and both are declared here or not at all.
 
+### `breaks`
+
+Lunch, dinner, the coffee break — the parts of the day that belong to the whole
+event rather than to a room. They are not sessions: nobody hosts one, they sit
+in no column, and nothing on the schedule opens them. They are drawn as a quiet
+band behind the grid so nobody books over one by accident, and they stop
+nothing — a session may still run through lunch.
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `label` | ✓ | Up to 60 characters — `Lunch`, `Coffee`, `Dinner` |
+| `start`, `end` | ✓ | Wall-clock `HH:MM`, on the 5-minute grid. `end` must be after `start` |
+| `date` | | One day only, `YYYY-MM-DD`. **Omit it for every day of the event**, which is the usual case |
+
+```json
+"breaks": [
+  { "label": "Lunch", "start": "12:00", "end": "14:00" },
+  { "label": "Conference dinner", "start": "19:00", "end": "21:30", "date": "2026-09-02" }
+]
+```
+
+Up to 40 of them. A `date` outside the event's dates is refused — a break
+nobody is there for is invisible, and silently so.
+
 ### `sessions`
 
 | Field | Required | Notes |
@@ -115,7 +139,6 @@ Both are optional, and both are declared here or not at all.
 | `speaker` | | Free text. Matches an existing profile in this event, or creates an unclaimed one |
 | `type` | | `official` (default) or `open` |
 | `blocksOpenBooking` | | `true` holds the floor: while this session runs, attendees can add nothing anywhere in the event. Official sessions only. Default `false` |
-| `background` | | `true` makes it a break — lunch, dinner, coffee. Drawn greyed out across the schedule instead of in its room's column, and it blocks nobody. Official sessions only. Default `false` |
 | `date`, `start`, `end` | ✓ | Local date and wall-clock times — see below |
 | `startsAt`, `endsAt` | | ISO instants instead, for a document a program wrote |
 | `repeat` | | Say the row once, land it on every day it happens — see below |
@@ -232,9 +255,12 @@ anyway, because both are things an organiser is allowed to do:
   and off the top or bottom of the grid, which reads as a failed import.
   Widening `dayStartMin`/`dayEndMin` in Manage Event → Settings reveals it.
 - *overlaps …* — two sessions double-booked in one room. Organisers may do
-  this, and the grid badges the clash. A `background` row never raises this and
-  never becomes one for a later row: lunch sits over the whole afternoon by
-  design, and warning about it every time would bury the clashes that are real.
+  this, and the grid badges the clash. Breaks are not sessions and never raise
+  it: lunch occupies no room.
+- *imported as an ordinary session* — a session carrying `background`, which
+  used to mean "this is a break". Breaks are their own list now, so the flag is
+  ignored rather than refused: the row still lands, and the warning says to
+  move it into `breaks`.
 - *excepting that day does nothing* — a `repeat.except` date the run never
   reaches, which is the shape a mistyped date takes and is otherwise invisible:
   the grid just quietly has that day.

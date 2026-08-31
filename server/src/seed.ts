@@ -227,6 +227,7 @@ export function seedDemoEvent(db: Db, options: DemoSeedOptions = {}): DemoSeedRe
       db.prepare('DELETE FROM rooms WHERE event_id = ?').run(prior.id);
       db.prepare('DELETE FROM tags WHERE event_id = ?').run(prior.id);
       db.prepare('DELETE FROM tracks WHERE event_id = ?').run(prior.id);
+      db.prepare('DELETE FROM breaks WHERE event_id = ?').run(prior.id);
       db.prepare('DELETE FROM event_permissions WHERE event_id = ?').run(prior.id);
       db.prepare('DELETE FROM event_identities WHERE event_id = ?').run(prior.id);
       db.prepare('DELETE FROM roles WHERE event_id = ?').run(prior.id);
@@ -281,6 +282,15 @@ export function seedDemoEvent(db: Db, options: DemoSeedOptions = {}): DemoSeedRe
           .run(eventId, tag.name, tag.color).lastInsertRowid,
       ),
     );
+
+    // Lunch every day, and one dinner on the opening evening: the two shapes a
+    // break comes in, so the demo shows both.
+    const insertBreak = db.prepare(
+      `INSERT INTO breaks (event_id, label, start_min, end_min, date, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    );
+    insertBreak.run(eventId, 'Lunch', 12 * 60, 13 * 60 + 30, null, now);
+    insertBreak.run(eventId, 'Dinner', 19 * 60, 21 * 60, dayList[0] as string, now);
 
     const insertPerson = db.prepare(
       `INSERT INTO people (event_id, identity_id, name, bio, links, created_at, updated_at)

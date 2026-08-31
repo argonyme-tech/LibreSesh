@@ -1,11 +1,14 @@
 import { useMemo } from 'react';
-import type { RoomDto, SessionDto, TagDto } from '@shared/types';
+import type { BreakDto, RoomDto, SessionDto, TagDto } from '@shared/types';
 import { fmtMin, place } from '../lib/format';
 
 export interface ListViewProps {
   rooms: RoomDto[];
   tags: TagDto[];
   sessions: SessionDto[];
+  /** Lunch and friends, for the days they apply to. Read-only furniture here
+   *  too — it is in the list so the day reads honestly, not to be opened. */
+  breaks: BreakDto[];
   contributionCounts: Record<number, number>;
   /** Sessions on the current identity's personal agenda. */
   starredIds: Set<number>;
@@ -25,6 +28,7 @@ export function ListView({
   rooms,
   tags,
   sessions,
+  breaks,
   contributionCounts,
   starredIds,
   starCounts,
@@ -53,18 +57,44 @@ export function ListView({
     return out;
   }, [sessions, timezone, day]);
 
-  // The first group that has not finished yet is where "Now" scrolls to.
-  const nowGroupIndex =
-    nowMin === null
-      ? -1
-      : groups.findIndex((g) => Math.max(...g.items.map((i) => i.endMin)) > nowMin);
+  /** Session groups and breaks on one clock. A break sorts ahead of a session
+   *  starting the same minute: it is the context the session sits in. */
+  const rows = useMemo(() => {
+    const sessionRows = groups.map((group) => ({
+      kind: 'sessions' as const,
+      start: group.start,
+      end: Math.max(...group.items.map((i) => i.endMin)),
+      group,
+    }));
+    const breakRows = breaks
+      .filter((b) => b.date === null || b.date === day)
+      .map((b) => ({ kind: 'break' as const, start: b.startMin, end: b.endMin, item: b }));
+    return [...breakRows, ...sessionRows].sort(
+      (a, b) => a.start - b.start || Number(a.kind === 'sessions') - Number(b.kind === 'sessions'),
+    );
+  }, [groups, breaks, day]);
+
+  // The first row that has not finished yet is where "Now" scrolls to.
+  const nowGroupIndex = nowMin === null ? -1 : rows.findIndex((r) => r.end > nowMin);
 
   return (
     <div className="px-4 pb-24 pt-3">
-      {groups.map((group, index) => (
-        <div key={group.start} id={index === nowGroupIndex ? 'now-anchor' : undefined} className="mb-4">
+      {rows.map((row, index) =>
+        row.kind === 'break' ? (
+          <div
+            key={`break-${row.item.id}`}
+            id={index === nowGroupIndex ? 'now-anchor' : undefined}
+            className="mb-4 rounded-xl border border-dashed border-stone-200 bg-stone-100/70 px-3 py-2 text-xs font-semibold text-stone-500 dark:border-stone-700 dark:bg-stone-800/50 dark:text-stone-400"
+          >
+            {row.item.label}
+            <span className="ml-1.5 font-normal">
+              {fmtMin(row.item.startMin)}–{fmtMin(row.item.endMin)}
+            </span>
+          </div>
+        ) : (
+        <div key={row.group.start} id={index === nowGroupIndex ? 'now-anchor' : undefined} className="mb-4">
           <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-stone-500 dark:text-stone-400">
-            {fmtMin(group.start)}
+            {fmtMin(row.group.start)}
             {index === nowGroupIndex && (
               <span className="rounded bg-accent px-1.5 py-0.5 font-bold text-stone-900">
                 next / now
@@ -72,7 +102,7 @@ export function ListView({
             )}
           </div>
           <div className="space-y-2">
-            {group.items.map(({ session, startMin, endMin }) => {
+            {row.group.items.map(({ session, startMin, endMin }) => {
               const live = nowMin !== null && nowMin >= startMin && nowMin < endMin;
               const count = contributionCounts[session.id] ?? 0;
               const starred = starredIds.has(session.id);
@@ -180,7 +210,8 @@ export function ListView({
             })}
           </div>
         </div>
-      ))}
+        ),
+      )}
     </div>
   );
 }

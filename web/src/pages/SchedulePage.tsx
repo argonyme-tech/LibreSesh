@@ -1050,6 +1050,7 @@ export function SchedulePage() {
             subtitleOf={axis === "track" ? roomNameOf : undefined}
             tags={bundle.tags}
             sessions={daySessions}
+            breaks={bundle.breaks}
             matchedIds={matchedIds}
             starredIds={starredIds}
             starCounts={bundle.starCounts}
@@ -1072,6 +1073,7 @@ export function SchedulePage() {
             rooms={bundle.rooms}
             tags={bundle.tags}
             sessions={visibleSessions}
+            breaks={bundle.breaks}
             contributionCounts={bundle.contributionCounts}
             starredIds={starredIds}
             starCounts={bundle.starCounts}
