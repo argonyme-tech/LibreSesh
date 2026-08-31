@@ -190,6 +190,24 @@ Rotating the secret pushes every returning visitor down the yellow branch at
 once, and their old names are still held — which is the red box, for everyone,
 until they pick a new one.
 
+**If the secret leaks, on its own, very little happens.** It lets someone forge
+a valid signature over a token of their choosing — but the token still has to
+exist in `identities`, and tokens are 22 random base62 characters. A forged
+cookie carrying a token nobody holds resolves to no identity, and the
+middleware mints a fresh anonymous one, which is exactly what the forger would
+have got by sending no cookie at all. The token is the credential; the secret
+only proves a token was issued here.
+
+**Where it does matter is in combination.** Someone holding tokens — from a
+copied database file, a whole-instance backup, a careless `SELECT` in a
+screenshot — cannot turn them into working cookies without the secret. So the
+two halves are worth keeping apart: **do not store `COOKIE_SECRET` on the
+volume that holds the database or its backups.** In production it is an
+environment variable for exactly this reason. (The dev fallback writes
+`.cookie-secret` beside the database, putting both halves in one place — which
+is fine precisely because a dev database holds nothing worth stealing, and is
+why the fallback is not offered in production.)
+
 **What identity is not:** it is not a login, and it is not global state. A role
 is a row keyed on (identity, event); a display name is a row keyed on (event,
 identity). Signing out of an event deletes the role, never the identity — which
@@ -374,6 +392,7 @@ explicitly *not* built to withstand a targeted attacker with time.
 | Reading a schedule you were not given | Viewing requires the viewer password; there is no public event view |
 | Leaking one person's agenda | Stars and interest are never broadcast and never attributed in any payload; only aggregate counts are exposed |
 | A leaked calendar URL | The token grants only what its owner's role already allows, and only for that one event; revoking the role kills the feed |
+| A leaked `COOKIE_SECRET` | Little on its own — a forged signature still needs a real 131-bit token, and an unknown one just mints an anonymous identity. Kept out of the database's volume so a copied DB and the secret do not leak together |
 | A leaked whole-database backup | Never leaves the server unencrypted: AES-256-GCM under a scrypt key (N=2^15) from a passphrase typed at download time, gated by the instance password and the 5-per-15-min auth budget |
 
 **Out of scope, accepted:**

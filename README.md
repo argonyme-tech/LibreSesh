@@ -303,6 +303,34 @@ For continuous replication instead of nightly snapshots, add
 [Litestream](https://litestream.io) — one extra binary streaming the WAL to
 S3-compatible storage, no code changes.
 
+### The cookie secret, and rotating it
+
+`COOKIE_SECRET` is set once and kept. It signs the identity cookie, so it is
+the one variable whose *change* costs more than its absence:
+
+- **Changing it signs out every visitor at once** — their cookies stop
+  verifying and they come back as strangers.
+- **Worse, their names do not come back with them.** A display name is held,
+  uniquely per event, by the identity that claimed it. After a rotation people
+  are told "someone at this event is already called Ada", which is true and
+  useless: the someone is their own former self. The gate offers "Enter as
+  *Ada 2*", and an organiser can free the originals with
+  `sqlite3 "$DATABASE_PATH" "DELETE FROM event_identities WHERE event_id = <id>;"`,
+  which is a blunt instrument — it frees every name in that event.
+
+Leaking it is the milder half. On its own a leaked secret buys almost nothing:
+a forged signature still has to carry a token that exists in `identities`, and
+those are 22 random characters. It matters **in combination** with a copy of
+the database, where the tokens live — so keep the secret out of the volume that
+holds the database and its backups. That is why production takes it from the
+environment rather than a file: the dev fallback deliberately puts both halves
+in one place, and a dev database is worth nothing.
+
+If you do have to rotate — the secret was committed, pasted into a chat, or
+sent to the wrong person — do it between events rather than during one, and
+expect the sign-out. Nothing else about the instance is affected: roles,
+schedules, profiles and the audit log are untouched.
+
 ### Upgrades
 
 Upgrading in place is safe by design: before applying any pending migration to

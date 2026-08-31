@@ -43,7 +43,7 @@ export function preflight(env: Env): PreflightProblem[] {
     problems.push({
       severity: 'fatal',
       problem: 'COOKIE_SECRET is not set.',
-      fix: `Set it in ${where} to a long random string — \`openssl rand -hex 32\`. It signs the identity cookie, so changing it later signs everyone out.`,
+      fix: `Set it in ${where} to a long random string — \`openssl rand -hex 32\`. It signs the identity cookie: set it once and keep it, because changing it later signs everyone out and leaves their display names held by the identities they lost. Keep it out of the data volume — that is where the tokens it signs live.`,
     });
   }
 
