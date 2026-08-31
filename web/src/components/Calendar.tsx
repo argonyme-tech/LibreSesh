@@ -225,12 +225,20 @@ function ColumnCard({ column, alignEnd }: { column: CalendarColumn; alignEnd: bo
   const panelId = `column-info-${column.id}`;
 
   return (
-    <div className="relative shrink-0 px-1" style={{ width: COL_W }}>
+    <div className="shrink-0 px-1" style={{ width: COL_W }}>
+      {/* The panel hangs off *this* box, not the flex item around it: column
+          cards are different heights, the flex item stretches to the tallest,
+          and anchoring to that dropped the panel a card's height below the one
+          it belongs to. */}
       <div
-        className="rounded-lg border border-stone-200/80 px-3 py-2 dark:border-stone-700"
+        className="relative rounded-lg border border-stone-200/80 px-3 py-2 dark:border-stone-700"
         // The palette is already washed out; 'cc'/'22' keep it that way
         // in light and dark without maintaining two palettes.
         style={{ background: `${column.color}cc`, borderColor: column.color }}
+        // Closing on the button's own mouseleave put the panel out of reach:
+        // moving the pointer towards it left the icon and dismissed it. The
+        // card is what the pointer has to leave, and the panel is inside it.
+        onMouseLeave={() => setOpen(false)}
       >
         <div className="flex items-center gap-1">
           <div className="min-w-0 flex-1 truncate text-xs font-semibold text-stone-900">
@@ -244,7 +252,6 @@ function ColumnCard({ column, alignEnd }: { column: CalendarColumn; alignEnd: bo
               aria-describedby={open ? panelId : undefined}
               className="-m-1 shrink-0 rounded-full p-1 text-stone-600 hover:text-stone-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-stone-500"
               onMouseEnter={() => setOpen(true)}
-              onMouseLeave={() => setOpen(false)}
               onFocus={() => setOpen(true)}
               onBlur={() => setOpen(false)}
               onClick={() => setOpen((v) => !v)}
@@ -257,20 +264,21 @@ function ColumnCard({ column, alignEnd }: { column: CalendarColumn; alignEnd: bo
           )}
         </div>
         {column.detail}
+        {hasInfo && open && (
+          <div
+            id={panelId}
+            role="tooltip"
+            // Flush to the card's own edge, one step below it. Anchored to the
+            // last column, a left-aligned panel would hang off the end of the
+            // grid and be clipped by the scroller.
+            className={`absolute top-full z-30 mt-1 w-60 rounded-lg border border-stone-200 bg-white p-3 text-xs leading-relaxed text-stone-600 shadow-lg dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300 ${
+              alignEnd ? 'right-0' : 'left-0'
+            }`}
+          >
+            {column.info}
+          </div>
+        )}
       </div>
-      {hasInfo && open && (
-        <div
-          id={panelId}
-          role="tooltip"
-          // Anchored to the last column, a left-aligned panel would hang off
-          // the end of the grid and be clipped by the scroller.
-          className={`absolute top-full z-30 mt-1 w-60 rounded-lg border border-stone-200 bg-white p-3 text-xs leading-relaxed text-stone-600 shadow-lg dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300 ${
-            alignEnd ? 'right-1' : 'left-1'
-          }`}
-        >
-          {column.info}
-        </div>
-      )}
     </div>
   );
 }
