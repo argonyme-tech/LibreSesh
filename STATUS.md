@@ -40,6 +40,40 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
 ## High Priority
 
+- **The drop still flickers, and the fix so far only made it smaller.**
+  Reported 2026-08-31, after the two fixes in CHANGELOG `[Unreleased]` landed
+  (`461e7ab`, `9b95de7`): a dragged block and a permission switch still show a
+  visible pop, "just maybe a bit less glitchy". What is already ruled out is
+  the double-application — the drop hold is absolute now, so the server's echo
+  of our own write cannot move the block a second time. What is left is
+  unidentified, and it needs eyes on a real browser: neither dev container nor
+  the test suite has a DOM, so `drawnAt` and `overlay` are tested as pure
+  functions and the actual paint is not.
+
+  Leading suspect for the grid, not yet confirmed: **lane re-layout.**
+  `drawnAt` overrides a block's `startMin`, `durMin` and `columnIndex`, but not
+  its lane — `laneLayout` recomputes from `placed`, which follows the echoed
+  row, so `lane.lane` and `lane.lanes` can change while the block is still
+  held, moving its `left` and `width` sideways mid-hold. That would be exactly
+  one horizontal pop at echo time. If confirmed, the fix is the same shape as
+  the last one: lay the grid out from the drawn positions rather than the raw
+  rows, so a held block lanes against where it is drawn.
+
+  Second suspect, cheaper to test: nothing on the block transitions position —
+  the class list carries `transition-shadow` only — so every correction, however
+  small and however correct, arrives as an instant jump. A short transform
+  transition on `top`/`left` would make a legitimate re-layout read as movement
+  instead of a glitch, and would also mask the tail of whatever the real cause
+  turns out to be. Worth doing on its own merits; not a substitute for finding
+  the cause.
+
+  For the permissions matrix there is no remaining suspect on file. The
+  optimistic overlay does move the switch on click, so if it still flicks, the
+  next thing to establish is *which* of the three states is wrong and when —
+  note that `busy !== null` disables every switch in the table during a save,
+  and a disabled `Toggle` restyles, which is a visible change that is not a
+  revert and could easily read as one.
+
 - **Pitch board.** Always show the creator, default the creator as host, and
   split the board into hot/new. The plan is
   `_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`, whose
@@ -193,6 +227,19 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   and recreate. What it wants is a line in the ARCHITECTURE §Migrations
   section naming the deploy as the cut-over, so the first `002_*.sql` is
   written deliberately rather than remembered.
+
+- **A one-line reset for the local database.** Wiping a dev instance is
+  currently three commands: stop the api, `rm -f data/app.db data/app.db-wal
+  data/app.db-shm`, restart and let boot reseed. Easy to get wrong in the
+  direction that hurts — `rm data/app.db*` also takes the `app.db.backup-*`
+  copies sitting in the same directory. Wants an `npm run db:reset` that names
+  the three files explicitly and leaves `data/.cookie-secret` alone (deleting
+  it signs every browser out, which is a different intent and should be its
+  own flag). Noted 2026-08-31, prompted by fixture identities —
+  `programme_team` and the five seeded attendees — showing up unexplained in
+  the admin attendance list. Note the naming collision with the item below: if
+  "seed" becomes "mock", this is `db:reset` either way, but its reseed step
+  changes name.
 
 - **Rename "seed" to "mock".** Floated 2026-08-31. Worth knowing before
   starting that the word means three unrelated things in this tree, and only
