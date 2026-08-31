@@ -149,6 +149,16 @@ export interface SessionDto {
   /** null when the event has no tracks, or the session is not on one. */
   trackId: number | null;
   type: SessionType;
+  /** This session holds the floor: while it runs, attendees may not place an
+   *  open session anywhere in the event. Official sessions only, and only an
+   *  organiser can set it. Speakers and organisers are not stopped by it —
+   *  what they place is badged as competing instead. */
+  blocksOpenBooking: boolean;
+  /** Programme furniture — lunch, dinner, the coffee break. Drawn as a grey
+   *  band across the whole schedule rather than a block in one room's column,
+   *  and it stops nobody: running a session through lunch is allowed, which is
+   *  what separates this from `blocksOpenBooking`. Official sessions only. */
+  background: boolean;
   title: string;
   description: string;
   /** Resolved from the linked person; empty when the session has no speaker. */

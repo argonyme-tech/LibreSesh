@@ -17,19 +17,21 @@ import {
   todayInZone,
 } from "../lib/format";
 import { useEventData } from "../lib/useEventData";
+import { matchesQuery } from "../lib/search";
 import { useFilters } from "../lib/useFilters";
 import { useMe } from "../lib/useMe";
 import { Calendar, PX_PER_MIN, timeClashPairs } from "../components/Calendar";
 import { DetailSheet } from "../components/DetailSheet";
 import { SessionDetail } from "../components/SessionDetail";
+import { ActiveFilters, FilterMenu } from "../components/FilterMenu";
 import { Gate } from "../components/Gate";
 import { ListView } from "../components/ListView";
 import { Logo } from "../components/Logo";
 import { ProfileMenu } from "../components/ProfileMenu";
+import { SearchBox } from "../components/SearchBox";
 import { SessionModal } from "../components/SessionModal";
 import { Tour, tourSeen, type TourStep } from "../components/Tour";
 import {
-  Chip,
   EmptyState,
   Modal,
   PrimaryButton,
@@ -240,7 +242,7 @@ export function SchedulePage() {
   /** Sessions on the current day that pass the filter chips (SPEC §7.3). */
   const matchedIds = useMemo(() => {
     if (!bundle) return new Set<number>();
-    const q = filters.q.trim().toLowerCase();
+    const q = filters.q.trim();
     const soonNow = nowMin;
     return new Set(
       bundle.sessions
@@ -253,14 +255,9 @@ export function SchedulePage() {
           )
             return false;
           if (filters.mine && !starredIds.has(s.id)) return false;
-          if (
-            q &&
-            !`${s.title} ${s.speaker} ${s.description}`
-              .toLowerCase()
-              .includes(q)
-          ) {
-            return false;
-          }
+          // Same matcher the search box uses: every word has to appear
+          // somewhere in the session, in any order.
+          if (q && !matchesQuery(s, q)) return false;
           if (filters.soon) {
             if (soonNow === null) return false;
             const { endMin } = place(s, timezone);
@@ -629,8 +626,8 @@ export function SchedulePage() {
     },
     {
       target: "filters",
-      title: "Narrow it down",
-      body: "Search plus room and tag filters. Filters live in the URL, so a filtered view can be shared as a link.",
+      title: "Find and narrow",
+      body: "Search finds a session on any day — press Enter for the full list of results. Filter narrows the day on screen by room, tag or text, and lives in the URL, so a filtered view can be shared as a link.",
     },
   ];
   if (canArrange) {
@@ -927,67 +924,36 @@ export function SchedulePage() {
             </div>
           </div>
 
-          <div className="mx-auto max-w-6xl overflow-x-auto px-4 pb-3 no-scrollbar">
+          {/* Two controls, not a row of chips that scrolled off the right
+              edge: find a session anywhere (the box), or narrow the day on
+              screen (the panel). Whatever the panel is currently doing shows
+              up beside it as chips you can take off one at a time. */}
+          <div className="mx-auto max-w-6xl px-4 pb-3">
             <div
               data-tour="filters"
-              className="flex items-center gap-1.5 whitespace-nowrap"
+              className="flex flex-wrap items-center gap-1.5"
             >
-              <input
-                value={filters.q}
-                onChange={(e) => filters.set({ q: e.target.value })}
-                placeholder="Search title, speaker…"
-                aria-label="Search sessions"
-                className="w-40 shrink-0 rounded-full border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 px-3 py-1 text-xs outline-none focus:border-stone-500 dark:focus:border-stone-400"
+              <SearchBox
+                sessions={bundle.sessions}
+                rooms={bundle.rooms}
+                timezone={timezone}
+                today={today}
+                onOpen={openResult}
+                onSeeAll={(q) =>
+                  navigate(`/e/${slug}/search?q=${encodeURIComponent(q)}`)
+                }
               />
-              <Chip
-                active={filters.soon}
-                onClick={() => filters.set({ soon: !filters.soon })}
-              >
-                Now / next
-              </Chip>
-              <Chip
-                active={filters.mine}
-                onClick={() => filters.set({ mine: !filters.mine })}
-              >
-                <span
-                  className={
-                    filters.mine ? "" : "text-amber-500 dark:text-amber-400"
-                  }
-                >
-                  ★
-                </span>{" "}
-                My agenda ({starredIds.size})
-              </Chip>
-              <span className="mx-1 h-4 w-px shrink-0 bg-stone-300 dark:bg-stone-600" />
-              {bundle.rooms.map((r) => (
-                <Chip
-                  key={r.id}
-                  active={filters.rooms.includes(r.id)}
-                  onClick={() => filters.toggleRoom(r.id)}
-                >
-                  {r.name}
-                </Chip>
-              ))}
-              <span className="mx-1 h-4 w-px shrink-0 bg-stone-300 dark:bg-stone-600" />
-              {bundle.tags.map((t) => (
-                <Chip
-                  key={t.id}
-                  dot={t.color}
-                  active={filters.tags.includes(t.id)}
-                  onClick={() => filters.toggleTag(t.id)}
-                >
-                  {t.name}
-                </Chip>
-              ))}
-              {filters.active && (
-                <button
-                  type="button"
-                  onClick={filters.clear}
-                  className="shrink-0 rounded-full px-2.5 py-1 text-xs font-medium text-stone-500 dark:text-stone-400 underline hover:text-stone-800 dark:hover:text-stone-200"
-                >
-                  Clear all
-                </button>
-              )}
+              <FilterMenu
+                filters={filters}
+                rooms={bundle.rooms}
+                tags={bundle.tags}
+                starredCount={starredIds.size}
+              />
+              <ActiveFilters
+                filters={filters}
+                rooms={bundle.rooms}
+                tags={bundle.tags}
+              />
             </div>
           </div>
           </>

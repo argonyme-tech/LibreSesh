@@ -11,7 +11,8 @@ import type {
 } from '@shared/types';
 import { fmtMin, place, relativeTime } from '../lib/format';
 import { renderMarkdown } from '../lib/markdown';
-import { PrimaryButton, SecondaryButton, inputClass } from './ui';
+import { EditIcon, HideIcon, RemoveIcon, UnhideIcon } from './icons';
+import { IconButton, PrimaryButton, SecondaryButton, inputClass } from './ui';
 
 const KIND_LABEL: Record<ContributionKind, string> = {
   question: 'Questions',
@@ -135,6 +136,22 @@ export function SessionDetail({
               official
             </span>
           )}
+          {session.background && (
+            <span
+              title="Programme furniture — it blocks nobody"
+              className="rounded-full bg-stone-100 dark:bg-stone-800 px-2 py-0.5 text-xs font-semibold text-stone-500 dark:text-stone-400"
+            >
+              break
+            </span>
+          )}
+          {session.blocksOpenBooking && (
+            <span
+              title="While this runs, attendees cannot add a session anywhere"
+              className="rounded-full bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300"
+            >
+              everyone should be here
+            </span>
+          )}
           {session.tagIds.map((id) => {
             const tag = tags.find((t) => t.id === id);
             if (!tag) return null;
@@ -226,14 +243,16 @@ export function SessionDetail({
       // In the page's rail the gap comes from `space-y-4`; in the sheet's
       // single stack it has to come from the row itself.
       <div className={`flex gap-2 ${page ? '' : 'mb-4'}`}>
-        <SecondaryButton className="flex-1 py-1.5" onClick={onEdit}>
+        <SecondaryButton className="flex-1 justify-center gap-1.5 py-1.5" onClick={onEdit}>
+          <EditIcon className="h-3.5 w-3.5" />
           Edit session
         </SecondaryButton>
         <button
           type="button"
           onClick={onDelete}
-          className="rounded-lg border border-red-200 dark:border-red-900 px-3 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
         >
+          <RemoveIcon className="h-3.5 w-3.5" />
           Delete
         </button>
       </div>
@@ -309,26 +328,31 @@ export function SessionDetail({
                         {c.createdByName} · {relativeTime(c.createdAt)}
                         {c.hidden && ' · hidden'}
                       </span>
-                      {role === 'admin' && !archived && (
-                        <button
-                          type="button"
-                          onClick={() => onToggleHidden(c)}
-                          className="ml-auto shrink-0 text-stone-500 dark:text-stone-400 underline hover:text-stone-800 dark:hover:text-stone-200"
-                        >
-                          {c.hidden ? 'unhide' : 'hide'}
-                        </button>
-                      )}
-                      {!archived && (role === 'admin' || c.createdBy === me?.id) && (
-                        <button
-                          type="button"
-                          onClick={() => onRemoveContribution(c.id)}
-                          className={`shrink-0 text-red-500 dark:text-red-400 underline ${
-                            role === 'admin' ? '' : 'ml-auto'
-                          }`}
-                        >
-                          remove
-                        </button>
-                      )}
+                      {/* Icon buttons rather than the underlined words these
+                          were: two text links in a row this dense read as prose
+                          and wrapped on a phone. `title` carries the wording
+                          for a pointer, `aria-label` for everyone else. */}
+                      <div className="ml-auto flex shrink-0 items-center gap-0.5">
+                        {role === 'admin' && !archived && (
+                          <IconButton
+                            onClick={() => onToggleHidden(c)}
+                            aria-label={c.hidden ? 'Unhide this contribution' : 'Hide this contribution'}
+                            title={c.hidden ? 'Unhide' : 'Hide'}
+                          >
+                            {c.hidden ? <UnhideIcon /> : <HideIcon />}
+                          </IconButton>
+                        )}
+                        {!archived && (role === 'admin' || c.createdBy === me?.id) && (
+                          <IconButton
+                            onClick={() => onRemoveContribution(c.id)}
+                            aria-label="Remove this contribution"
+                            title="Remove"
+                            className="hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:hover:border-red-900 dark:hover:bg-red-950/50 dark:hover:text-red-400"
+                          >
+                            <RemoveIcon />
+                          </IconButton>
+                        )}
+                      </div>
                     </div>
                   </li>
                 ))}

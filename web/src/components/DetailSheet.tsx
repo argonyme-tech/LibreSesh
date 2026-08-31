@@ -9,6 +9,7 @@ import type {
   SessionDto,
   TagDto,
 } from '@shared/types';
+import { CloseIcon, ExpandIcon } from './icons';
 import { COLLAPSED_COUNT, SessionDetail } from './SessionDetail';
 
 export interface DetailSheetProps {
@@ -26,7 +27,7 @@ export interface DetailSheetProps {
   starred: boolean;
   /** The event's word for the middle role, used in the upgrade prompt. */
   userLabel: string;
-  /** Where the ⤢ control goes — the same session's full-page route. */
+  /** Where the expand control goes — the same session's full-page route. */
   expandTo: string;
   onClose: () => void;
   onToggleStar: () => void;
@@ -36,6 +37,12 @@ export interface DetailSheetProps {
   onRemoveContribution: (id: number) => void;
   onToggleHidden: (contribution: ContributionDto) => void;
 }
+
+/** Both header controls share one 36px square target — big enough to hit on a
+ *  touch screen, and equal so the pair reads as a pair. */
+const headerButtonClass =
+  'grid h-9 w-9 place-items-center rounded-full text-stone-400 dark:text-stone-500 ' +
+  'hover:bg-stone-100 hover:text-stone-600 dark:hover:bg-stone-800 dark:hover:text-stone-300';
 
 /** Bottom sheet on mobile, side panel from `sm` up (SPEC §7.4). The panel is
  *  chrome only: everything inside it is `SessionDetail`, shared with the
@@ -73,22 +80,12 @@ export function DetailSheet({
           layout="sheet"
           collapseAt={COLLAPSED_COUNT}
           headerActions={
-            <div className="flex shrink-0 items-center gap-0.5">
-              <Link
-                to={expandTo}
-                aria-label="Open this session as a full page"
-                title="Open as a full page"
-                className="rounded-full p-1.5 text-stone-400 dark:text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800"
-              >
-                <span aria-hidden="true">⤢</span>
+            <div className="flex shrink-0 items-center gap-1">
+              <Link to={expandTo} aria-label="Open this session as a full page" title="Open as a full page" className={headerButtonClass}>
+                <ExpandIcon />
               </Link>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close"
-                className="rounded-full p-1.5 text-stone-400 dark:text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800"
-              >
-                ✕
+              <button type="button" onClick={onClose} aria-label="Close" className={headerButtonClass}>
+                <CloseIcon />
               </button>
             </div>
           }

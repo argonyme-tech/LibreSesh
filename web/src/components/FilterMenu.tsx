@@ -1,0 +1,231 @@
+import { useEffect, useRef, useState } from 'react';
+import type { RoomDto, TagDto } from '@shared/types';
+import type { FilterApi } from '../lib/useFilters';
+import { FilterIcon, SearchIcon } from './icons';
+import { Chip } from './ui';
+
+/**
+ * Every way of narrowing the grid, behind one button.
+ *
+ * The chips used to sit in a row that scrolled sideways, so an event with a
+ * dozen rooms and as many tags hid most of its filters off the right edge, and
+ * the search box shared that row with them. Collapsing them into a panel leaves
+ * the header with two controls, and gives the tags room to wrap and be read.
+ *
+ * The mini search in here is the *old* search: it writes `q` into the URL and
+ * narrows what the grid draws. The header's box is a different question — find
+ * a session anywhere in the programme — and deliberately touches nothing.
+ */
+export function FilterMenu({
+  filters,
+  rooms,
+  tags,
+  starredCount,
+}: {
+  filters: FilterApi;
+  rooms: RoomDto[];
+  tags: TagDto[];
+  starredCount: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+
+  const count =
+    filters.rooms.length +
+    filters.tags.length +
+    (filters.q.trim() ? 1 : 0) +
+    (filters.soon ? 1 : 0) +
+    (filters.mine ? 1 : 0);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: PointerEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={wrap} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${
+          count > 0 || open
+            ? 'border-stone-900 bg-stone-900 text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-900'
+            : 'border-stone-300 bg-white text-stone-600 hover:border-stone-400 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-300 dark:hover:border-stone-500'
+        }`}
+      >
+        <FilterIcon className="h-3.5 w-3.5" />
+        Filter
+        {count > 0 && (
+          <span className="rounded-full bg-white/20 px-1.5 text-[10px] font-semibold text-white dark:bg-stone-900/20 dark:text-stone-900">
+            {count}
+          </span>
+        )}
+        <span aria-hidden="true" className="text-[10px] opacity-70">
+          ▾
+        </span>
+      </button>
+
+      {open && (
+        <div
+          role="dialog"
+          aria-label="Filters"
+          className="absolute left-0 z-40 mt-1 max-h-[70vh] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-stone-200 bg-white p-3 shadow-lg dark:border-stone-700 dark:bg-stone-900"
+        >
+          <div className="relative">
+            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-stone-400 dark:text-stone-500" />
+            <input
+              value={filters.q}
+              onChange={(e) => filters.set({ q: e.target.value })}
+              placeholder="Filter by title, speaker…"
+              aria-label="Filter sessions by text"
+              className="w-full rounded-lg border border-stone-300 bg-white py-1.5 pl-8 pr-3 text-xs outline-none focus:border-stone-500 dark:border-stone-600 dark:bg-stone-900 dark:focus:border-stone-400"
+            />
+          </div>
+          <p className="mt-1 text-[11px] text-stone-500 dark:text-stone-400">
+            Narrows the schedule below. Filters live in the URL, so this view can be shared as a
+            link.
+          </p>
+
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <Chip active={filters.soon} onClick={() => filters.set({ soon: !filters.soon })}>
+              Now / next
+            </Chip>
+            <Chip active={filters.mine} onClick={() => filters.set({ mine: !filters.mine })}>
+              <span className={filters.mine ? '' : 'text-amber-500 dark:text-amber-400'}>★</span> My
+              agenda ({starredCount})
+            </Chip>
+          </div>
+
+          {rooms.length > 0 && (
+            <>
+              <h3 className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
+                Rooms
+              </h3>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {rooms.map((r) => (
+                  <Chip
+                    key={r.id}
+                    dot={r.color}
+                    active={filters.rooms.includes(r.id)}
+                    onClick={() => filters.toggleRoom(r.id)}
+                  >
+                    {r.name}
+                  </Chip>
+                ))}
+              </div>
+            </>
+          )}
+
+          {tags.length > 0 && (
+            <>
+              <h3 className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
+                Tags
+              </h3>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {tags.map((t) => (
+                  <Chip
+                    key={t.id}
+                    dot={t.color}
+                    active={filters.tags.includes(t.id)}
+                    onClick={() => filters.toggleTag(t.id)}
+                  >
+                    {t.name}
+                  </Chip>
+                ))}
+              </div>
+            </>
+          )}
+
+          <div className="mt-3 flex items-center justify-between border-t border-stone-100 pt-2 dark:border-stone-800">
+            <button
+              type="button"
+              onClick={filters.clear}
+              disabled={count === 0}
+              className="text-xs font-medium text-stone-500 underline hover:text-stone-800 disabled:cursor-default disabled:no-underline disabled:opacity-40 dark:text-stone-400 dark:hover:text-stone-200"
+            >
+              Clear all
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="rounded-lg border border-stone-300 px-2.5 py-1 text-xs font-medium text-stone-600 hover:border-stone-400 dark:border-stone-600 dark:text-stone-300"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * What is currently narrowing the grid, spelled out beside the button — a
+ * filter you cannot see is a filter you forget you set, and the panel that now
+ * holds them is closed most of the time. Each chip takes itself off.
+ */
+export function ActiveFilters({
+  filters,
+  rooms,
+  tags,
+}: {
+  filters: FilterApi;
+  rooms: RoomDto[];
+  tags: TagDto[];
+}) {
+  if (!filters.active) return null;
+  const remove = (label: string, onClick: () => void, key: string, dot?: string) => (
+    <button
+      key={key}
+      type="button"
+      onClick={onClick}
+      aria-label={`Remove filter ${label}`}
+      className="flex shrink-0 items-center gap-1.5 rounded-full border border-stone-300 bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-600 hover:border-stone-400 dark:border-stone-600 dark:bg-stone-800 dark:text-stone-300"
+    >
+      {dot && <span className="h-2 w-2 rounded-full" style={{ background: dot }} />}
+      {label}
+      <span aria-hidden="true" className="text-stone-400 dark:text-stone-500">
+        ×
+      </span>
+    </button>
+  );
+
+  return (
+    <>
+      {filters.q.trim() &&
+        remove(`“${filters.q.trim()}”`, () => filters.set({ q: '' }), 'q')}
+      {filters.soon && remove('Now / next', () => filters.set({ soon: false }), 'soon')}
+      {filters.mine && remove('★ My agenda', () => filters.set({ mine: false }), 'mine')}
+      {filters.rooms.map((id) => {
+        const room = rooms.find((r) => r.id === id);
+        return room
+          ? remove(room.name, () => filters.toggleRoom(id), `room-${id}`, room.color)
+          : null;
+      })}
+      {filters.tags.map((id) => {
+        const tag = tags.find((t) => t.id === id);
+        return tag ? remove(tag.name, () => filters.toggleTag(id), `tag-${id}`, tag.color) : null;
+      })}
+      <button
+        type="button"
+        onClick={filters.clear}
+        className="shrink-0 rounded-full px-2 py-1 text-xs font-medium text-stone-500 underline hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200"
+      >
+        Clear all
+      </button>
+    </>
+  );
+}

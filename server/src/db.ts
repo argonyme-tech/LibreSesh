@@ -73,6 +73,10 @@ export interface SessionRow {
   room_id: number;
   track_id: number | null;
   type: 'official' | 'open';
+  /** 1 = while this runs, attendees may place nothing anywhere in the event. */
+  blocks_open_booking: number;
+  /** 1 = drawn as a band across the schedule, not a block in a room column. */
+  background: number;
   title: string;
   description: string;
   speaker: string;

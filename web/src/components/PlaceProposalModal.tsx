@@ -3,7 +3,15 @@ import type { ProposalDto, RoomDto } from '@shared/types';
 import type { PlaceWrite } from '../lib/api';
 import { fmtMin } from '../lib/format';
 import { zonedTimeToUtc } from '@shared/time';
-import { Field, FormGrid, Modal, PrimaryButton, SecondaryButton, inputClass } from './ui';
+import {
+  Field,
+  FormError,
+  FormGrid,
+  Modal,
+  PrimaryButton,
+  SecondaryButton,
+  inputClass,
+} from './ui';
 
 const DURATIONS = [15, 30, 45, 60, 90, 120, 180];
 
@@ -55,11 +63,21 @@ export function PlaceProposalModal({
   };
 
   return (
-    <Modal title="Place on the grid" onClose={onCancel}>
-      <p className="-mt-2 mb-3 text-xs text-stone-500 dark:text-stone-400">
-        “{proposal.title}” becomes a session. Its tags and speaker carry over.
-      </p>
-
+    <Modal
+      title="Place on the grid"
+      description={`“${proposal.title}” becomes a session. Its tags and speaker carry over.`}
+      onClose={onCancel}
+      onSubmit={place}
+      footer={
+        <>
+          {error && <FormError className="basis-full">{error}</FormError>}
+          <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
+          <PrimaryButton type="submit" disabled={saving || rooms.length === 0}>
+            {saving ? 'Placing…' : 'Place session'}
+          </PrimaryButton>
+        </>
+      }
+    >
       <FormGrid>
         <Field label="Room">
           <select
@@ -84,7 +102,7 @@ export function PlaceProposalModal({
             ))}
           </select>
         </Field>
-        <Field label="Start (5-min steps)">
+        <Field label="Start" hint="In 5-minute steps.">
           <input
             type="time"
             step={300}
@@ -107,17 +125,6 @@ export function PlaceProposalModal({
           </select>
         </Field>
       </FormGrid>
-
-      {error && <p className="mt-3 text-xs text-red-600 dark:text-red-400">{error}</p>}
-
-      <div className="mt-4 flex gap-2">
-        <SecondaryButton className="ml-auto" onClick={onCancel}>
-          Cancel
-        </SecondaryButton>
-        <PrimaryButton onClick={place} disabled={saving || rooms.length === 0}>
-          {saving ? 'Placing…' : 'Place session'}
-        </PrimaryButton>
-      </div>
     </Modal>
   );
 }

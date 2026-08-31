@@ -6,6 +6,7 @@ import {
   Chip,
   DangerButton,
   Field,
+  FormError,
   FormStack,
   Modal,
   PrimaryButton,
@@ -57,11 +58,26 @@ export function ProposalModal({
   };
 
   return (
-    <Modal title={proposal ? 'Edit pitch' : 'Pitch a session'} onClose={onCancel}>
-      <p className="-mt-2 mb-3 text-xs text-stone-500 dark:text-stone-400">
-        Pitches have no room or time. An organiser places the popular ones on the grid.
-      </p>
-
+    <Modal
+      title={proposal ? 'Edit pitch' : 'Pitch a session'}
+      description="Pitches have no room or time. An organiser places the popular ones on the grid."
+      onClose={onCancel}
+      onSubmit={save}
+      footer={
+        <>
+          {error && <FormError className="basis-full">{error}</FormError>}
+          {onDelete && (
+            <DangerButton className="mr-auto" onClick={onDelete}>
+              Withdraw
+            </DangerButton>
+          )}
+          <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
+          <PrimaryButton type="submit" disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
+          </PrimaryButton>
+        </>
+      }
+    >
       <FormStack>
       <Field label="Title">
         <input
@@ -72,7 +88,7 @@ export function ProposalModal({
           autoFocus
         />
       </Field>
-      <Field label="Speaker / host">
+      <Field label="Speaker or host">
         <SpeakerCombobox people={people} value={speaker} onChange={setSpeaker} />
       </Field>
       <Field label="Description" hint="Markdown is supported.">
@@ -107,20 +123,6 @@ export function ProposalModal({
         </div>
       </Field>
       </FormStack>
-
-      {error && <p className="mt-3 text-xs text-red-600 dark:text-red-400">{error}</p>}
-
-      <div className="mt-4 flex gap-2">
-        {onDelete && (
-          <DangerButton onClick={onDelete}>Withdraw</DangerButton>
-        )}
-        <SecondaryButton className="ml-auto" onClick={onCancel}>
-          Cancel
-        </SecondaryButton>
-        <PrimaryButton onClick={save} disabled={saving}>
-          {saving ? 'Saving…' : 'Save'}
-        </PrimaryButton>
-      </div>
     </Modal>
   );
 }

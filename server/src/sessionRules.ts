@@ -111,6 +111,10 @@ export function assertWithinEventWindow(event: EventRow, window: TimeWindow): vo
 /**
  * Reject a session that would overlap another in the same room. Applied to
  * `user` writes only — admins may double-book, and the client badges the clash.
+ *
+ * Background sessions are not in the way: lunch is not using the room in the
+ * sense this rule means, and an attendee who wants to run something through it
+ * may. That is the whole difference between a break and a plenary.
  */
 export function assertNoOverlap(
   db: Db,
@@ -123,6 +127,7 @@ export function assertNoOverlap(
     .prepare<[number, number, string, string, number], { id: number }>(
       `SELECT id FROM sessions
         WHERE event_id = ? AND room_id = ? AND deleted_at IS NULL
+          AND background = 0
           AND starts_at < ? AND ends_at > ?
           AND id != ?`,
     )
@@ -134,6 +139,95 @@ export function assertNoOverlap(
       excludeSessionId ?? -1,
     );
   if (clash) throw conflict('That slot is already taken in this room', 'overlap');
+}
+
+/**
+ * The flag is a claim the programme makes about itself, so it only fits a
+ * session the programme owns. An *open* session that stopped everyone else
+ * from booking would be an attendee-shaped hole in the rule — anyone who could
+ * place one could close the grid. Returns what to store, so callers read as
+ * `const blocks = assertMayBlock(type, body.blocksOpenBooking)`.
+ */
+export function assertMayBlock(type: 'official' | 'open', blocks: boolean | undefined): boolean {
+  if (!blocks) return false;
+  if (type !== 'official') throw badRequest('Only an official session can hold the floor');
+  return true;
+}
+
+/**
+ * Lunch, dinner, the coffee break. Like a hold, it is a statement the
+ * programme makes about itself, so it only fits an official session — and an
+ * attendee could otherwise paint a grey band over everyone else's afternoon.
+ */
+export function assertMayBackground(
+  type: 'official' | 'open',
+  background: boolean | undefined,
+): boolean {
+  if (!background) return false;
+  if (type !== 'official') throw badRequest('Only an official session can be a break');
+  return true;
+}
+
+/**
+ * The blocking session, if any, that is live at some point in `window`.
+ *
+ * The overlap test is half-open — `starts_at < end AND ends_at > start` — so a
+ * session that begins exactly as the keynote ends does not count as competing
+ * with it. Any other overlap does, however partial: a session that starts ten
+ * minutes before the keynote and runs through it is the case the rule exists
+ * for, and letting it through would make the rule decorative.
+ *
+ * Event-wide, deliberately. The room is not a parameter, because the point of
+ * a plenary is that there is nowhere else to be.
+ */
+export function findBlockingSession(
+  db: Db,
+  eventId: number,
+  window: TimeWindow,
+  excludeSessionId?: number,
+): SessionRow | undefined {
+  return db
+    .prepare<[number, string, string, number], SessionRow>(
+      `SELECT * FROM sessions
+        WHERE event_id = ? AND blocks_open_booking = 1 AND deleted_at IS NULL
+          AND starts_at < ? AND ends_at > ?
+          AND id != ?
+        ORDER BY starts_at
+        LIMIT 1`,
+    )
+    .get(
+      eventId,
+      window.endsAt.toISOString(),
+      window.startsAt.toISOString(),
+      excludeSessionId ?? -1,
+    );
+}
+
+/**
+ * Refuse an attendee's placement that would run against a session holding the
+ * floor.
+ *
+ * Speakers and organisers pass. A speaker with a talk to give is part of the
+ * programme rather than someone the programme is being protected from, and the
+ * cases where one legitimately runs alongside a plenary — a workshop that has
+ * to start before the closing remarks end — are real. What they place is
+ * badged as competing on the schedule instead, which is the honest outcome:
+ * visible to everyone, refused to nobody who ought to be able to do it.
+ */
+export function assertNotBlocked(
+  db: Db,
+  eventId: number,
+  role: Role,
+  window: TimeWindow,
+  excludeSessionId?: number,
+): void {
+  if (atLeast(role, 'speaker')) return;
+  const blocker = findBlockingSession(db, eventId, window, excludeSessionId);
+  if (!blocker) return;
+  throw conflict(
+    `“${blocker.title}” is on then, and everyone should be at it — nothing else can be booked while it runs`,
+    'blocked',
+  );
 }
 
 /**

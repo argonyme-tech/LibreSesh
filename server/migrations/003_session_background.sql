@@ -1,0 +1,11 @@
+-- Lunch, dinner, the coffee break, "doors open". Programme furniture: it
+-- belongs on the schedule so nobody schedules over it by accident, but it is
+-- not a session anyone attends *instead* of another one.
+--
+-- Drawn as a grey band across the whole grid rather than a block in one room's
+-- column, and — unlike `blocks_open_booking` — it stops nothing. An attendee
+-- who wants to run a session through lunch may; that is what a break is.
+--
+-- Orthogonal to `blocks_open_booking` on purpose. Lunch is a background thing
+-- nobody is required to attend; a conference dinner can be both.
+ALTER TABLE sessions ADD COLUMN background INTEGER NOT NULL DEFAULT 0;

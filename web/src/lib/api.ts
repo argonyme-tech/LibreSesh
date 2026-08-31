@@ -295,6 +295,12 @@ export const api = {
 export interface SessionWrite {
   roomId: number;
   type?: 'official' | 'open';
+  /** Organisers only, official sessions only: while this runs, attendees may
+   *  place nothing anywhere in the event. */
+  blocksOpenBooking?: boolean;
+  /** Organisers only, official sessions only: lunch, dinner, a break — drawn
+   *  as a grey band across the schedule, and it stops nobody. */
+  background?: boolean;
   title: string;
   description?: string;
   /** Link to an existing person, or `null` to detach. */

@@ -6,6 +6,57 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **Search that finds a session on any day.** The header has a search box that
+  spans the whole programme, not just the day on screen: it drops down the best
+  five hits with the day, time, room and the matched words in bold, the arrow
+  keys open one directly, and Enter takes the query to `/e/:slug/search`, where
+  every hit is grouped by day and the query lives in the URL so a search can be
+  sent to someone. The matcher itself changed with it — the old one was a single
+  `includes` over title, speaker and description joined together, so "lovelace
+  ada" found nothing and every hit ranked the same. Words are matched in any
+  order, accents fold away, and a title hit outranks a speaker hit outranks a
+  description hit, with a bonus when the whole query sits in one title. Typing
+  more always narrows, because every word has to appear somewhere.
+
+- **Filters live behind one button.** Room and tag chips used to share a row
+  with the search box and scroll off the right edge, which on an event with a
+  dozen rooms hid most of them. They are a Filter panel now, with a count on the
+  button and the active ones listed beside it as chips you can take off one at a
+  time. The panel keeps its own mini search, which is the old behaviour — it
+  writes `q` into the URL and narrows the day being drawn. Finding a session and
+  narrowing the grid are two different questions, and they have two controls.
+
+- **Lunch, dinner and coffee belong on the schedule.** An organiser can mark an
+  official session a **break**. It leaves the room columns and is drawn greyed
+  out across the whole grid, so nobody puts a session over it by accident — but
+  it stops nothing. Running a session through lunch is allowed, and a break
+  never counts as double-booking the room it names, which is exactly what
+  separates it from a session everyone should be at. The room is still
+  recorded, because "lunch, in the Foyer" is worth saying; the grid just does
+  not spend a column on it. The two marks are independent, so a conference
+  dinner can be both a break and something everyone should be at — it gets the
+  one band, and the hold still bites. Repeats put lunch on every day of a run in
+  one row, and the importer takes it as `background`.
+
+- **A session can hold the floor.** An organiser can mark an official session
+  *everyone should be at this* — a keynote, the closing plenary — and while it
+  runs an attendee cannot add a session anywhere in the event, not even in a
+  room that allows booking. The schedule shades the hour with the session's
+  name across it, so the rule is visible before anyone runs into it. It is a
+  mark on the session rather than a switch on the event, because at a real
+  unconference most of what is "official" is registration, coffee and a track
+  that runs all afternoon: a rule keyed on the type would have closed the grid
+  for the whole event instead of protecting the keynote. Partial overlaps count
+  — a session starting ten minutes early and running through it is exactly the
+  case the rule is for — while back-to-back is not competing. Organisers and
+  speakers are not stopped, since a speaker with a talk to give is part of the
+  programme rather than someone it is being protected from; what they place is
+  badged **competing** on the grid. Sessions booked before the mark went on
+  stay where they are and stay editable: refusing a title fix afterwards would
+  punish an attendee for the organiser's later decision. Repeats carry the mark
+  onto every day of a run, and the JSON importer takes it as
+  `blocksOpenBooking`.
+
 - **The session form can put one session on many days.** Adding a session as an
   organiser now offers **Repeat**: an *Until* day, a row of weekday chips, and a
   live count — *Creates 15 separate sessions* — with the button following suit
@@ -280,6 +331,12 @@ All notable changes to this project are documented here.
   is soft-deleted. Audited; not undoable via /trash, hence admin-only.
 
 ### Changed
+
+- **The last hand-rolled modals moved onto the primitive.** Six callers still
+  built their own intro paragraph and button row rather than passing
+  `description` and `footer`; they now match every other modal, and the ones
+  holding a form submit on Enter. The session panel's expand and close controls
+  became shared icons on one 36px target apiece.
 
 - **Arrange is admin-only.** It used to appear for attendees too, whenever the
   event had any open-booking room. Arrange is a whole-grid drag mode, though,

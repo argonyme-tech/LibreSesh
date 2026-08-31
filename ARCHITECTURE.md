@@ -59,7 +59,7 @@ every failure as `{ error: { code, message } }`.
 | `event_identities` | `(event, identity) → display name`, unique within the event |
 | `roles` | `(identity, event) → viewer\|user\|speaker\|admin` |
 | `rooms`, `tags` | Per event, soft-deleted |
-| `sessions` | Scheduled: always has a room and a time |
+| `sessions` | Scheduled: always has a room and a time; `blocks_open_booking` holds the floor against attendees, `background` is a break |
 | `proposals` | Pitched: no room, no time, until an organiser places it |
 | `people` | Speakers/hosts, optionally claimed by an identity |
 | `contributions` | Notes, links, questions; `hidden` for moderation |
@@ -76,6 +76,59 @@ do not "simplify" this by comparing UTC minutes.
 **Soft deletes everywhere.** `deleted_at` rather than `DELETE`, so an organiser
 can undo vandalism (`/trash` and the restore endpoints). A hard delete of a
 session would orphan its contributions and stars.
+
+### Sessions that hold the floor
+
+`sessions.blocks_open_booking` marks a session as the only thing happening:
+while it runs, the `user` role may place nothing anywhere in the event.
+`assertNotBlocked` in `sessionRules.ts` is the whole rule, and it is applied on
+every path an attendee can reach — create, and the retime half of PATCH.
+
+Three decisions in it are easy to get wrong later:
+
+- **It is per session, not per type.** `type = 'official'` means only "an
+  organiser created it", and at a real unconference that covers registration,
+  the coffee break and a track that runs all afternoon. A rule that fired on
+  "an official session is happening" would close the grid for the entire event
+  rather than protect the keynote, and the organiser who switched it on would
+  have no way to see why.
+- **It is event-wide, so the room is not a parameter.** The point of a plenary
+  is that there is nowhere else to be; a hold that only covered the bookable
+  rooms would be a hold on nothing, since those are the only rooms an attendee
+  can reach anyway.
+- **It refuses placement, never existence.** A session already booked in the
+  hour stays where it is when the mark goes on, and its owner can still edit
+  it — PATCH re-checks only when the window actually moves. Refusing a title
+  fix would punish an attendee for a decision the organiser made afterwards.
+  Such sessions, and anything a speaker or organiser places against a hold, are
+  badged *competing* by `competingIds` in `Calendar.tsx`; the badge is a
+  property of the overlap, computed on the client from the day's sessions,
+  which is why it is not on the DTO.
+
+Speakers pass the rule (`atLeast(role, 'speaker')`). A speaker with a talk to
+give is part of the programme, not someone it is being protected from.
+
+`sessions.background` is the quiet sibling: lunch, dinner, the coffee break.
+Deliberately a **separate column, not a third `type`** — `type` decides who may
+edit a session, and a break is edited by exactly the people an official session
+is. Deliberately **orthogonal to `blocks_open_booking`** too: lunch is
+background and blocks nobody, a keynote blocks and is not background, and a
+conference dinner is both.
+
+What it changes is that a break is not competing for anything:
+
+- `assertNoOverlap` skips background rows, so an attendee may book the very
+  room lunch names, at the very same minutes. Without this a break would be a
+  hold in disguise, wherever it was parked.
+- The importer neither warns that a break overlaps a room nor counts it against
+  later rows, for the same reason.
+- `Calendar.tsx` splits the day into `placed` (blocks, laned and draggable) and
+  `bands`. A break is only ever a band, which is why the band takes the click:
+  there is no block anywhere to open it from. A hold that has a block stays
+  `pointer-events-none`, or it would swallow clicks across every column.
+
+The band is also why a break keeps its `room_id`: the column does not draw it,
+but "lunch, in the Foyer" is worth recording, and the schema requires a room.
 
 ### One database, many events
 

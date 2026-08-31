@@ -8,9 +8,12 @@ import { loadSessionDto } from '../mappers.js';
 import { getPermissions, requireCapability } from '../permissions.js';
 import { limit } from '../ratelimit.js';
 import {
+  assertMayBackground,
+  assertMayBlock,
   assertMayMutate,
   assertMayPlace,
   assertNoOverlap,
+  assertNotBlocked,
   assertNotStale,
   assertTagsBelong,
   assertTrackBelongs,
@@ -50,12 +53,15 @@ export function sessionRoutes(ctx: Ctx): Router {
     // Only admins choose the type; anyone else is placing an open session.
     const type = req.role === 'admin' ? (body.type ?? 'official') : 'open';
     assertMayPlace(getPermissions(ctx.db, req.event.id), req.role, room, type);
+    const blocks = req.role === 'admin' && assertMayBlock(type, body.blocksOpenBooking);
+    const background = req.role === 'admin' && assertMayBackground(type, body.background);
 
     const window = { startsAt: new Date(body.startsAt), endsAt: new Date(body.endsAt) };
     assertValidTimes(req.event, window);
     if (req.role !== 'admin') {
       assertWithinEventWindow(req.event, window);
       assertNoOverlap(ctx.db, req.event.id, room.id, window);
+      assertNotBlocked(ctx.db, req.event.id, req.role, window);
     }
     const tagIds = body.tagIds ?? [];
     assertTagsBelong(ctx.db, req.event.id, tagIds);
@@ -68,15 +74,18 @@ export function sessionRoutes(ctx: Ctx): Router {
       const info = ctx.db
         .prepare(
           `INSERT INTO sessions
-            (event_id, room_id, track_id, type, title, description, speaker, speaker_id,
-             livestream_url, starts_at, ends_at, created_by, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?)`,
+            (event_id, room_id, track_id, type, blocks_open_booking, background, title,
+             description, speaker, speaker_id, livestream_url, starts_at, ends_at,
+             created_by, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           req.event.id,
           room.id,
           trackId,
           type,
+          blocks ? 1 : 0,
+          background ? 1 : 0,
           body.title,
           body.description ?? '',
           speakerId,
@@ -129,6 +138,11 @@ export function sessionRoutes(ctx: Ctx): Router {
       const room = getRoom(ctx.db, req.event.id, body.roomId);
       const type = body.type ?? 'official';
       assertMayPlace(getPermissions(ctx.db, req.event.id), req.role, room, type);
+      // A plenary that happens every morning is a run like any other; the flag
+      // rides along so each occurrence holds its own day.
+      const blocks = assertMayBlock(type, body.blocksOpenBooking);
+      // Lunch every day of a three-week programme is one row, like any run.
+      const background = assertMayBackground(type, body.background);
 
       const first = { startsAt: new Date(body.startsAt), endsAt: new Date(body.endsAt) };
       assertValidTimes(req.event, first);
@@ -176,9 +190,10 @@ export function sessionRoutes(ctx: Ctx): Router {
         const speakerId = resolveSpeaker(ctx.db, req.event.id, body, null);
         const insert = ctx.db.prepare(
           `INSERT INTO sessions
-            (event_id, room_id, track_id, type, title, description, speaker, speaker_id,
-             livestream_url, starts_at, ends_at, created_by, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?)`,
+            (event_id, room_id, track_id, type, blocks_open_booking, background, title,
+             description, speaker, speaker_id, livestream_url, starts_at, ends_at,
+             created_by, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?)`,
         );
         return windows.map((window) => {
           const newId = Number(
@@ -187,6 +202,8 @@ export function sessionRoutes(ctx: Ctx): Router {
               room.id,
               trackId,
               type,
+              blocks ? 1 : 0,
+              background ? 1 : 0,
               body.title,
               body.description ?? '',
               speakerId,
@@ -246,6 +263,18 @@ export function sessionRoutes(ctx: Ctx): Router {
     if (body.roomId !== undefined || body.type !== undefined) {
       assertMayPlace(getPermissions(ctx.db, req.event.id), req.role, room, type);
     }
+    // A patch that would leave the hold on an open session is refused, not
+    // quietly fixed — same as the create path. Lifting the hold and opening
+    // the session are two separate decisions, and an organiser who meant both
+    // sends both; the form does exactly that when the type chip changes.
+    const blocks =
+      req.role === 'admin'
+        ? assertMayBlock(type, body.blocksOpenBooking ?? existing.blocks_open_booking === 1)
+        : existing.blocks_open_booking === 1;
+    const background =
+      req.role === 'admin'
+        ? assertMayBackground(type, body.background ?? existing.background === 1)
+        : existing.background === 1;
 
     const window = {
       startsAt: new Date(body.startsAt ?? existing.starts_at),
@@ -255,6 +284,14 @@ export function sessionRoutes(ctx: Ctx): Router {
     if (req.role !== 'admin') {
       assertWithinEventWindow(req.event, window);
       assertNoOverlap(ctx.db, req.event.id, room.id, window, existing.id);
+      // Only a session that actually moves is re-checked. A plenary announced
+      // after someone had already booked that hour leaves their session where
+      // it is — badged as competing — and refusing to let them fix a typo in
+      // it afterwards would punish them for the organiser's later decision.
+      const retimed =
+        window.startsAt.toISOString() !== existing.starts_at ||
+        window.endsAt.toISOString() !== existing.ends_at;
+      if (retimed) assertNotBlocked(ctx.db, req.event.id, req.role, window, existing.id);
     }
     if (body.tagIds) assertTagsBelong(ctx.db, req.event.id, body.tagIds);
     // `undefined` leaves the track alone; an explicit `null` clears it.
@@ -266,14 +303,17 @@ export function sessionRoutes(ctx: Ctx): Router {
       const speakerId = resolveSpeaker(ctx.db, req.event.id, body, existing.speaker_id);
       ctx.db
         .prepare(
-          `UPDATE sessions SET room_id = ?, track_id = ?, type = ?, title = ?, description = ?,
-                  speaker_id = ?, livestream_url = ?, starts_at = ?, ends_at = ?, updated_at = ?
+          `UPDATE sessions SET room_id = ?, track_id = ?, type = ?, blocks_open_booking = ?,
+                  background = ?, title = ?, description = ?, speaker_id = ?,
+                  livestream_url = ?, starts_at = ?, ends_at = ?, updated_at = ?
             WHERE id = ?`,
         )
         .run(
           room.id,
           nextTrackId,
           type,
+          blocks ? 1 : 0,
+          background ? 1 : 0,
           body.title ?? existing.title,
           body.description ?? existing.description,
           speakerId,

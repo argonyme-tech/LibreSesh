@@ -202,6 +202,10 @@ const optionalHttpUrl = z
 export const sessionSchema = z.object({
   roomId: z.number().int().positive(),
   type: z.enum(['official', 'open']).optional(),
+  /** Organisers only; refused on an open session. */
+  blocksOpenBooking: z.boolean().optional(),
+  /** Lunch, dinner, a break: drawn across the schedule. Organisers only. */
+  background: z.boolean().optional(),
   title: trimmed(120),
   description: optionalTrimmed(5000).optional(),
   speakerId: z.number().int().positive().nullable().optional(),

@@ -3,6 +3,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
@@ -88,6 +89,40 @@ export function overlappingIds(
           out.add(a.session.id);
           out.add(b.session.id);
         }
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Sessions running against one that holds the floor.
+ *
+ * The server refuses these to attendees outright, so what reaches here was
+ * placed by an organiser or a speaker, who are allowed to — or was booked
+ * before the hold was put on. Either way it is worth saying out loud on the
+ * grid: someone reading the schedule needs to know the plenary is not the only
+ * thing in that hour, and the organiser needs to see what they created.
+ *
+ * A holding session never competes with itself, or with another hold, and a
+ * break never competes with anything.
+ */
+export function competingIds(
+  items: { session: SessionDto; startMin: number; endMin: number }[],
+): Set<number> {
+  const holds = items.filter((i) => i.session.blocksOpenBooking);
+  const out = new Set<number>();
+  if (holds.length === 0) return out;
+  for (const item of items) {
+    if (item.session.blocksOpenBooking) continue;
+    // Running through lunch is not competing with it — that is the difference
+    // a break is for. A break that *also* holds the floor is still a hold,
+    // which is why this skips competitors rather than filtering `holds`.
+    if (item.session.background) continue;
+    for (const hold of holds) {
+      if (item.startMin < hold.endMin && hold.startMin < item.endMin) {
+        out.add(item.session.id);
+        break;
       }
     }
   }
@@ -242,15 +277,26 @@ export function Calendar({
   const pending = useRef<number | null>(null);
   const holdTimer = useRef<number | null>(null);
 
-  const placed = useMemo(
+  const onThisDay = useMemo(
     () =>
       sessions
         .map((session) => ({ session, ...place(session, timezone) }))
         .filter((p) => p.date === day),
     [sessions, timezone, day],
   );
+  // Breaks leave the columns entirely. Lunch is not using the Main Hall in any
+  // sense the grid cares about, so it is not laned, not clashed against, and
+  // not draggable — it is drawn behind everything as a band.
+  const placed = useMemo(() => onThisDay.filter((p) => !p.session.background), [onThisDay]);
+  // Both kinds of band: a break (grey, clickable — it has no block anywhere)
+  // and a hold (amber). A session marked as both gets one band, the amber one.
+  const bands = useMemo(
+    () => onThisDay.filter((p) => p.session.background || p.session.blocksOpenBooking),
+    [onThisDay],
+  );
   const lanes = useMemo(() => laneLayout(placed, columnOf), [placed, columnOf]);
   const overlaps = useMemo(() => overlappingIds(placed), [placed]);
+  const competing = useMemo(() => competingIds(onThisDay), [onThisDay]);
   const tagColor = useMemo(() => new Map(tags.map((t) => [t.id, t.color])), [tags]);
 
   const height = (dayEndMin - dayStartMin) * PX_PER_MIN;
@@ -485,6 +531,65 @@ export function Calendar({
             />
           ))}
 
+          {bands.map(({ session, startMin, durMin, endMin }) => {
+            const amber = session.blocksOpenBooking;
+            // A break has no block in any column, so the band is the only way
+            // to open it and has to take the click. A hold that *does* have a
+            // block must not: it spans every column, and would swallow clicks
+            // meant for the grid underneath.
+            const clickable = session.background;
+            return (
+              <div
+                key={`band-${session.id}`}
+                {...(clickable
+                  ? {
+                      role: 'button',
+                      tabIndex: 0,
+                      onClick: () => onOpen(session.id),
+                      onKeyDown: (e: ReactKeyboardEvent<HTMLDivElement>) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onOpen(session.id);
+                        }
+                      },
+                    }
+                  : { 'aria-hidden': true })}
+                aria-label={
+                  clickable
+                    ? `${session.title}, ${fmtMin(startMin)} to ${fmtMin(endMin)}, ${
+                        amber ? 'everyone should be here' : 'a break'
+                      }`
+                    : undefined
+                }
+                className={`absolute right-0 border-y ${
+                  clickable ? 'cursor-pointer' : 'pointer-events-none'
+                } ${
+                  amber
+                    ? 'border-amber-300/70 bg-amber-100/50 dark:border-amber-500/40 dark:bg-amber-500/10'
+                    : 'border-stone-200 bg-stone-100/80 hover:bg-stone-200/80 dark:border-stone-700 dark:bg-stone-800/60 dark:hover:bg-stone-800'
+                }`}
+                style={{
+                  top: (startMin - dayStartMin) * PX_PER_MIN,
+                  height: durMin * PX_PER_MIN,
+                  left: GUTTER_W,
+                }}
+              >
+                {amber ? (
+                  <span className="absolute right-1 top-0.5 text-xs font-semibold text-amber-800/80 dark:text-amber-300/80">
+                    {session.title} — everyone should be here
+                  </span>
+                ) : (
+                  <span className="absolute left-2 top-0.5 text-xs font-semibold text-stone-500 dark:text-stone-400">
+                    {session.title}
+                    <span className="ml-1.5 font-normal">
+                      {fmtMin(startMin)}–{fmtMin(endMin)}
+                    </span>
+                  </span>
+                )}
+              </div>
+            );
+          })}
+
           {showNow && (
             <div
               className="pointer-events-none absolute left-0 right-0 z-10"
@@ -520,6 +625,7 @@ export function Calendar({
             const editable = arrange && canEdit(session);
             const live = nowMin !== null && nowMin >= startMin && nowMin < endMin;
             const clash = overlaps.has(session.id);
+            const competes = competing.has(session.id);
             const dimmed = !matchedIds.has(session.id);
             const starred = starredIds.has(session.id);
             const starCount = starCounts[session.id] ?? 0;
@@ -533,6 +639,8 @@ export function Calendar({
                 tabIndex={0}
                 aria-label={`${session.title}, ${fmtMin(startMin)} to ${fmtMin(endMin)}${
                   clash ? ', overlaps another session' : ''
+                }${session.blocksOpenBooking ? ', everyone should be here' : ''}${
+                  competes ? ', competing with an official session' : ''
                 }${starred ? ', on your agenda' : ''}${
                   starCount > 0 ? `, starred by ${starCount}` : ''
                 }`}
@@ -595,9 +703,17 @@ export function Calendar({
                       clash
                     </span>
                   )}
+                  {competes && (
+                    <span
+                      title="Runs against a session everyone should be at"
+                      className={`${clash ? '' : 'ml-auto '}rounded bg-amber-100 dark:bg-amber-950/60 px-1 text-xs font-bold text-amber-800 dark:text-amber-300`}
+                    >
+                      competing
+                    </span>
+                  )}
                   {live && (
                     <span
-                      className={`${clash ? '' : 'ml-auto '}rounded bg-accent px-1 text-xs font-bold text-stone-900`}
+                      className={`${clash || competes ? '' : 'ml-auto '}rounded bg-accent px-1 text-xs font-bold text-stone-900`}
                     >
                       now
                     </span>

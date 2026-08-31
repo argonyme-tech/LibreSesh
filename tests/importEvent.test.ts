@@ -154,6 +154,37 @@ describe('event import from JSON', () => {
     expect(result.counts.people).toBe(1);
   });
 
+  it('lands a session that holds the floor, and holds it against attendees', async () => {
+    const doc = document();
+    doc.sessions[0] = { ...doc.sessions[0]!, blocksOpenBooking: true };
+    await post(doc);
+    const row = harness.db
+      .prepare<[string], { blocks_open_booking: number }>(
+        'SELECT blocks_open_booking FROM sessions WHERE title = ?',
+      )
+      .get('Opening keynote');
+    expect(row?.blocks_open_booking).toBe(1);
+  });
+
+  it('lands a break, and never warns that it overlaps the room', async () => {
+    const doc = document();
+    // Lunch sits over the session already in that room; that is not a clash.
+    doc.sessions.push({
+      room: doc.sessions[0]!.room,
+      title: 'Lunch',
+      background: true,
+      date: doc.sessions[0]!.date,
+      start: doc.sessions[0]!.start,
+      end: doc.sessions[0]!.end,
+    });
+    const result = await post(doc);
+    expect(result.warnings.filter((w) => w.includes('overlaps'))).toEqual([]);
+    const row = harness.db
+      .prepare<[string], { background: number }>('SELECT background FROM sessions WHERE title = ?')
+      .get('Lunch');
+    expect(row?.background).toBe(1);
+  });
+
   describe('dry run', () => {
     it('reports the same counts and writes nothing', async () => {
       const result = await post(document(), { dryRun: true });
@@ -186,6 +217,22 @@ describe('event import from JSON', () => {
       const message = await failure(doc, 400);
       expect(message).toContain('sessions[0] "Opening keynote"');
       expect(message).toContain('Balcony');
+    });
+
+    it('refuses a hold on an open session, naming the row', async () => {
+      const doc = document();
+      doc.sessions[0] = { ...doc.sessions[0]!, type: 'open', blocksOpenBooking: true };
+      const message = await failure(doc, 400);
+      expect(message).toContain('sessions[0] "Opening keynote"');
+      expect(message).toMatch(/official/i);
+    });
+
+    it('refuses a break on an open session, naming the row', async () => {
+      const doc = document();
+      doc.sessions[0] = { ...doc.sessions[0]!, type: 'open', background: true };
+      const message = await failure(doc, 400);
+      expect(message).toContain('sessions[0] "Opening keynote"');
+      expect(message).toMatch(/break/i);
     });
 
     it('refuses an undeclared track or tag', async () => {
