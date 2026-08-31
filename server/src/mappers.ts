@@ -175,6 +175,7 @@ export function toSessionDto(
     trackId: row.track_id,
     type: row.type,
     blocksOpenBooking: row.blocks_open_booking === 1,
+    background: row.background === 1,
     title: row.title,
     description: row.description,
     speaker: speakerName,

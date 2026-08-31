@@ -6,6 +6,18 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **Lunch, dinner and coffee belong on the schedule.** An organiser can mark an
+  official session a **break**. It leaves the room columns and is drawn greyed
+  out across the whole grid, so nobody puts a session over it by accident — but
+  it stops nothing. Running a session through lunch is allowed, and a break
+  never counts as double-booking the room it names, which is exactly what
+  separates it from a session everyone should be at. The room is still
+  recorded, because "lunch, in the Foyer" is worth saying; the grid just does
+  not spend a column on it. The two marks are independent, so a conference
+  dinner can be both a break and something everyone should be at — it gets the
+  one band, and the hold still bites. Repeats put lunch on every day of a run in
+  one row, and the importer takes it as `background`.
+
 - **A session can hold the floor.** An organiser can mark an official session
   *everyone should be at this* — a keynote, the closing plenary — and while it
   runs an attendee cannot add a session anywhere in the event, not even in a

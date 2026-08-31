@@ -136,6 +136,14 @@ export function SessionDetail({
               official
             </span>
           )}
+          {session.background && (
+            <span
+              title="Programme furniture — it blocks nobody"
+              className="rounded-full bg-stone-100 dark:bg-stone-800 px-2 py-0.5 text-xs font-semibold text-stone-500 dark:text-stone-400"
+            >
+              break
+            </span>
+          )}
           {session.blocksOpenBooking && (
             <span
               title="While this runs, attendees cannot add a session anywhere"

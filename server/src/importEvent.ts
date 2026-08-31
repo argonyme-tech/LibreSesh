@@ -82,6 +82,8 @@ const importSessionSchema = z
     type: z.enum(['official', 'open']).optional(),
     /** Holds the floor: attendees can place nothing while this one runs. */
     blocksOpenBooking: z.boolean().optional(),
+    /** Lunch, dinner, a break: a grey band across the schedule, blocking nobody. */
+    background: z.boolean().optional(),
     title: trimmed(120),
     description: optionalTrimmed(5000).optional(),
     /** Free text, matched to an existing profile or given a new unclaimed one. */
@@ -387,10 +389,10 @@ export function importEvent(
 
     const insertSession = db.prepare(
       `INSERT INTO sessions
-        (event_id, room_id, track_id, type, blocks_open_booking, title, description,
-         speaker, speaker_id, livestream_url, starts_at, ends_at, created_by,
-         created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, '', ?, ?, ?, ?, ?)`,
+        (event_id, room_id, track_id, type, blocks_open_booking, background, title,
+         description, speaker, speaker_id, livestream_url, starts_at, ends_at,
+         created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', ?, '', ?, ?, ?, ?, ?)`,
     );
     const linkTag = db.prepare(
       'INSERT OR IGNORE INTO session_tags (session_id, tag_id) VALUES (?, ?)',
@@ -457,6 +459,9 @@ export function importEvent(
       if (session.blocksOpenBooking && sessionType !== 'official') {
         throw badRequest(`${errorLabel}: only an official session can hold the floor`);
       }
+      if (session.background && sessionType !== 'official') {
+        throw badRequest(`${errorLabel}: only an official session can be a break`);
+      }
       const sessionId = Number(
         insertSession.run(
           eventId,
@@ -464,6 +469,7 @@ export function importEvent(
           trackId,
           sessionType,
           session.blocksOpenBooking ? 1 : 0,
+          session.background ? 1 : 0,
           session.title,
           session.description ?? '',
           speakerId,
@@ -489,15 +495,21 @@ export function importEvent(
         );
       }
 
-      const inRoom = placed.get(roomId) ?? [];
-      const clash = inRoom.find(
-        (other) => other.startsAt < endsAt.getTime() && other.endsAt > startsAt.getTime(),
-      );
-      if (clash) {
-        warn(`${warnLabel} overlaps ${clash.label} in "${session.room}"`);
+      // A break is not competing for the room, so it neither raises an overlap
+      // warning nor becomes one for the next row. Lunch sits over the whole
+      // afternoon by design, and warning about it every time would bury the
+      // double-bookings that are real.
+      if (!session.background) {
+        const inRoom = placed.get(roomId) ?? [];
+        const clash = inRoom.find(
+          (other) => other.startsAt < endsAt.getTime() && other.endsAt > startsAt.getTime(),
+        );
+        if (clash) {
+          warn(`${warnLabel} overlaps ${clash.label} in "${session.room}"`);
+        }
+        inRoom.push({ startsAt: startsAt.getTime(), endsAt: endsAt.getTime(), label: warnLabel });
+        placed.set(roomId, inRoom);
       }
-      inRoom.push({ startsAt: startsAt.getTime(), endsAt: endsAt.getTime(), label: warnLabel });
-      placed.set(roomId, inRoom);
     }
 
     // Every profile in a brand-new event was made by this import, from a

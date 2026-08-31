@@ -171,6 +171,13 @@ administered at all:
 Viewing an event requires the viewer password — schedules are never public.
 Display names are unique within an event, so nobody can take an organiser's.
 
+**Breaks.** An official session can be marked a *break* — lunch, dinner,
+coffee. It leaves the room columns and is drawn greyed out across the whole
+schedule, so nobody puts a session over it by accident. It blocks nothing:
+running a session through lunch is allowed, and a break never counts as
+double-booking the room it names. The room still records where it is. A
+conference dinner can be both a break and something everyone should be at.
+
 **Holding the floor.** An organiser can mark an official session *everyone
 should be at this* — a keynote, a closing plenary. While it runs, attendees
 cannot add a session anywhere in the event, not even in a room that allows

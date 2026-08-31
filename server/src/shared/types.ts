@@ -154,6 +154,11 @@ export interface SessionDto {
    *  organiser can set it. Speakers and organisers are not stopped by it —
    *  what they place is badged as competing instead. */
   blocksOpenBooking: boolean;
+  /** Programme furniture — lunch, dinner, the coffee break. Drawn as a grey
+   *  band across the whole schedule rather than a block in one room's column,
+   *  and it stops nobody: running a session through lunch is allowed, which is
+   *  what separates this from `blocksOpenBooking`. Official sessions only. */
+  background: boolean;
   title: string;
   description: string;
   /** Resolved from the linked person; empty when the session has no speaker. */

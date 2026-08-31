@@ -160,6 +160,7 @@ export function exportEvent(db: Db, event: EventRow): EventExport {
       trackId: s.track_id,
       type: s.type,
       blocksOpenBooking: s.blocks_open_booking === 1,
+      background: s.background === 1,
       title: s.title,
       description: s.description,
       speakerId: s.speaker_id,

@@ -111,6 +111,10 @@ export function assertWithinEventWindow(event: EventRow, window: TimeWindow): vo
 /**
  * Reject a session that would overlap another in the same room. Applied to
  * `user` writes only — admins may double-book, and the client badges the clash.
+ *
+ * Background sessions are not in the way: lunch is not using the room in the
+ * sense this rule means, and an attendee who wants to run something through it
+ * may. That is the whole difference between a break and a plenary.
  */
 export function assertNoOverlap(
   db: Db,
@@ -123,6 +127,7 @@ export function assertNoOverlap(
     .prepare<[number, number, string, string, number], { id: number }>(
       `SELECT id FROM sessions
         WHERE event_id = ? AND room_id = ? AND deleted_at IS NULL
+          AND background = 0
           AND starts_at < ? AND ends_at > ?
           AND id != ?`,
     )
@@ -146,6 +151,20 @@ export function assertNoOverlap(
 export function assertMayBlock(type: 'official' | 'open', blocks: boolean | undefined): boolean {
   if (!blocks) return false;
   if (type !== 'official') throw badRequest('Only an official session can hold the floor');
+  return true;
+}
+
+/**
+ * Lunch, dinner, the coffee break. Like a hold, it is a statement the
+ * programme makes about itself, so it only fits an official session — and an
+ * attendee could otherwise paint a grey band over everyone else's afternoon.
+ */
+export function assertMayBackground(
+  type: 'official' | 'open',
+  background: boolean | undefined,
+): boolean {
+  if (!background) return false;
+  if (type !== 'official') throw badRequest('Only an official session can be a break');
   return true;
 }
 
