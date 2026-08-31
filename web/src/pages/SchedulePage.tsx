@@ -24,6 +24,7 @@ import { Gate } from "../components/Gate";
 import { ListView } from "../components/ListView";
 import { Logo } from "../components/Logo";
 import { ProfileMenu } from "../components/ProfileMenu";
+import { RhythmCheck } from "../components/RhythmCheck";
 import { SessionModal } from "../components/SessionModal";
 import { Tour, tourSeen, type TourStep } from "../components/Tour";
 import {
@@ -823,6 +824,10 @@ export function SchedulePage() {
               </span>
             )}
           </Link>
+
+          {/* Mímir add-on: advisory rhythm notes. Renders nothing when the
+              schedule has nothing to flag. */}
+          <RhythmCheck sessions={bundle.sessions} rooms={bundle.rooms} />
 
           <button
             type="button"

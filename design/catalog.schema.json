@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Mímir dynamics catalog",
+  "description": "Schema for the facilitator's dynamics catalog. The CONTENT lives in the deployment's private data volume (/data/catalog.json), never in this public repo — purchased/copyrighted material may enter the private catalog in full, but publishing it here would redistribute it. This file is the contract plus one rights-free sample.",
+  "type": "object",
+  "required": ["version", "dynamics"],
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "dynamics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "category", "tier", "source"],
+        "properties": {
+          "name": { "type": "string", "maxLength": 120 },
+          "category": {
+            "description": "The school's seven categories, from the facilitator's corpus.",
+            "type": "string"
+          },
+          "purpose": {
+            "description": "'Para qué': what happens to the group. One line.",
+            "type": "string"
+          },
+          "reveals": {
+            "description": "'Qué revela': what this shows about the group that was not visible before — the field that makes it facilitation, not a game.",
+            "type": "string"
+          },
+          "people": { "type": "string", "description": "e.g. '4-20', 'parejas', 'indiferente'" },
+          "minutes": { "type": "string", "description": "e.g. '45-60', 'variable'" },
+          "energy": { "type": "string", "enum": ["activa", "profunda", "mixta"] },
+          "curve": {
+            "description": "Where it belongs in the energy curve.",
+            "type": "string",
+            "enum": ["apertura", "centro", "cierre", "transversal"]
+          },
+          "difficulty": { "type": "string" },
+          "safety": {
+            "description": "Safety warning, attached to the name in every UI.",
+            "type": "string"
+          },
+          "discardIf": {
+            "description": "Condición de descarte — when NOT to use it. May be '⚠️ sin fuente' if the corpus does not say.",
+            "type": "string"
+          },
+          "tier": {
+            "description": "Quality scale. cantera = ingested with metadata only; destacada = proposed by Mímir (ficha completeness + fit with the school's depth ladder); validada = confirmed by the facilitator. The final criterion is always human.",
+            "type": "string",
+            "enum": ["cantera", "destacada", "validada"]
+          },
+          "dominio": {
+            "description": "The facilitator's own relationship to it. 'usada' outweighs 'leida'.",
+            "type": "string",
+            "enum": ["usada", "vista", "leida"]
+          },
+          "source": {
+            "description": "School, book, collection, or 'propia'. Cite the concrete collection.",
+            "type": "string"
+          },
+          "steps": {
+            "description": "Full steps. OMIT for copyrighted material in any public context — point to `stepsRef` instead.",
+            "type": "string"
+          },
+          "stepsRef": {
+            "description": "Where the steps live when they cannot be copied (e.g. a vault path or the original publication).",
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "version": 1,
+      "dynamics": [
+        {
+          "name": "Check-in de ronda",
+          "category": "Cohesión",
+          "purpose": "Que cada voz entre una vez antes de trabajar.",
+          "reveals": "Quién llega cargado y qué trae el grupo hoy.",
+          "people": "3-4+",
+          "minutes": "20-30 s/persona",
+          "energy": "profunda",
+          "curve": "apertura",
+          "difficulty": "fácil",
+          "safety": "segura",
+          "discardIf": "grupos > 25 — se vuelve maratón",
+          "tier": "validada",
+          "dominio": "usada",
+          "source": "práctica propia"
+        }
+      ]
+    }
+  ]
+}
