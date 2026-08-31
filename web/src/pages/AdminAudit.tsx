@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AuditEntryDto } from '@shared/types';
 import { api } from '../lib/api';
-import { relativeTime } from '../lib/format';
+import { relativeTime, rowId, uid } from '../lib/format';
 import { EmptyState, SecondaryButton, Section, Spinner, inputClass, useToast } from '../components/ui';
 
 /**
@@ -61,14 +61,29 @@ function Entry({ entry }: { entry: AuditEntryDto }) {
   return (
     <li className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 border-b border-stone-100 py-2 text-sm last:border-0 dark:border-stone-800">
       <span className="font-medium">{entry.actorName || 'someone'}</span>
+      {/* The identity id, not the name: names are editable and this log is
+          read precisely when someone wants to know who did a thing. The same
+          number identifies them at every event on this instance. */}
+      {entry.actorId !== null && (
+        <span
+          title="Identity — the same at every event on this instance"
+          className="font-mono text-xs text-stone-400 dark:text-stone-500"
+        >
+          ({uid(entry.actorId)})
+        </span>
+      )}
       <span className={TONE[entry.action] ?? 'text-stone-600 dark:text-stone-300'}>{action}</span>
       <span className="text-stone-500 dark:text-stone-400">{entity}</span>
-      {entry.entityLabel ? (
+      {entry.entityLabel && (
         <span className="min-w-0 truncate font-medium">“{entry.entityLabel}”</span>
-      ) : (
-        entry.entityId !== null && (
-          <span className="text-stone-400 dark:text-stone-500">#{entry.entityId}</span>
-        )
+      )}
+      {/* Always, even when a name resolved — the name is what it is called
+          now, the id is what was acted on. Two people can share a name, and a
+          renamed thing would otherwise make its own history unreadable. */}
+      {entry.entityId !== null && (
+        <span className="font-mono text-xs text-stone-400 dark:text-stone-500">
+          ({rowId(entry.entityId)})
+        </span>
       )}
       <time
         dateTime={entry.at}
@@ -123,7 +138,17 @@ export function AdminAudit({ slug, auditKeep }: { slug: string; auditKeep: numbe
   const shown = (entries ?? []).filter((e) =>
     needle === ''
       ? true
-      : `${e.actorName} ${e.action} ${e.entity} ${e.entityLabel}`.toLowerCase().includes(needle),
+      : [
+          e.actorName,
+          e.actorId === null ? '' : uid(e.actorId),
+          e.action,
+          e.entity,
+          e.entityLabel,
+          e.entityId === null ? '' : rowId(e.entityId),
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(needle),
   );
 
   return (
@@ -144,7 +169,7 @@ export function AdminAudit({ slug, auditKeep }: { slug: string; auditKeep: numbe
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filter by name, action or title"
+            placeholder="Filter by name, id, action or title"
             aria-label="Filter the loaded entries"
             className={`${inputClass} mb-3`}
           />

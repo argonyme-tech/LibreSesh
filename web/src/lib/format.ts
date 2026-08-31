@@ -3,6 +3,18 @@ import { localDate, localMinuteOfDay } from '@shared/time';
 
 const pad = (n: number): string => String(n).padStart(2, '0');
 
+/**
+ * Ids, rendered so two different id spaces are never mistaken for each other.
+ *
+ * A **UID** is an identity: one human's row, the same number at every event on
+ * this instance, and the only thing about them that never changes. An **ID** is
+ * the row that was acted on — a profile, a session, a tag — and is per event.
+ * Zero-padded so a column of them lines up and a five-digit id does not look
+ * like a different kind of thing from a two-digit one.
+ */
+export const uid = (identityId: number): string => `UID: ${String(identityId).padStart(5, '0')}`;
+export const rowId = (id: number): string => `ID: ${String(id).padStart(5, '0')}`;
+
 /** 'HH:MM' from minutes since local midnight. */
 export const fmtMin = (minute: number): string =>
   `${pad(Math.floor(minute / 60) % 24)}:${pad(minute % 60)}`;

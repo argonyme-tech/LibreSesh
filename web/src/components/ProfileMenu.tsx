@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { PersonDto, Role } from '@shared/types';
 import { api } from '../lib/api';
+import { uid } from '../lib/format';
 import { DeviceLinkModal } from './DeviceLink';
 import { ThemeToggle } from './ThemeToggle';
 import { RoleBadge, useToast } from './ui';
@@ -142,10 +143,10 @@ export function ProfileMenu({
           <div className="border-b border-stone-100 px-3 pb-2 pt-1 dark:border-stone-800">
             <p className="truncate text-xs font-semibold">{displayName}</p>
             <p
-              title="Your id on this instance. Quote it to an organiser if two people here share a name."
+              title="Your identity on this instance. Quote it to an organiser if two people here share a name."
               className="font-mono text-xs text-stone-400 dark:text-stone-500"
             >
-              you are #{identityId}
+              ({uid(identityId)})
             </p>
           </div>
           <button

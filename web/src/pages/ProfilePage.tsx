@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { PersonDetailDto, PersonDto, PersonLink } from '@shared/types';
 import { ApiError, api } from '../lib/api';
-import { dayLabel, fmtMin, place, todayInZone } from '../lib/format';
+import { dayLabel, fmtMin, place, rowId, todayInZone } from '../lib/format';
 import { renderMarkdown } from '../lib/markdown';
 import { useEventData } from '../lib/useEventData';
 import {
@@ -130,7 +130,7 @@ export function ProfilePage() {
                   person between events would tie their names together, which
                   is exactly what per-event names exist to avoid. */}
               <p className="mt-0.5 font-mono text-xs text-stone-400 dark:text-stone-500">
-                profile #{person.id}
+                ({rowId(person.id)})
               </p>
             </div>
             {isAdmin && (

@@ -97,6 +97,13 @@ export interface PersonDto {
    */
   role?: Role | null;
   /**
+   * Organisers only. The identity holding this profile — stable across every
+   * event on the instance, unlike the profile id, which is per event. Absent
+   * for everyone else: printed beside a name in public it would tie one
+   * person's names together between events.
+   */
+  holderId?: number | null;
+  /**
    * Organisers only. True when a speaker code minted for this profile has
    * never been redeemed — the phrase is still sitting in an unread email.
    * `claimed` cannot tell an organiser that, because minting attaches an
@@ -299,6 +306,13 @@ export interface AuditEntryDto {
   at: string;
   /** The actor's display name in this event. Empty if the row has no actor. */
   actorName: string;
+  /**
+   * The actor's identity id — the same number at every event on this instance,
+   * and the only thing about them that never changes. Display names can be
+   * edited, and this log is read precisely when someone wants to know who did
+   * something, so the name alone is not enough. Admin-only, like the endpoint.
+   */
+  actorId: number | null;
   action: string;
   entity: string;
   entityId: number | null;

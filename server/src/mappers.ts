@@ -83,6 +83,7 @@ export function parseLinks(raw: string): PersonLink[] {
 /** Extra columns only organisers are shown; see `PersonDto`. */
 export interface PersonRosterFacts {
   role: Role | null;
+  holderId: number | null;
   codePending: boolean;
 }
 
@@ -97,7 +98,9 @@ export const toPersonDto = (
   links: parseLinks(row.links),
   isMine: row.identity_id !== null && row.identity_id === viewerIdentityId,
   claimed: row.identity_id !== null,
-  ...(facts === undefined ? {} : { role: facts.role, codePending: facts.codePending }),
+  ...(facts === undefined
+    ? {}
+    : { role: facts.role, holderId: facts.holderId, codePending: facts.codePending }),
   updatedAt: row.updated_at,
 });
 
@@ -116,11 +119,17 @@ export const toPersonDto = (
  */
 export function personRosterFacts(db: Db, eventId: number): Map<number, PersonRosterFacts> {
   const rows = db
-    .prepare<[number, number], { id: number; role: Role | null; code_pending: number }>(
+    .prepare<[number, number], {
+      id: number;
+      role: Role | null;
+      holder_id: number | null;
+      code_pending: number;
+    }>(
       // `link_codes.person_id` is unique where set, so this joins at most one
       // code per person.
       `SELECT p.id AS id,
               r.role AS role,
+              p.identity_id AS holder_id,
               CASE WHEN lc.id IS NOT NULL AND lc.used_at IS NULL THEN 1 ELSE 0 END AS code_pending
          FROM people p
     LEFT JOIN roles r ON r.identity_id = p.identity_id AND r.event_id = ?
@@ -128,7 +137,12 @@ export function personRosterFacts(db: Db, eventId: number): Map<number, PersonRo
         WHERE p.event_id = ? AND p.deleted_at IS NULL`,
     )
     .all(eventId, eventId);
-  return new Map(rows.map((r) => [r.id, { role: r.role, codePending: r.code_pending === 1 }]));
+  return new Map(
+    rows.map((r) => [
+      r.id,
+      { role: r.role, holderId: r.holder_id, codePending: r.code_pending === 1 },
+    ]),
+  );
 }
 
 export function tagIdsBySession(db: Db, sessionIds: number[]): Map<number, number[]> {

@@ -6,6 +6,20 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **The audit log and the roster show ids, not just names.** An entry read
+  `Marcel edited person "attendee_4skp9"` — the label resolved, so the id it
+  already had was hidden, and neither the actor nor the thing acted on could be
+  pinned down. Names are editable and profile names are not unique, so both are
+  now shown with their id: the actor's **identity id**, which is the same
+  number at every event on this instance and the only thing about them that
+  never changes, and the entity's own id beside its current name. The People
+  roster shows the holder's identity id too, and the audit filter searches ids
+  as well as names. Both are written zero-padded and labelled — `(UID: 00007)`
+  for an identity, `(ID: 00012)` for the row acted on — so a column of them
+  lines up and the two id spaces are never mistaken for one another. Organisers only, as before — a public profile still shows
+  only the per-event profile id, because printing an identity id beside a name
+  would tie one person's names together across events.
+
 - **Profiles carry an id, because names do not identify anyone.** A profile
   page and each row of the People roster now show `#12` — the id already in the
   address bar, unique within the event. Deliberately the *profile* id and not

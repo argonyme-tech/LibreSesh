@@ -20,3 +20,14 @@ describe('dayRangeLabel', () => {
     expect(dayRangeLabel('2026-06-04', '2026-06-04')).toBe('4 Jun');
   });
 });
+
+describe('id formatting', () => {
+  it('pads and labels the two id spaces distinctly', async () => {
+    const { uid, rowId } = await import('../web/src/lib/format.js');
+    expect(uid(12)).toBe('UID: 00012');
+    expect(rowId(12)).toBe('ID: 00012');
+    expect(uid(7)).toBe('UID: 00007');
+    // Beyond five digits it simply stops padding rather than truncating.
+    expect(uid(123456)).toBe('UID: 123456');
+  });
+});

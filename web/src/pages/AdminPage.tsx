@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { PersonDto, RoomDto, TagDto, TrackDto } from '@shared/types';
 import { ApiError, api, type TrashDto } from '../lib/api';
-import { fmtMin, relativeTime } from '../lib/format';
+import { fmtMin, relativeTime, rowId, uid } from '../lib/format';
 import { useEventData } from '../lib/useEventData';
 import { AdminRooms, type RoomDraft } from './AdminRooms';
 import { AdminPermissions } from './AdminPermissions';
@@ -723,7 +723,7 @@ export function AdminPage() {
                   <span className="min-w-32 flex-1 text-sm font-medium">
                     {person.name}
                     <span className="ml-1.5 font-mono text-xs font-normal text-stone-400 dark:text-stone-500">
-                      #{person.id}
+                      ({rowId(person.id)})
                     </span>
                   </span>
                   {/* Three things an organiser acts on differently: nobody
@@ -737,6 +737,14 @@ export function AdminPage() {
                   {!person.claimed && (
                     <span className="rounded-full border border-dashed border-stone-300 px-2 py-0.5 text-xs text-stone-500 dark:border-stone-600 dark:text-stone-400">
                       unclaimed
+                    </span>
+                  )}
+                  {person.holderId != null && (
+                    <span
+                      title="Identity holding this profile — the same at every event on this instance"
+                      className="font-mono text-xs text-stone-400 dark:text-stone-500"
+                    >
+                      ({uid(person.holderId)})
                     </span>
                   )}
                   {person.codePending === true && (

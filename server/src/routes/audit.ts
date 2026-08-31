@@ -113,6 +113,7 @@ export function auditRoutes(ctx: Ctx): Router {
       // removed, which nothing does today — but the log is append-only and
       // must render whatever it holds.
       actorName: row.identity_id === null ? '' : names.get(row.identity_id),
+      actorId: row.identity_id,
       action: row.action,
       entity: row.entity,
       entityId: row.entity_id,

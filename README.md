@@ -21,9 +21,11 @@ Three design pillars:
    1 vCPU VPS and backs up with a single `sqlite3` command.
 3. **Mobile-first.** The schedule has to be readable on a phone in a hallway.
 
-![The LibreSesh schedule: a two-day grid with rooms as columns, sessions as
-blocks, a red now-line across the current time, and the day tabs and filter bar
-above it](assets/screenshot-schedule.png)
+![LibreSesh showing LongConf 2026: a week rail above a row of day tabs, filter
+chips for rooms and tracks, and the grid below with four room columns, session
+blocks carrying their tag colours, and a now-line crossing 12:13 with the
+sessions it passes through marked
+"now"](assets/app-screenshot-0.2.0.png)
 
 ## Tech stack
 
@@ -179,7 +181,7 @@ Display names are unique within an event, so nobody can take an organiser's.
 | Settings | Name, dates, day bounds, passwords, audit retention, duplicate, archive |
 | Trash | Deleted sessions and contributions, with restore |
 | Backup | The event as JSON, and the encrypted whole-instance download |
-| Audit | Who created, edited, deleted or restored what |
+| Audit | Who created, edited, deleted or restored what, by identity id |
 
 The open tab lives in the URL as `?tab=`, so a link lands a co-organiser on the
 same one.
