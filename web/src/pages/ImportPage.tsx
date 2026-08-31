@@ -13,8 +13,19 @@ import {
   useToast,
 } from '../components/ui';
 
-/** Bigger than any real document; a paste past this is a wrong file. */
-const MAX_BYTES = 4_000_000;
+/**
+ * The server's own body cap — `express.json({ limit: '256kb' })` in app.ts.
+ * Checked here so an oversized document is caught with the file in hand rather
+ * than after a round trip, and so the number quoted is the one that applies.
+ * A schedule this size is a wrong file: the whole VoTC programme is 31 KB.
+ */
+const MAX_BYTES = 256 * 1024;
+
+const asKb = (bytes: number): string => `${Math.round(bytes / 1024)} KB`;
+
+/** What the request will weigh. Not `text.length`: “Jörg” and “→” are not one
+ *  byte each, and the cap the server applies is on bytes. */
+const byteLength = (text: string): number => new TextEncoder().encode(text).length;
 
 const plural = (n: number, one: string, many = `${one}s`): string =>
   `${n} ${n === 1 ? one : many}`;
@@ -50,13 +61,20 @@ export function ImportPage() {
 
   const parsed = parseDoc(text);
   const summary: DocSummary | null = parsed.ok ? parsed.summary : null;
+  // A paste can be over the cap just as a file can, and the server would answer
+  // 413 for both. Saying so here costs nothing and keeps the button honest.
+  const bytes = byteLength(text);
+  const oversize = bytes > MAX_BYTES;
   /** A result only describes the box while the box still says what it said. */
   const rehearsal = checked && checked.text === text ? checked.result : null;
 
   const readFile = (file: File | undefined) => {
     if (!file) return;
     if (file.size > MAX_BYTES) {
-      setError(`${file.name} is ${Math.round(file.size / 1e6)} MB — that is not a schedule.`);
+      setError(
+        `${file.name} is ${asKb(file.size)}, and this server accepts ${asKb(MAX_BYTES)}. ` +
+          'That is far larger than any programme — check it is the right file.',
+      );
       return;
     }
     void file.text().then((contents) => {
@@ -67,7 +85,7 @@ export function ImportPage() {
   };
 
   const run = async (dryRun: boolean) => {
-    if (!parsed.ok) return;
+    if (!parsed.ok || oversize) return;
     setBusy(dryRun ? 'check' : 'import');
     setError(null);
     try {
@@ -196,6 +214,11 @@ export function ImportPage() {
           {text.trim() !== '' && !parsed.ok && (
             <p className="mt-2 text-xs text-red-600 dark:text-red-400">{parsed.error}</p>
           )}
+          {oversize && (
+            <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+              This document is {asKb(bytes)}, and this server accepts {asKb(MAX_BYTES)}.
+            </p>
+          )}
           {summary && <Summary summary={summary} />}
         </div>
 
@@ -205,18 +228,18 @@ export function ImportPage() {
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <SecondaryButton
             onClick={() => void run(true)}
-            disabled={!parsed.ok || busy !== null || instanceKey === ''}
+            disabled={!parsed.ok || oversize || busy !== null || instanceKey === ''}
           >
             {busy === 'check' ? 'Checking…' : rehearsal ? 'Check again' : 'Check it'}
           </SecondaryButton>
           <PrimaryButton
             onClick={() => void run(false)}
-            disabled={!rehearsal || busy !== null}
+            disabled={!rehearsal || oversize || busy !== null}
             title={rehearsal ? undefined : 'Check the document first'}
           >
             {busy === 'import' ? 'Importing…' : 'Import'}
           </PrimaryButton>
-          {!rehearsal && parsed.ok && (
+          {!rehearsal && parsed.ok && !oversize && (
             <span className="text-xs text-stone-500 dark:text-stone-400">
               Check it first — nothing is written until then.
             </span>

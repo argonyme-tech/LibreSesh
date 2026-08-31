@@ -309,7 +309,7 @@ guess, since a wrong name creates a profile someone then has to merge away.
 - **It only creates events, never updates one.** There is no way to add a day
   to an event that already exists, or to re-run a corrected document over the
   top of a previous import. Delete the event and import again.
-- **It has no UI.** The route is curl-only for now.
 - **Request bodies are capped at 256 KB**, which is a large schedule but not an
   unlimited one. A document over the cap is rejected by Express before this
-  route sees it, as a `413`.
+  route sees it, as a `413` naming the limit; `/import` checks the size before
+  sending, so a wrong file is caught with the file still in hand.
