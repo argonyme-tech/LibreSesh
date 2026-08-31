@@ -127,6 +127,23 @@ All notable changes to this project are documented here.
 
 ### Changed
 
+- **The schema is one file again.** Seventeen migrations squashed into
+  `001_baseline.sql`, done now because no instance yet holds data and this is
+  the only moment it is free. Four of the old files existed solely to backfill
+  rows or rebuild a table to widen a `CHECK`, and the final shape of `roles`,
+  `link_codes` and `people` was not visible in any single file — you had to
+  replay the sequence to know what the schema was. Verified rather than
+  trusted: a database built by replaying all seventeen and one built from the
+  baseline were compared on every column, default, foreign key, index and
+  `CHECK` that SQLite reports, and matched exactly. That check caught four
+  indexes the hand-written baseline had renamed or dropped. The old files
+  remain in git history.
+
+  **Any existing database must be deleted and reseeded** — the runner tracks
+  migrations by filename, so one that recorded the old names now refuses to
+  start against this build. That is the newer-build guard working, and the
+  reason this could not have waited until after a real deploy.
+
 - **Manage Event is tabbed instead of one long page.** Rooms, tracks and tags
   sit under **Programme**; people, permissions, event settings and the bin each
   get their own tab, and Backup and Audit joined them later in this release —

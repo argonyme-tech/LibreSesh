@@ -36,7 +36,7 @@ Three design pillars:
 
 ```
 server/            Express app, DB layer, SSE, auth, rate limiting
-  migrations/      numbered .sql files, applied at boot
+  migrations/      numbered .sql files, applied at boot (001 is the whole schema)
   src/shared/      types + timezone helpers, imported by the web app too
 web/               Vite React app
 scripts/           seed.ts, create-event.ts, decrypt-backup.ts

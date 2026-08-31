@@ -318,8 +318,29 @@ pruned by an event's cap, and no screen shows them yet.
 
 ### Migrations
 
-Numbered `.sql` files in `server/migrations/`, applied at boot, each in its
-own transaction, tracked by filename in the `migrations` table. The runner
+Numbered `.sql` files in `server/migrations/`, applied at boot, each in its own
+transaction, tracked by filename in the `migrations` table.
+
+`001_baseline.sql` is the whole schema in one file, squashed on 2026-08-31 from
+the seventeen files that preceded it — before any instance held data, which is
+the only moment a squash is free. Four of those existed only to backfill rows
+or rebuild a table to widen a `CHECK`, and could never have run again. The
+squash was verified rather than trusted: a database built by replaying all
+seventeen and one built from the baseline were compared on what SQLite itself
+reports — every column with its type, default, nullability and primary-key
+position, every foreign key, every index with its uniqueness, partiality and
+columns, and every `CHECK` — and they matched exactly. The old files are in git
+history.
+
+That window is now shut. Any database that recorded the old filenames will
+refuse to start against this build, which is the runner's newer-build guard
+doing its job, and the fix is to delete a development database rather than to
+weaken the guard. From here it is the ordinary rule: never edit an applied
+migration, add a numbered file. The runner matches on filename, so an edit
+would silently never reach a database that already has that name — and nothing
+would report the divergence.
+
+The runner
 (`server/src/db.ts`) enforces three rules that matter once instances run in
 the wild:
 
@@ -333,9 +354,11 @@ the wild:
   a NOT NULL in place; the recipe is create-new → copy → drop → rename, which
   needs `foreign_keys` off (a pragma that cannot change mid-transaction, so
   the runner turns it off around the pending files). Every file must leave
-  `PRAGMA foreign_key_check` clean or its transaction rolls back. Migrations
-  014 (adding the speaker role to two CHECKs) and 015 (making
-  `link_codes.expires_at` nullable) are the worked examples.
+  `PRAGMA foreign_key_check` clean or its transaction rolls back. The worked
+  examples are in git history rather than on disk — the squashed 014 (adding
+  the speaker role to two `CHECK`s) and 015 (making `link_codes.expires_at`
+  nullable) — and `tests/migrationRunner.test.ts` exercises the same recipe on
+  fixtures of its own.
 
 Prefer additive migrations anyway — `ADD COLUMN … DEFAULT`, new tables,
 overrides-only tables like `event_permissions` — and reach for a rebuild only
