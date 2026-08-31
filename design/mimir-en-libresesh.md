@@ -118,6 +118,36 @@ Un proceso de diseño (sesión o evento) es un **proyecto con dueño**, que pued
   acuerdo de trabajo? ¿formato de decisión?), nunca como personas; si escala a
   conflicto personal → deflexión F13 (esto merece un humano; no se almacena).
 
+## 3c · Fuentes del proceso — audios y documentos
+*(Decisión del facilitador, 2026-09-01.)*
+
+Cada proceso tiene su **carpeta de fuentes**: se pueden colgar **audios** (subir
+o grabar desde el móvil — pasillo, reunión de equipo) y **documentos** (notas,
+actas, propuestas), y Mímir los procesa y analiza dentro del proceso.
+
+**Pipeline de audio:** subir/grabar → transcripción → análisis de Mímir.
+Con las reglas del corpus (🎙️ Fuentes primarias en crudo), no negociables:
+- Hablantes sin diarización verificada se marcan **INFERIDOS**, no verificados.
+- Lo que no se oye/entiende **se declara, no se reconstruye**.
+- Juicios sobre personas se archivan como **dato del relato, no hecho**.
+- Lo marcado confidencial **no cruza la frontera** del cuaderno del proceso.
+
+**Análisis de documentos** (según tipo, siempre como devolución):
+- Acta/notas de grupo → **espejo despersonalizado**: 4-5 puntos reales de entre
+  la repetición, resumen sin nombres, compromisos con nombres.
+- Documento con propuesta → **lista de supuestos** («esto da por hecho que…»),
+  como lista, no como crítica.
+- Material de terceros → entra con las reglas **anti-ancla** (después de la
+  versión propia del grupo, despersonalizado, como espejo/ejemplo).
+
+**Reglas de instrumento:** cada fuente muestra su estado (⏳ procesando →
+✓ analizada) · el análisis lleva etiqueta de estatus y enlaza a la fuente ·
+todo lo que salga del proceso hacia fuera pasa la puerta **P6** (anonimizado) ·
+borrar una fuente es del dueño del proceso y borra también sus derivados.
+
+**Infra:** transcripción vía el ecosistema existente (n8n + Groq Whisper ya
+operativo en el VPS, o Hermes/DGX en local); el análisis, el motor Mímir (v2+).
+
 ## 4 · Chat por proceso
 
 Un chat **por proceso abierto** (no un chat global): cada sesión o evento en diseño

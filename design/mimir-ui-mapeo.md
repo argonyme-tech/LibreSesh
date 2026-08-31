@@ -58,7 +58,13 @@ Dos columnas (una en móvil):
    Al unirse alguien, el primer mensaje de Mímir en el chat compartido es el
    contrato de colaboración (cómo os organizáis → abanico de acuerdos → eligen
    los humanos). Las decisiones registradas muestran SIEMPRE quién las tomó.
-4. **Estado del evento** (solo organizador): avisos de ritmo + espejo/cosecha.
+4. **Fuentes del proceso** — zona de soltar/subir + botón 🎙 grabar (clave en
+   móvil: la conversación de pasillo se captura donde ocurre). Tarjetas de
+   fuente con estado (⏳ transcribiendo → ✓ analizada) y tipo de análisis:
+   audio → transcripción con hablantes INFERIDOS marcados visualmente;
+   acta → espejo despersonalizado; propuesta → lista de supuestos. El análisis
+   siempre enlaza a su fuente y lleva etiqueta de estatus.
+5. **Estado del evento** (solo organizador): avisos de ritmo + espejo/cosecha.
 
 ### 2.3 La entrevista — ADAPTATIVA, no cuestionario fijo
 *(Decisión del facilitador, 2026-09-01.)*
