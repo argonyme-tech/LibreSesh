@@ -256,8 +256,9 @@ positional, and worth stating once: **the `:id` in the URL is the survivor**,
 the profile that remains; **`from` in the body is the loser**, the duplicate
 being folded in and soft-deleted.
 
-What the merge moves is *profile* data. What it does not move is anything keyed
-on an **identity** — and that is the distinction the whole feature turns on:
+A merge moves *everything*, in two layers (the second decided 2026-08-31):
+profile data first, then — when both profiles were claimed by different
+identities — the loser identity's whole body of work in this event.
 
 ```mermaid
 flowchart LR
@@ -272,37 +273,46 @@ flowchart LR
   subgraph after["After the merge"]
     direction TB
     I1b(["identity #7"]) --> P1b["people: Ada<br/>+ speaker_id, bio, links,<br/>speaker code"]
-    I2b(["identity #9<br/>still signed in,<br/>still “Ada on phone”"]) -.-> C2["contributions.created_by<br/>stars · created_by · interest<br/>unchanged"]
+    I1b -.-> C2["contributions.created_by<br/>stars · created_by · interest<br/>re-keyed onto #7, this event only"]
+    I2b(["identity #9<br/>signed out of this event —<br/>role revoked, name row kept"])
     P2b["people: A. Lovelace<br/>deleted_at set, identity_id NULL"]
   end
 
   before ==> after
 
   style P2b fill:#e7e5e4,stroke:#78716c,color:#000
-  style C2 fill:#fde68a,stroke:#b45309,color:#000
+  style C2 fill:#bbf7d0,stroke:#15803d,color:#000
+  style I2b fill:#fde68a,stroke:#b45309,color:#000
 ```
 
-So after a merge, verified against the running app:
+So after a merge:
 
 - the survivor holds both profiles' sessions and pitches, the identity claim if
   it had none, the bio and links if its own were empty, and the speaker code if
   that code still names the surviving person;
-- **the loser's identity keeps everything it wrote**, still under its own event
-  display name — so one human's contributions stay split across two names on
-  screen;
-- **the human on the losing device silently stops owning a profile.** They are
-  still signed in and still called what they were called, but nothing in the
-  event is `isMine` any more, so they cannot edit the bio that describes them;
-- they *can* still delete their own contributions: that is keyed on
-  `created_by`, and their identity was never touched.
+- **the loser identity's work in this event moves to the survivor's identity**
+  (`rekeyIdentityWork`): stars, contributions, proposal interest, and the
+  authorship of sessions and pitches. Where both did the same thing — starred
+  one session, marked interest in one pitch — the duplicate collapses to one,
+  because the primary key is (identity, thing) and one person does a thing
+  once;
+- **the losing device is signed out of the event** — its role revoked, the
+  same operation as /logout — rather than left signed in as a zombie that is
+  present but owns nothing. Deleting the identity itself would not be safe:
+  it may be a real person at other events on this instance, and the audit log
+  points at it. Its event display name row stays, so the attendance list and
+  old audit entries keep their label and the name stays reserved. The device
+  can re-enter through the gate and is then a fresh participant;
+- the re-keying and the sign-out are **scoped to the event being merged**. The
+  losing identity may be a genuinely different presence at other events on the
+  instance; those are untouched. Unifying the history means the losing device
+  no longer owns anything it wrote here, which is why merge is admin-only,
+  irreversible (no `/trash` path), and audited.
 
-The obvious fix — re-key the five identity-keyed tables onto the survivor — is
-not obviously right, which is why it is still queued rather than done. It would
-unify the history under one name, and in the same stroke take away the losing
-device's ability to delete words it wrote, because ownership is exactly that
-key. The alternative is to make merging an **adoption** the way device linking
-is, and adoption cannot be done *to* someone: it swaps a cookie, and only the
-holder of that browser can do it.
+An admin merging the wrong two people is therefore a real mistake with no undo
+— the confirmation step in the UI is the only gate. The audit log keeps the
+truthful record either way: rows written before the merge keep the actor who
+actually wrote them.
 
 ### The audit log, and what "append-only" means here
 

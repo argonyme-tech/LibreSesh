@@ -9,7 +9,8 @@ import {
 } from '../deviceLink.js';
 import type { PersonRow, SessionRow } from '../db.js';
 import { badRequest, conflict, forbidden, notFound } from '../errors.js';
-import { loadSessionDto, toPersonDto } from '../mappers.js';
+import { rekeyIdentityWork } from '../mergeIdentityWork.js';
+import { loadProposalDtos, loadSessionDto, toPersonDto } from '../mappers.js';
 import { requireCapability } from '../permissions.js';
 import { limit } from '../ratelimit.js';
 import {
@@ -216,9 +217,12 @@ export function peopleRoutes(ctx: Ctx): Router {
    * Fold a duplicate profile into this one (identity spec, B2): sessions and
    * pitches are repointed, blanks on the survivor fill from the duplicate, the
    * duplicate is soft-deleted. When only one side is claimed, the claim moves
-   * to the survivor; when both are, picking the survivor *is* picking whose
-   * claim wins — the other identity simply ends up profile-less, not deleted.
-   * Not reversible through /trash, hence admin-only and audited.
+   * to the survivor. When both are claimed, picking the survivor *is* picking
+   * whose identity wins: everything the losing identity did in this event —
+   * stars, contributions, interest, authorship — is re-keyed onto the
+   * survivor's, and the losing device is signed out of the event (decided
+   * 2026-08-31; see `rekeyIdentityWork`). Not reversible through /trash,
+   * hence admin-only and audited.
    */
   router.post(
     '/people/:id/merge',
@@ -236,6 +240,7 @@ export function peopleRoutes(ctx: Ctx): Router {
         .prepare<[number], { id: number }>('SELECT id FROM sessions WHERE speaker_id = ?')
         .all(loser.id)
         .map((r) => r.id);
+      let rekeyed = { sessionIds: [] as number[], proposalIds: [] as number[] };
 
       ctx.db.transaction(() => {
         ctx.db
@@ -265,6 +270,16 @@ export function peopleRoutes(ctx: Ctx): Router {
         // The loser's row is gone from the roster; its speaker code must not
         // outlive it as a phrase nobody can revoke.
         settleSpeakerCodeAfterMerge(ctx.db, loser.id, survivor.id, survivingIdentity);
+        // Only a both-claimed merge leaves a second identity behind to strip.
+        // When the survivor inherited the loser's identity, the work already
+        // belongs to the surviving pair and there is nothing to move.
+        if (
+          loser.identity_id !== null &&
+          survivor.identity_id !== null &&
+          survivor.identity_id !== loser.identity_id
+        ) {
+          rekeyed = rekeyIdentityWork(ctx.db, req.event.id, loser.identity_id, survivor.identity_id);
+        }
       })();
 
       const dto = toPersonDto(load(req.event.id, survivor.id), req.identity.id);
@@ -277,7 +292,15 @@ export function peopleRoutes(ctx: Ctx): Router {
       });
       ctx.broker.publish(req.event.slug, 'person.deleted', { id: loser.id });
       ctx.broker.publish(req.event.slug, 'person.updated', dto);
-      for (const sessionId of movedSessions) {
+      if (rekeyed.proposalIds.length > 0) {
+        const changed = new Set(rekeyed.proposalIds);
+        for (const proposal of loadProposalDtos(ctx.db, req.event.id, req.identity.id)) {
+          if (changed.has(proposal.id)) {
+            ctx.broker.publish(req.event.slug, 'proposal.updated', proposal);
+          }
+        }
+      }
+      for (const sessionId of new Set([...movedSessions, ...rekeyed.sessionIds])) {
         const row = ctx.db
           .prepare<[number], SessionRow>('SELECT * FROM sessions WHERE id = ?')
           .get(sessionId);

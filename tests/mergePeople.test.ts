@@ -120,6 +120,125 @@ describe('merging people', () => {
    * or dies, and never lingers as a phrase pointing at a profile that is no
    * longer on the roster.
    */
+
+  describe('a both-claimed merge re-keys the loser\u2019s work (decided 2026-08-31)', () => {
+    it('moves stars, contributions, interest and authorship onto the survivor, deduping overlaps', async () => {
+      const dupe = await actorWithRole(harness, 'testconf', 'user-pw');
+      await user.patch('/api/e/testconf/me/profile').send({ name: 'Ada' }).expect(201);
+      const theirs = await dupe
+        .patch('/api/e/testconf/me/profile')
+        .send({ name: 'Ada 2' })
+        .expect(201);
+      const mine = await user.get('/api/e/testconf/bundle').expect(200);
+      const myProfileId = mine.body.people.find((p: { isMine: boolean }) => p.isMine).id as number;
+      const { body: userMe } = await user.get('/api/me').expect(200);
+
+      // The loser's body of work: a session of their own, a star each on the
+      // admin's session (shared with the survivor), a contribution, a pitch,
+      // and interest on that pitch from both sides.
+      const adminSession = (await makeSession('Keynote')).body.id as number;
+      const ownSession = (
+        await dupe
+          .post('/api/e/testconf/sessions')
+          .send({
+            roomId,
+            title: 'Hallway chat',
+            startsAt: at(DAY_ONE, 800),
+            endsAt: at(DAY_ONE, 830),
+          })
+          .expect(201)
+      ).body.id as number;
+      await dupe.put(`/api/e/testconf/sessions/${adminSession}/star`).expect(204);
+      await user.put(`/api/e/testconf/sessions/${adminSession}/star`).expect(204);
+      const note = (
+        await dupe
+          .post(`/api/e/testconf/sessions/${adminSession}/contributions`)
+          .send({ kind: 'note', body: 'great talk' })
+          .expect(201)
+      ).body.id as number;
+      const pitch = (
+        await dupe
+          .post('/api/e/testconf/proposals')
+          .send({ title: 'Lightning round', description: '' })
+          .expect(201)
+      ).body.id as number;
+      await dupe.put(`/api/e/testconf/proposals/${pitch}/interest`).expect(204);
+      await user.put(`/api/e/testconf/proposals/${pitch}/interest`).expect(204);
+
+      await admin
+        .post(`/api/e/testconf/people/${myProfileId}/merge`)
+        .send({ from: theirs.body.id })
+        .expect(200);
+
+      const bundle = (await user.get('/api/e/testconf/bundle').expect(200)).body;
+      // The shared star collapsed to one; the loser's own star is now mine.
+      expect(bundle.starCounts[adminSession]).toBe(1);
+      expect(bundle.starredSessionIds).toContain(adminSession);
+      // Authorship moved: the loser's session and pitch read as the survivor's.
+      const moved = bundle.sessions.find((x: { id: number }) => x.id === ownSession);
+      expect(moved.createdBy).toBe(userMe.id);
+      const movedPitch = bundle.proposals.find((x: { id: number }) => x.id === pitch);
+      expect(movedPitch.createdBy).toBe(userMe.id);
+      // The two interests deduped to one, and it is the survivor's.
+      expect(movedPitch.interestCount).toBe(1);
+      expect(movedPitch.interested).toBe(true);
+
+      // The losing device is signed out of the event, not left as a zombie
+      // that is present but owns nothing: its role is revoked, so the event
+      // is gone from under it until it re-enters through the gate as a
+      // fresh participant. The survivor owns the note now.
+      await dupe.get('/api/e/testconf/bundle').expect(401);
+      await dupe.delete(`/api/e/testconf/contributions/${note}`).expect(401);
+      await user.delete(`/api/e/testconf/contributions/${note}`).expect(204);
+      // Re-entering works — the identity was signed out, not destroyed.
+      await dupe.post('/api/e/testconf/auth').send({ password: 'user-pw' }).expect(200);
+      const back = (await dupe.get('/api/e/testconf/bundle').expect(200)).body;
+      expect(back.starredSessionIds).toEqual([]);
+    });
+
+    it('is scoped to the event being merged \u2014 the same identity elsewhere keeps its work', async () => {
+      seedEvent(harness.db, { slug: 'otherconf' });
+      const dupe = await actorWithRole(harness, 'testconf', 'user-pw');
+      await actorWithRole({ ...harness, app: harness.app }, 'otherconf', 'user-pw');
+
+      await user.patch('/api/e/testconf/me/profile').send({ name: 'Ada' }).expect(201);
+      const theirs = await dupe
+        .patch('/api/e/testconf/me/profile')
+        .send({ name: 'Ada 2' })
+        .expect(201);
+      const mine = (await user.get('/api/e/testconf/bundle').expect(200)).body;
+      const myProfileId = mine.people.find((p: { isMine: boolean }) => p.isMine).id as number;
+
+      // The losing identity also lives at another event, with a star there.
+      await dupe.post('/api/e/otherconf/auth').send({ password: 'user-pw' }).expect(200);
+      const otherAdmin = await actorWithRole(harness, 'otherconf', 'admin-pw');
+      const otherRoom = (
+        await otherAdmin.post('/api/e/otherconf/rooms').send({ name: 'Side room' }).expect(201)
+      ).body.id as number;
+      const farSession = (
+        await otherAdmin
+          .post('/api/e/otherconf/sessions')
+          .send({
+            roomId: otherRoom,
+            title: 'Far away',
+            startsAt: at(DAY_ONE, 600),
+            endsAt: at(DAY_ONE, 630),
+          })
+          .expect(201)
+      ).body.id as number;
+      await dupe.put(`/api/e/otherconf/sessions/${farSession}/star`).expect(204);
+
+      await admin
+        .post(`/api/e/testconf/people/${myProfileId}/merge`)
+        .send({ from: theirs.body.id })
+        .expect(200);
+
+      // Signed out of the merged event only; the other event still knows them.
+      const farBundle = (await dupe.get('/api/e/otherconf/bundle').expect(200)).body;
+      expect(farBundle.starredSessionIds).toContain(farSession);
+    });
+  });
+
   describe('the loser’s speaker code', () => {
     const mint = (personId: number) =>
       admin.post(`/api/e/testconf/people/${personId}/speaker-code`).expect(200);

@@ -49,28 +49,6 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   up-arrow rather than a star, which was only ever about the glyph colliding
   with "on my agenda".
 
-- **Merge unifies profiles, not identities.** `POST /people/:id/merge` moves
-  `sessions.speaker_id`, `proposals.speaker_id`, the identity claim, bio, links
-  and the speaker code onto the survivor. Stars, contributions,
-  `sessions.created_by`, `proposals.created_by` and proposal interest are keyed
-  on `identities.id` and stay where they are. Corrected 2026-08-31 after probing
-  the running app — the previous wording here said the loser's words end up
-  nameless and undeletable, and **both were wrong**: `event_identities` is
-  untouched, so those words keep the loser's own event display name, and
-  deletion is keyed on `created_by`, which still matches that identity. What is
-  actually true, and still wrong:
-  - one human's history stays visibly split across two names;
-  - the human on the losing device **silently stops owning a profile** — still
-    signed in, still named, but nothing is `isMine`, so they cannot edit the bio
-    that describes them.
-
-  The obvious fix — re-key those five tables onto the survivor — would unify the
-  history and, in the same stroke, take away the losing device's ability to
-  delete words it wrote, since ownership is exactly that key. The alternative is
-  to make merging an adoption the way device linking is, and adoption cannot be
-  done *to* someone: it swaps a cookie, so only that browser can do it. Wants a
-  decision before code; written up in ARCHITECTURE.md §Merging two people.
-
 - **Instance-level audit rows have no screen — and no pruning.** A
   whole-database backup, an event created from the landing page, or any
   device-link mint/redeem/failure carries no `event_id`, so those rows are

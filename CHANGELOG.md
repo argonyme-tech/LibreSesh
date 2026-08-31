@@ -6,6 +6,23 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **Merging two people now merges their work.** `POST /people/:id/merge`
+  repointed sessions and pitches but left everything keyed on the loser's
+  *identity* — stars, contributions, proposal interest, authorship — where it
+  was, so one human's history stayed visibly split across two names and the
+  losing device kept ownership of words that now described someone else's
+  profile. Decided and shipped: a both-claimed merge re-keys all of it onto
+  the surviving identity, deduping anything both sides did (a shared star
+  collapses to one), and the losing device is signed out of the event — role
+  revoked, exactly like /logout — rather than left signed in owning nothing.
+  Deleting the identity itself would not be safe (it may be a real person at
+  other events, and the audit log points at it); its name row stays so the
+  attendance list and old audit entries keep their label. Scoped to the event
+  being merged — the same identity at another event keeps its work and its
+  role — and the device can re-enter through the gate as a fresh participant.
+  Merge stays admin-only, irreversible and audited. ARCHITECTURE §Merging two
+  people rewritten, diagram included.
+
 - **UIDs are now random hex codes, not row numbers.** The identity id shown to
   admins (and to you, in the menu behind your name) was the database row id —
   sequential, so `UID: 00012` told anyone that eleven identities came before it
