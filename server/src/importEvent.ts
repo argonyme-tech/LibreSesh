@@ -66,7 +66,48 @@ const importRoomSchema = z.object({
   openBooking: z.boolean().optional(),
 });
 
-const importTrackSchema = z.object({ name: trimmed(60), color: colorSchema.optional() });
+/**
+ * A strand, optionally with the hours it keeps: "Workshops, 09:00–13:00". A
+ * day named in `windows` replaces those hours for that date. Wall-clock times
+ * like everything else in this document; omit them and the track takes a
+ * session at any hour, which is what every track did before.
+ */
+const importTrackSchema = z
+  .object({
+    name: trimmed(60),
+    color: colorSchema.optional(),
+    start: startTimeSchema.optional(),
+    end: endTimeSchema.optional(),
+    windows: z
+      .array(z.object({ date: dateSchema, start: startTimeSchema, end: endTimeSchema }))
+      .max(60)
+      .optional(),
+  })
+  .superRefine((v, ctx) => {
+    if ((v.start === undefined) !== (v.end === undefined)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['end'],
+        message: 'Give both ends of the hours, or neither',
+      });
+    }
+    if (v.start && v.end && minuteOfDay(v.end) <= minuteOfDay(v.start)) {
+      ctx.addIssue({ code: 'custom', path: ['end'], message: 'A track must close after it opens' });
+    }
+    for (const [i, w] of (v.windows ?? []).entries()) {
+      if (minuteOfDay(w.end) <= minuteOfDay(w.start)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['windows', i, 'end'],
+          message: 'A track must close after it opens',
+        });
+      }
+    }
+    const dates = (v.windows ?? []).map((w) => w.date);
+    if (new Set(dates).size !== dates.length) {
+      ctx.addIssue({ code: 'custom', path: ['windows'], message: 'One window per day' });
+    }
+  });
 
 const importTagSchema = z.object({ name: trimmed(40), color: colorSchema.optional() });
 
@@ -207,6 +248,29 @@ class DryRunFinished extends Error {
 const minuteOfDay = (hhmm: string): number => {
   const [h, m] = hhmm.split(':').map(Number) as [number, number];
   return h * 60 + m;
+};
+
+/** The 5-minute grid the calendar snaps to, which the rest of the app enforces
+ *  on every write. An import is no exception — a track opening at 09:02 could
+ *  never be edited back to itself in the UI. */
+const assertSnapped = (startMin: number, endMin: number, label: string): void => {
+  if (startMin % 5 !== 0 || endMin % 5 !== 0) {
+    throw badRequest(`${label}: times land on a 5-minute step`);
+  }
+};
+
+/** A track's own hours, in minutes, or nulls when it keeps none. */
+const trackHoursOf = (
+  track: { start?: string; end?: string },
+  label: string,
+): { startMin: number | null; endMin: number | null } => {
+  if (track.start === undefined || track.end === undefined) {
+    return { startMin: null, endMin: null };
+  }
+  const startMin = minuteOfDay(track.start);
+  const endMin = minuteOfDay(track.end);
+  assertSnapped(startMin, endMin, label);
+  return { startMin, endMin };
 };
 
 /** `sessions[3] "Opening keynote"` — every message says which row it came from. */
@@ -373,14 +437,39 @@ export function importEvent(
     assertNamesDistinct(tracks, 'tracks');
     const trackIds = new Map<string, number>();
     const insertTrack = db.prepare(
-      'INSERT INTO tracks (event_id, name, color, sort_order) VALUES (?, ?, ?, ?)',
+      `INSERT INTO tracks (event_id, name, color, sort_order, start_min, end_min)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    );
+    const insertTrackWindow = db.prepare(
+      `INSERT INTO track_windows (track_id, date, start_min, end_min, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
     );
     const trackColors: string[] = [];
     for (const [order, track] of tracks.entries()) {
       const color = track.color ?? nextRoomColor(trackColors);
       trackColors.push(color);
-      const id = insertTrack.run(eventId, track.name, color, order).lastInsertRowid;
+      const hours = trackHoursOf(track, `tracks[${order}] "${track.name}"`);
+      const id = insertTrack.run(
+        eventId,
+        track.name,
+        color,
+        order,
+        hours.startMin,
+        hours.endMin,
+      ).lastInsertRowid;
       trackIds.set(key(track.name), Number(id));
+      for (const [i, w] of (track.windows ?? []).entries()) {
+        const label = `tracks[${order}] "${track.name}" windows[${i}]`;
+        if (w.date < event.start_date || w.date > event.end_date) {
+          throw badRequest(
+            `${label}: ${w.date} is outside the event dates ${event.start_date}…${event.end_date}`,
+          );
+        }
+        const startMin = minuteOfDay(w.start);
+        const endMin = minuteOfDay(w.end);
+        assertSnapped(startMin, endMin, label);
+        insertTrackWindow.run(Number(id), w.date, startMin, endMin, now);
+      }
     }
 
     assertNamesDistinct(tags, 'tags');

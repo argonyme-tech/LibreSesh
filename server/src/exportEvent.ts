@@ -11,6 +11,7 @@ import type {
 } from './db.js';
 import { NameResolver } from './eventIdentity.js';
 import { parseLinks, speakerNames, tagIdsBySession } from './mappers.js';
+import { trackWindowsFor } from './trackHours.js';
 import type { EventExport } from './shared/types.js';
 
 /**
@@ -48,6 +49,10 @@ export function exportEvent(db: Db, event: EventRow): EventExport {
       'SELECT * FROM tracks WHERE event_id = ? AND deleted_at IS NULL ORDER BY sort_order, id',
     )
     .all(eventId);
+  const trackWindows = trackWindowsFor(
+    db,
+    tracks.map((t) => t.id),
+  );
   const tags = db
     .prepare<[number], TagRow>(
       'SELECT * FROM tags WHERE event_id = ? AND deleted_at IS NULL ORDER BY name',
@@ -149,6 +154,9 @@ export function exportEvent(db: Db, event: EventRow): EventExport {
       name: t.name,
       color: t.color,
       sortOrder: t.sort_order,
+      startMin: t.start_min,
+      endMin: t.end_min,
+      windows: trackWindows.get(t.id) ?? [],
     })),
     tags: tags.map((t) => ({ id: t.id, name: t.name, color: t.color })),
     breaks: breaks.map((b) => ({

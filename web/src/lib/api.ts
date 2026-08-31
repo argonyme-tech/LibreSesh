@@ -21,6 +21,7 @@ import type {
   SessionDto,
   TagDto,
   TrackDto,
+  TrackWindowDto,
 } from '@shared/types';
 import type { Repeat } from '@shared/repeat';
 
@@ -163,9 +164,9 @@ export const api = {
   deleteTag: (slug: string, id: number) => request<void>('DELETE', `/e/${encode(slug)}/tags/${id}`),
 
   // Tracks — thematic strands the schedule can use as columns instead of rooms.
-  createTrack: (slug: string, body: { name: string; color?: string }) =>
+  createTrack: (slug: string, body: TrackWrite & { name: string }) =>
     request<TrackDto>('POST', `/e/${encode(slug)}/tracks`, body),
-  updateTrack: (slug: string, id: number, body: { name?: string; color?: string }) =>
+  updateTrack: (slug: string, id: number, body: TrackWrite) =>
     request<TrackDto>('PATCH', `/e/${encode(slug)}/tracks/${id}`, body),
   reorderTracks: (slug: string, ids: number[]) =>
     request<TrackDto[]>('PATCH', `/e/${encode(slug)}/tracks`, { ids }),
@@ -331,6 +332,21 @@ export interface SessionWrite {
   tagIds?: number[];
   /** `null` clears the track; omitting the key leaves it as it was. */
   trackId?: number | null;
+}
+
+export interface TrackWrite {
+  name?: string;
+  color?: string;
+  /**
+   * The hours the track accepts sessions in, as local minutes on the 5-minute
+   * grid. Send both or neither: `null` for the pair lifts the limit, and
+   * omitting them leaves the stored window alone.
+   */
+  startMin?: number | null;
+  endMin?: number | null;
+  /** Days that keep different hours. The whole list, every time — what is sent
+   *  replaces what is stored. */
+  windows?: TrackWindowDto[];
 }
 
 export interface BreakWrite {

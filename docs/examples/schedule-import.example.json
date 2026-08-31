@@ -25,7 +25,13 @@
   ],
 
   "tracks": [
-    { "name": "Commons", "color": "#7FB069" },
+    {
+      "name": "Commons",
+      "color": "#7FB069",
+      "start": "09:00",
+      "end": "13:00",
+      "windows": [{ "date": "2026-09-15", "start": "14:00", "end": "18:00" }]
+    },
     { "name": "Infrastructure" }
   ],
 

@@ -20,6 +20,16 @@ export const rowId = (id: number): string => `ID: ${String(id).padStart(5, '0')}
 export const fmtMin = (minute: number): string =>
   `${pad(Math.floor(minute / 60) % 24)}:${pad(minute % 60)}`;
 
+/** Minutes since local midnight from an `<input type="time">` value. */
+export const minutesOf = (hhmm: string): number => {
+  const [h, m] = hhmm.split(':').map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+};
+
+/** Snapped to the same 5-minute grid the calendar uses, which is what the
+ *  server accepts — `step` alone is advisory in some browsers. */
+export const snapMinute = (minute: number): number => Math.round(minute / 5) * 5;
+
 export interface Placed {
   date: string;
   startMin: number;

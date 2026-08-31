@@ -233,11 +233,28 @@ export interface ProposalDto {
 
 /** A thematic strand across rooms and days. One per session at most, because
  *  the schedule can lay tracks out as its columns. */
+/** A day that keeps different hours from the track's own. */
+export interface TrackWindowDto {
+  /** 'YYYY-MM-DD'. */
+  date: string;
+  startMin: number;
+  endMin: number;
+}
+
 export interface TrackDto {
   id: number;
   name: string;
   color: string;
   sortOrder: number;
+  /**
+   * The hours of the day this track accepts sessions in, as local minutes in
+   * the event's timezone. Both null — the default — means any hour, and the
+   * track behaves as it always has.
+   */
+  startMin: number | null;
+  endMin: number | null;
+  /** Days that replace the window above, earliest first. */
+  windows: TrackWindowDto[];
 }
 
 /**
@@ -319,7 +336,16 @@ export interface EventExport {
     openBooking: boolean;
     sortOrder: number;
   }[];
-  tracks: { id: number; name: string; color: string; sortOrder: number }[];
+  tracks: {
+    id: number;
+    name: string;
+    color: string;
+    sortOrder: number;
+    /** The hours the track keeps, as local minutes; null means any hour. */
+    startMin: number | null;
+    endMin: number | null;
+    windows: TrackWindowDto[];
+  }[];
   tags: { id: number; name: string; color: string }[];
   /** Local minutes of day; `date` null means every day of the event. */
   breaks: { id: number; label: string; startMin: number; endMin: number; date: string | null }[];

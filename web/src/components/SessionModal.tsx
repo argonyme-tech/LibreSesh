@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { PersonDto, RoomDto, Role, SessionDto, TagDto, TrackDto } from '@shared/types';
+import { windowLabel, windowOn } from '@shared/trackHours';
 import type { SessionWrite } from '../lib/api';
 import { fmtMin, place } from '../lib/format';
 import {
@@ -291,11 +292,17 @@ export function SessionModal({
                   className={inputClass}
                 >
                   <option value="">No track</option>
-                  {tracks.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
+                  {/* A track that keeps hours says so here, for the day being
+                      placed — cheaper than a refusal after Save, and it is the
+                      only place the choice and the day are on screen together. */}
+                  {tracks.map((t) => {
+                    const hours = windowOn(t, day);
+                    return (
+                      <option key={t.id} value={t.id}>
+                        {hours ? `${t.name} (${windowLabel(hours)})` : t.name}
+                      </option>
+                    );
+                  })}
                 </select>
               </Field>
             )}

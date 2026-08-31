@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { BreakDto } from '@shared/types';
 import type { BreakWrite } from '../lib/api';
-import { fmtMin } from '../lib/format';
+import { fmtMin, minutesOf, snapMinute } from '../lib/format';
 import {
   DangerButton,
   Field,
@@ -15,15 +15,6 @@ import {
 } from '../components/ui';
 
 const EVERY_DAY = '';
-
-const toMinutes = (hhmm: string): number => {
-  const [h, m] = hhmm.split(':').map(Number);
-  return (h ?? 0) * 60 + (m ?? 0);
-};
-
-/** Snapped to the same 5-minute grid the calendar uses, which is what the
- *  server accepts — `step` alone is advisory in some browsers. */
-const snap = (minute: number): number => Math.round(minute / 5) * 5;
 
 /** "Wed 2 Sep". Rendered in UTC because the date string *is* the day — it has
  *  no timezone of its own, and letting the browser's zone shift it would name
@@ -54,13 +45,13 @@ const draftOf = (item: BreakDto): Draft => ({
 
 const writeOf = (draft: Draft): BreakWrite => ({
   label: draft.label.trim(),
-  startMin: snap(toMinutes(draft.start)),
-  endMin: snap(toMinutes(draft.end)),
+  startMin: snapMinute(minutesOf(draft.start)),
+  endMin: snapMinute(minutesOf(draft.end)),
   date: draft.date === EVERY_DAY ? null : draft.date,
 });
 
 const valid = (draft: Draft): boolean =>
-  draft.label.trim().length > 0 && toMinutes(draft.end) > toMinutes(draft.start);
+  draft.label.trim().length > 0 && minutesOf(draft.end) > minutesOf(draft.start);
 
 function DayPicker({
   value,

@@ -113,6 +113,31 @@ Array order is column order on the grid: list them the way they are printed.
 
 Both are optional, and both are declared here or not at all.
 
+A track may also state the hours it keeps, which is how "workshops run in the
+mornings" gets said once instead of being watched for:
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `start`, `end` | | `HH:MM`, both or neither. Omitted, the track takes a session at any hour |
+| `windows` | | Days that keep different hours: `[{ "date": "2026-09-02", "start": "14:00", "end": "18:00" }]`. One entry per date |
+
+A day in `windows` *replaces* the track's own hours for that date rather than
+narrowing them, so a day can be wider than usual as easily as shorter.
+
+```json
+{
+  "name": "Workshops",
+  "start": "09:00",
+  "end": "13:00",
+  "windows": [{ "date": "2026-09-02", "start": "14:00", "end": "18:00" }]
+}
+```
+
+The hours bind attendees and speakers: a session of theirs that starts before
+the track opens or runs past its close is refused, naming the window. Organisers
+are not held to them — the grid stays the organiser's instrument — so an import,
+which runs with the instance password, places whatever the document says.
+
 ### `breaks`
 
 Lunch, dinner, the coffee break — the parts of the day that belong to the whole

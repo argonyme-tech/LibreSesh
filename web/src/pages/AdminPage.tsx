@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import type { BreakDto, PersonDto, RoomDto, TagDto, TrackDto } from '@shared/types';
-import { ApiError, api, type BreakWrite, type TrashDto } from '../lib/api';
-import { fmtMin, relativeTime, rowId, uid } from '../lib/format';
+import type {
+  BreakDto,
+  PersonDto,
+  RoomDto,
+  TagDto,
+  TrackDto,
+  TrackWindowDto,
+} from '@shared/types';
+import { windowLabel } from '@shared/trackHours';
+import { ApiError, api, type BreakWrite, type TrackWrite, type TrashDto } from '../lib/api';
+import { fmtMin, minutesOf, relativeTime, rowId, snapMinute, uid } from '../lib/format';
 import { useEventData } from '../lib/useEventData';
-import { AdminBreaks } from './AdminBreaks';
+import { AdminBreaks, dayName } from './AdminBreaks';
 import { AdminRooms, type RoomDraft } from './AdminRooms';
 import { AdminPermissions } from './AdminPermissions';
 import { AdminBackup } from './AdminBackup';
@@ -24,6 +32,7 @@ import {
   SecondaryButton,
   Section,
   Spinner,
+  Toggle,
   controlHeightClass,
   inputClass,
   linkClass,
@@ -274,10 +283,7 @@ export function AdminPage() {
     }
   };
 
-  const patchTrack = async (
-    track: TrackDto,
-    patch: { name?: string; color?: string },
-  ): Promise<boolean> => {
+  const patchTrack = async (track: TrackDto, patch: TrackWrite): Promise<boolean> => {
     try {
       data.apply({ type: 'track.updated', entity: await api.updateTrack(slug, track.id, patch) });
       return true;
@@ -647,6 +653,13 @@ export function AdminPage() {
                         style={{ background: track.color }}
                       />
                       <p className="min-w-0 flex-1 truncate text-sm font-medium">{track.name}</p>
+                      {track.startMin !== null && (
+                        <span className="shrink-0 tabular-nums text-xs text-stone-500 dark:text-stone-400">
+                          {windowLabel({ startMin: track.startMin, endMin: track.endMin ?? 1440 })}
+                          {track.windows.length > 0 &&
+                            ` +${plural(track.windows.length, 'day')}`}
+                        </span>
+                      )}
                       <span className="shrink-0 text-xs text-stone-500 dark:text-stone-400">
                         {plural(
                           bundle.sessions.filter((x) => x.trackId === track.id).length,
@@ -692,6 +705,7 @@ export function AdminPage() {
             <TrackEditor
               track={editingTrack}
               sessions={bundle.sessions.filter((x) => x.trackId === editingTrack.id).length}
+              days={dayList}
               onPatch={patchTrack}
               onDelete={removeTrack}
               onClose={() => setEditingTrack(null)}
@@ -1237,9 +1251,140 @@ function TagEditor({
  * rather than an input in the row, so there is something to cancel — but it
  * says what deleting costs, because a track's sessions survive it.
  */
+/**
+ * The hours half of the track editor: the window the track keeps on an ordinary
+ * day, and the days that keep a different one.
+ *
+ * A per-day row *replaces* the default rather than trimming it, so "workshops
+ * run mornings, except Saturday, when they have the afternoon" is one row and
+ * not a special case. Only days without a row are offered, because two windows
+ * on one date would have no defined winner.
+ */
+function TrackHoursFields({
+  start,
+  end,
+  windows,
+  days,
+  onStart,
+  onEnd,
+  onWindows,
+}: {
+  start: string;
+  end: string;
+  windows: TrackWindowDto[];
+  days: string[];
+  onStart: (next: string) => void;
+  onEnd: (next: string) => void;
+  onWindows: (next: TrackWindowDto[]) => void;
+}) {
+  const taken = new Set(windows.map((w) => w.date));
+  const free = days.filter((d) => !taken.has(d));
+  const [day, setDay] = useState(free[0] ?? '');
+  const [from, setFrom] = useState(start);
+  const [to, setTo] = useState(end);
+
+  const addDay = () => {
+    if (!day || minutesOf(to) <= minutesOf(from)) return;
+    const next = [
+      ...windows,
+      { date: day, startMin: snapMinute(minutesOf(from)), endMin: snapMinute(minutesOf(to)) },
+    ].sort((a, b) => a.date.localeCompare(b.date));
+    onWindows(next);
+    setDay(free.filter((d) => d !== day)[0] ?? '');
+  };
+
+  return (
+    <div className="space-y-3 rounded-lg border border-stone-200 p-3 dark:border-stone-700">
+      <FormRow>
+        <Field label="From">
+          <input
+            type="time"
+            step={300}
+            value={start}
+            onChange={(e) => onStart(e.target.value)}
+            className={inputClass}
+          />
+        </Field>
+        <Field label="To" hint={minutesOf(end) > minutesOf(start) ? undefined : 'Must be later.'}>
+          <input
+            type="time"
+            step={300}
+            value={end}
+            onChange={(e) => onEnd(e.target.value)}
+            className={inputClass}
+          />
+        </Field>
+      </FormRow>
+
+      {windows.length > 0 && (
+        <ul className="space-y-1.5">
+          {windows.map((w) => (
+            <li
+              key={w.date}
+              className="flex items-center gap-2 rounded bg-stone-50 px-2 py-1.5 text-sm dark:bg-stone-800"
+            >
+              <span className="min-w-0 flex-1 truncate">{dayName(w.date)}</span>
+              <span className="shrink-0 tabular-nums text-xs text-stone-500 dark:text-stone-400">
+                {fmtMin(w.startMin)}–{fmtMin(w.endMin)}
+              </span>
+              <IconButton
+                onClick={() => onWindows(windows.filter((x) => x.date !== w.date))}
+                aria-label={`Drop the ${dayName(w.date)} hours`}
+              >
+                ×
+              </IconButton>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {free.length > 0 && (
+        <FormRow>
+          <Field label="A day that differs">
+            <select
+              value={day}
+              onChange={(e) => setDay(e.target.value)}
+              className={inputClass}
+              aria-label="Day"
+            >
+              {free.map((d) => (
+                <option key={d} value={d}>
+                  {dayName(d)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="From">
+            <input
+              type="time"
+              step={300}
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+          <Field label="To">
+            <input
+              type="time"
+              step={300}
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+          <SecondaryButton onClick={addDay} disabled={!day || minutesOf(to) <= minutesOf(from)}>
+            Add day
+          </SecondaryButton>
+        </FormRow>
+      )}
+    </div>
+  );
+}
+
 function TrackEditor({
   track,
   sessions,
+  days,
   onPatch,
   onDelete,
   onClose,
@@ -1247,21 +1392,37 @@ function TrackEditor({
   track: TrackDto;
   /** How many sessions sit on it. */
   sessions: number;
-  onPatch: (track: TrackDto, patch: { name?: string; color?: string }) => Promise<boolean>;
+  /** Every date the event runs, for the per-day rows. */
+  days: string[];
+  onPatch: (track: TrackDto, patch: TrackWrite) => Promise<boolean>;
   onDelete: (track: TrackDto) => Promise<boolean>;
   onClose: () => void;
 }) {
   const [name, setName] = useState(track.name);
   const [color, setColor] = useState(track.color);
+  const [limited, setLimited] = useState(track.startMin !== null);
+  const [start, setStart] = useState(fmtMin(track.startMin ?? 9 * 60));
+  const [end, setEnd] = useState(fmtMin(track.endMin ?? 13 * 60));
+  const [windows, setWindows] = useState<TrackWindowDto[]>(track.windows);
   const [busy, setBusy] = useState(false);
 
-  const dirty = name.trim() !== track.name || color !== track.color;
+  const hours = limited
+    ? { startMin: snapMinute(minutesOf(start)), endMin: snapMinute(minutesOf(end)) }
+    : { startMin: null, endMin: null };
+  const hoursValid = !limited || minutesOf(end) > minutesOf(start);
+
+  const dirty =
+    name.trim() !== track.name ||
+    color !== track.color ||
+    hours.startMin !== track.startMin ||
+    hours.endMin !== track.endMin ||
+    JSON.stringify(windows) !== JSON.stringify(track.windows);
 
   const save = async () => {
-    if (!name.trim() || busy) return;
+    if (!name.trim() || !hoursValid || busy) return;
     setBusy(true);
     try {
-      if (await onPatch(track, { name: name.trim(), color })) onClose();
+      if (await onPatch(track, { name: name.trim(), color, ...hours, windows })) onClose();
     } finally {
       setBusy(false);
     }
@@ -1288,7 +1449,7 @@ function TrackEditor({
             Delete
           </DangerButton>
           <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-          <PrimaryButton type="submit" disabled={!name.trim() || !dirty || busy}>
+          <PrimaryButton type="submit" disabled={!name.trim() || !dirty || !hoursValid || busy}>
             Save
           </PrimaryButton>
         </>
@@ -1312,6 +1473,23 @@ function TrackEditor({
             className={`${controlHeightClass} w-16 cursor-pointer rounded border border-stone-300 bg-white p-1 dark:border-stone-600 dark:bg-stone-900`}
           />
         </Field>
+
+        <Toggle
+          checked={limited}
+          onChange={setLimited}
+          label="Only takes sessions at certain hours"
+        />
+        {limited && (
+          <TrackHoursFields
+            start={start}
+            end={end}
+            windows={windows}
+            days={days}
+            onStart={setStart}
+            onEnd={setEnd}
+            onWindows={setWindows}
+          />
+        )}
       </FormStack>
 
       <p className="mt-3 text-xs text-stone-500 dark:text-stone-400">
@@ -1319,6 +1497,12 @@ function TrackEditor({
           ? 'No sessions are on this track yet.'
           : `${plural(sessions, 'session')} on this track. Deleting it keeps them — they lose the track, not their room.`}
       </p>
+      {limited && sessions > 0 && (
+        <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+          Sessions already on the track stay where they are, whatever these hours say — the window
+          is a rule about what may be booked next. Organisers are never held to it.
+        </p>
+      )}
     </Modal>
   );
 }

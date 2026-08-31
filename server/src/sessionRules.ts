@@ -1,9 +1,10 @@
 import type { Role } from './shared/types.js';
 import { atLeast } from './auth.js';
 import { can, type PermissionMatrix } from './permissions.js';
-import type { Db, EventRow, RoomRow, SessionRow } from './db.js';
+import type { Db, EventRow, RoomRow, SessionRow, TrackRow } from './db.js';
 import { badRequest, conflict, forbidden, notFound } from './errors.js';
 import { durationMinutes, localDate, localMinuteOfDay } from './shared/time.js';
+import { trackWindows, windowLabel, windowOn } from './trackHours.js';
 
 export const SNAP_MINUTES = 5;
 export const MIN_DURATION_MINUTES = 5;
@@ -105,6 +106,59 @@ export function assertWithinEventWindow(event: EventRow, window: TimeWindow): vo
   }
   if (startMin < event.day_start_min || endMin > event.day_end_min) {
     throw badRequest('That is outside the hours shown on the schedule');
+  }
+}
+
+/**
+ * Hold a session to the hours its track keeps (SPEC §5.1).
+ *
+ * A track is a strand with a shape — workshops in the mornings, the
+ * unconference floor after lunch — and this is where that shape stops being a
+ * convention and becomes a rule. Admins pass: the grid is the organiser's
+ * instrument, and an organiser who states the hours is the same person who
+ * occasionally has to place the exception. Speakers do *not* pass, unlike the
+ * blocking-session rule: running against a plenary is a judgement call about
+ * the programme, while a track's hours are what the strand *is*, and a talk
+ * outside them is on the wrong strand rather than an awkward one.
+ *
+ * A session with no track is unconstrained, and so is a track with no window —
+ * which is every track until an organiser fills one in.
+ */
+export function assertWithinTrackHours(
+  db: Db,
+  event: EventRow,
+  role: Role,
+  trackId: number | null,
+  window: TimeWindow,
+): void {
+  if (role === 'admin' || trackId === null) return;
+  const track = db
+    .prepare<[number, number], TrackRow>(
+      'SELECT * FROM tracks WHERE id = ? AND event_id = ? AND deleted_at IS NULL',
+    )
+    .get(trackId, event.id);
+  if (!track) return; // assertTrackBelongs has the say on unknown tracks.
+
+  const startDate = localDate(window.startsAt, event.timezone);
+  const hours = windowOn(
+    {
+      startMin: track.start_min,
+      endMin: track.end_min,
+      windows: trackWindows(db, track.id),
+    },
+    startDate,
+  );
+  if (!hours) return;
+
+  const startMin = localMinuteOfDay(window.startsAt, event.timezone);
+  let endMin = localMinuteOfDay(window.endsAt, event.timezone);
+  // As in assertWithinEventWindow: an end exactly at local midnight closes the
+  // day it belongs to rather than opening the next one.
+  if (endMin === 0 && localDate(window.endsAt, event.timezone) > startDate) endMin = 1440;
+  if (startMin < hours.startMin || endMin > hours.endMin) {
+    throw badRequest(
+      `“${track.name}” only takes sessions between ${windowLabel(hours)}`,
+    );
   }
 }
 

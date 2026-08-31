@@ -11,6 +11,7 @@ import type {
   SessionDto,
   TagDto,
   TrackDto,
+  TrackWindowDto,
 } from './shared/types.js';
 import type {
   BreakRow,
@@ -56,10 +57,13 @@ export const toRoomDto = (r: RoomRow): RoomDto => ({
   sortOrder: r.sort_order,
 });
 
-export const toTrackDto = (t: TrackRow): TrackDto => ({
+export const toTrackDto = (t: TrackRow, windows: TrackWindowDto[] = []): TrackDto => ({
   id: t.id,
   name: t.name,
   color: t.color,
+  startMin: t.start_min,
+  endMin: t.end_min,
+  windows,
   sortOrder: t.sort_order,
 });
 

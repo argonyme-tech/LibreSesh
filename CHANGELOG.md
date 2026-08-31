@@ -6,6 +6,23 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **A track can keep hours.** "Workshops run in the mornings" was a rule that
+  lived in the organiser's head and was enforced by watching the grid; a track
+  now says it once — a window of the local clock — and the schedule holds
+  attendees and speakers to it. A session that starts before the track opens or
+  runs past its close is refused, naming the window. Days that differ are said
+  as days: a date with its own hours *replaces* the usual ones rather than
+  trimming them, so "except the Saturday, when they have the afternoon" is one
+  row and not a special case. Organisers are exempt, because the grid is their
+  instrument and someone has to be able to place the exception. Setting or
+  narrowing a window moves nothing that is already scheduled and badges nothing
+  — it is a rule about what may be booked next — and a session that predates
+  the window stays editable by whoever owns it. The hours show under the track's
+  column on the schedule, in the session form's track picker for the day being
+  placed, and in the room-card-style panel the column reveals; they travel
+  through export and import (`"start": "09:00", "end": "13:00"`, plus
+  `windows`). Every existing track keeps no hours and behaves exactly as before.
+
 - **Importing a schedule no longer needs a terminal.** `POST /api/events/import`
   has been able to build a whole event from one JSON document for a while, but
   only through curl, which serves the person running the server and not the
