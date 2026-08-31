@@ -5,6 +5,7 @@ import type {
   ContributionKind,
   SessionDto,
 } from "@shared/types";
+import type { Repeat } from "@shared/repeat";
 import { dateRange, zonedTimeToUtc } from "@shared/time";
 import { ApiError, api, type SessionWrite } from "../lib/api";
 import {
@@ -453,7 +454,7 @@ export function SchedulePage() {
   );
 
   const saveSession = useCallback(
-    async (body: SessionWrite) => {
+    async (body: SessionWrite, repeat?: Repeat) => {
       setSaving(true);
       try {
         if (editing?.session) {
@@ -463,6 +464,15 @@ export function SchedulePage() {
           });
           data.apply({ type: "session.updated", entity: updated });
           toast.show("Session updated");
+        } else if (repeat) {
+          // One request, then every session it made applied here: the server
+          // broadcasts them too, and `apply` is idempotent, but a grid that
+          // waited for the echo would sit empty on a slow connection.
+          const { sessions } = await api.createSessionRepeat(slug, { ...body, repeat });
+          for (const created of sessions) {
+            data.apply({ type: "session.created", entity: created });
+          }
+          toast.show(`${sessions.length} sessions added`);
         } else {
           const created = await api.createSession(slug, body);
           data.apply({ type: "session.created", entity: created });
@@ -1207,7 +1217,7 @@ export function SchedulePage() {
           dayEndMin={event.dayEndMin}
           saving={saving}
           onCancel={() => setEditing(null)}
-          onSave={(body) => void saveSession(body)}
+          onSave={(body, repeat) => void saveSession(body, repeat)}
           onDelete={
             editing.session
               ? () => void deleteSession(editing.session as SessionDto)

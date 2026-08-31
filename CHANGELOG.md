@@ -6,6 +6,20 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **The session form can put one session on many days.** Adding a session as an
+  organiser now offers **Repeat**: an *Until* day, a row of weekday chips, and a
+  live count — *Creates 15 separate sessions* — with the button following suit
+  (**Create 15 sessions**). The day picked above is always the first
+  occurrence, so its weekday chip stays on and cannot be switched off. One
+  request (`POST /sessions/repeat`) creates them all in a transaction, and the
+  form says plainly what lands: fifteen independent sessions, not a series, so
+  moving or deleting one leaves the rest where they are. That is the right
+  trade for a programme whose sessions drift from their planned start on the
+  day — the thing this was built for. Organisers only; the calendar rule is
+  shared with the JSON importer (`server/src/shared/repeat.ts`), so the form
+  counts the run exactly as the server will create it, and a run one refuses
+  the other refuses too.
+
 - **An imported session can repeat.** A three-week programme is mostly the same
   thing every day — the officials that open and close it, the track that always
   runs 14:00–16:00 — and the importer made you type each one out per day.

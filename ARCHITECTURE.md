@@ -390,20 +390,31 @@ Three consequences worth knowing:
   top of the grid, which reads as a failed import, so it comes back as a
   warning naming the row and pointing at Settings. Double bookings warn too:
   admins are allowed them, and the grid badges them.
-- **A repeat expands, it does not persist.** `repeat` on a session row says
-  "every day until the 20th", or "mon, wed, fri, except the 7th", and
-  `planSessions` turns it into one ordinary session per day *before* anything
-  is written. There is no series table, no series id, nothing downstream that
-  knows a repeat existed. That is the whole design decision: this schedule is
-  last-write-wins rows that anyone with the role can drag, retitle or delete,
-  and a series entity would have to answer "does moving Tuesday move all of
-  them?" on the first edit of the first day. Repetition is authoring
-  convenience, and it stops at the door. The cost is real and stated in
-  `docs/schedule-import.md` — changing a repeated session afterwards means
-  changing each day — which is why the dry run matters more here than
-  anywhere else. It also refuses `startsAt`/`endsAt`: a repeat is a claim about
-  the printed clock, each day is resolved through the event timezone
-  separately, and that is what keeps 14:00 at 14:00 across a clock change.
+- **A repeat expands, it does not persist.** A repeat says "every day until
+  the 20th", or "mon, wed, fri, except the 7th", and it becomes one ordinary
+  session per day *before* anything is written. There is no series table, no
+  series id, nothing downstream that knows a repeat existed. That is the whole
+  design decision: this schedule is last-write-wins rows that anyone with the
+  role can drag, retitle or delete, and a series entity would have to answer
+  "does moving Tuesday move all of them?" on the first edit of the first day —
+  for an event whose sessions routinely drift from their planned times, the
+  answer is "no" nearly every time. Repetition is authoring convenience, and it
+  stops at the door. The cost is real and said out loud in both front doors —
+  changing a repeated session afterwards means changing each day. A repeat is
+  also a claim about the *printed clock*, so each day is resolved through the
+  event timezone separately: that is what keeps 14:00 at 14:00 across a clock
+  change, and why the import form of it refuses `startsAt`/`endsAt`.
+
+  There are two front doors and one rule. `server/src/shared/repeat.ts` holds
+  the calendar — which days a run lands on, and what makes a run
+  self-contradictory — and lives in `shared/` so the session form can count a
+  run before submitting it and count it the way the server will.
+  `server/src/repeat.ts` adds the zod schema and turns a refusal into a 400.
+  On top of that sit `planSessions` in `importEvent.ts` (a `repeat` key on a
+  document row) and `POST /sessions/repeat` (the **Repeat** control in the
+  session form, organisers only — placing sixty sessions is programme-building,
+  not what the `session.create_open` capability is for). A run that one refuses
+  is refused by the other, because there is only one thing to refuse it.
 
 Nothing reads an export back. Doing so would need decisions this route does not
 have to make — a new slug, fresh ids, and what to do with authorship that names

@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { requireWritable } from '../auth.js';
+import { requireRole, requireWritable } from '../auth.js';
 import { audit } from '../audit.js';
 import type { Ctx } from '../context.js';
 import type { SessionRow } from '../db.js';
-import { forbidden } from '../errors.js';
+import { badRequest, forbidden } from '../errors.js';
 import { loadSessionDto } from '../mappers.js';
 import { getPermissions, requireCapability } from '../permissions.js';
 import { limit } from '../ratelimit.js';
@@ -19,8 +19,14 @@ import {
   getRoom,
   getSession,
 } from '../sessionRules.js';
+import { MAX_REPEAT_DAYS, repeatDays, repeatSchema } from '../repeat.js';
+import { addDays, dateToUtcMs, DAY_MS } from '../shared/repeat.js';
+import { localDate, localMinuteOfDay, zonedTimeToUtc } from '../shared/time.js';
 import { resolveSpeaker, speaksFor } from '../speakers.js';
 import { parse, sessionPatchSchema, sessionSchema } from '../validation.js';
+
+/** The session form's fields, plus the run of days to put them on. */
+const sessionRepeatSchema = sessionSchema.extend({ repeat: repeatSchema });
 
 function setTags(ctx: Ctx, sessionId: number, tagIds: number[]): void {
   ctx.db.prepare('DELETE FROM session_tags WHERE session_id = ?').run(sessionId);
@@ -97,6 +103,122 @@ export function sessionRoutes(ctx: Ctx): Router {
     ctx.broker.publish(req.event.slug, 'session.created', dto);
     res.status(201).json(dto);
   });
+
+  /**
+   * Create the same session on every day of a run — "every weekday until the
+   * 20th" — in one request.
+   *
+   * What lands is **ordinary sessions**. There is no series, no series id and
+   * no link between them: each one can be dragged, retimed, retitled or
+   * deleted on its own, which is what a programme whose sessions drift from
+   * their planned times actually needs. The rule is spent here and forgotten.
+   * `repeat.ts` holds it, so a run the JSON importer refuses is refused here
+   * too.
+   *
+   * Organisers only. Placing sixty sessions is programme-building, and the
+   * `session.create_open` capability is for an attendee putting one session on
+   * a board.
+   */
+  router.post(
+    '/sessions/repeat',
+    requireRole(ctx.db, 'admin'),
+    requireWritable,
+    limit(ctx.limiter, 'session'),
+    (req, res) => {
+      const body = parse(sessionRepeatSchema, req.body);
+      const room = getRoom(ctx.db, req.event.id, body.roomId);
+      const type = body.type ?? 'official';
+      assertMayPlace(getPermissions(ctx.db, req.event.id), req.role, room, type);
+
+      const first = { startsAt: new Date(body.startsAt), endsAt: new Date(body.endsAt) };
+      assertValidTimes(req.event, first);
+      const tagIds = body.tagIds ?? [];
+      assertTagsBelong(ctx.db, req.event.id, tagIds);
+      const trackId = body.trackId ?? null;
+      assertTrackBelongs(ctx.db, req.event.id, trackId);
+
+      // The run is a claim about the printed clock, so it is the wall-clock
+      // start and end that repeat, not the instants. Each day is resolved
+      // through the event's timezone separately, which is what keeps 14:00 at
+      // 14:00 when the clocks change partway through a long programme.
+      const tz = req.event.timezone;
+      const firstDate = localDate(first.startsAt, tz);
+      const startMin = localMinuteOfDay(first.startsAt, tz);
+      const endMin = localMinuteOfDay(first.endsAt, tz);
+      // A session ending at or past local midnight belongs to the next date;
+      // every occurrence keeps that same offset.
+      const endOffset =
+        (dateToUtcMs(localDate(first.endsAt, tz)) - dateToUtcMs(firstDate)) / DAY_MS;
+
+      const { dates } = repeatDays(firstDate, body.repeat, {
+        eventEndDate: req.event.end_date,
+        max: MAX_REPEAT_DAYS,
+      });
+
+      const windows = dates.map((date) => {
+        const window = {
+          startsAt: zonedTimeToUtc(date, startMin, tz),
+          endsAt: zonedTimeToUtc(addDays(date, endOffset), endMin, tz),
+        };
+        // Checked per day rather than once: a wall-clock span that is 90
+        // minutes most days is 30 on the day the clocks go forward, and a
+        // session that quietly changed length is worse than a refusal.
+        try {
+          assertValidTimes(req.event, window);
+        } catch (err) {
+          throw badRequest(`${date}: ${(err as Error).message}`);
+        }
+        return window;
+      });
+
+      const now = new Date().toISOString();
+      const ids = ctx.db.transaction((): number[] => {
+        const speakerId = resolveSpeaker(ctx.db, req.event.id, body, null);
+        const insert = ctx.db.prepare(
+          `INSERT INTO sessions
+            (event_id, room_id, track_id, type, title, description, speaker, speaker_id,
+             livestream_url, starts_at, ends_at, created_by, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?)`,
+        );
+        return windows.map((window) => {
+          const newId = Number(
+            insert.run(
+              req.event.id,
+              room.id,
+              trackId,
+              type,
+              body.title,
+              body.description ?? '',
+              speakerId,
+              body.livestreamUrl ?? '',
+              window.startsAt.toISOString(),
+              window.endsAt.toISOString(),
+              req.identity.id,
+              now,
+              now,
+            ).lastInsertRowid,
+          );
+          setTags(ctx, newId, tagIds);
+          return newId;
+        });
+      })();
+
+      // One audit row and one broadcast each: they are separate sessions from
+      // the moment they exist, and every later edit or deletion will name one.
+      const dtos = ids.map((id) => loadSessionDto(ctx.db, getSession(ctx.db, req.event.id, id)));
+      for (const dto of dtos) {
+        audit(ctx.db, {
+          identityId: req.identity.id,
+          eventId: req.event.id,
+          action: 'create',
+          entity: 'session',
+          entityId: dto.id,
+        });
+        ctx.broker.publish(req.event.slug, 'session.created', dto);
+      }
+      res.status(201).json({ sessions: dtos });
+    },
+  );
 
   router.patch('/sessions/:id', ...userWrite, (req, res) => {
     const existing = getSession(ctx.db, req.event.id, Number(req.params.id));

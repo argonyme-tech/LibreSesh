@@ -32,6 +32,7 @@ import type { Db, EventRow } from './db.js';
 import { badRequest, conflict, HttpError } from './errors.js';
 import { resolveEventPasswords, type PasswordField } from './eventPasswords.js';
 import { assertValidTimes } from './sessionRules.js';
+import { describeRepeat, repeatDays, repeatSchema } from './repeat.js';
 import { nextRoomColor } from './shared/roomColors.js';
 import { localDate, localMinuteOfDay, zonedTimeToUtc } from './shared/time.js';
 import { resolveSpeaker } from './speakers.js';
@@ -55,40 +56,6 @@ const startTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Expected 
 const endTimeSchema = z
   .string()
   .regex(/^(([01]\d|2[0-3]):[0-5]\d|24:00)$/, 'Expected HH:MM (24-hour), or 24:00 for midnight');
-
-/**
- * A repeat is a statement about a wall calendar — "every weekday until the
- * 20th" — so everything below works on `YYYY-MM-DD` strings and never goes
- * near a timezone. Each day it produces is turned into an instant separately,
- * by the same path a hand-written date takes, which is what keeps 14:00 at
- * 14:00 across a clock change.
- */
-const DAY_MS = 86_400_000;
-/** Indexed by `getUTCDay()`, so Sunday is first whatever a calendar prints. */
-const WEEKDAY_NAMES = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
-type Weekday = (typeof WEEKDAY_NAMES)[number];
-
-const dateToUtcMs = (iso: string): number => {
-  const [y, m, d] = iso.split('-').map(Number) as [number, number, number];
-  return Date.UTC(y, m - 1, d);
-};
-const utcMsToDate = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
-const weekdayOf = (iso: string): Weekday =>
-  WEEKDAY_NAMES[new Date(dateToUtcMs(iso)).getUTCDay()] as Weekday;
-
-/**
- * Omitting `days` means every day, which is the common case: a standup, a
- * meal, a track that runs the same hours throughout. `except` lists the days
- * a programme skips — a holiday, an excursion — rather than inferring them,
- * because a gap in a printed schedule is a decision somebody made.
- */
-const importRepeatSchema = z
-  .object({
-    until: dateSchema,
-    days: z.array(z.enum(WEEKDAY_NAMES)).min(1).max(7).optional(),
-    except: z.array(dateSchema).max(200).optional(),
-  })
-  .strict();
 
 const importRoomSchema = z.object({
   name: trimmed(80),
@@ -125,7 +92,7 @@ const importSessionSchema = z
     startsAt: isoInstantSchema.optional(),
     endsAt: isoInstantSchema.optional(),
     /** Say the row once, land it on every day it happens. */
-    repeat: importRepeatSchema.optional(),
+    repeat: repeatSchema.optional(),
   })
   .superRefine((v, ctx) => {
     const local = v.date !== undefined || v.start !== undefined || v.end !== undefined;
@@ -154,26 +121,6 @@ const importSessionSchema = z
     }
     if (v.date === undefined || v.start === undefined || v.end === undefined) {
       ctx.addIssue({ code: 'custom', message: 'Needs date, start and end (or startsAt/endsAt)' });
-      return;
-    }
-    if (v.repeat) {
-      if (v.repeat.until < v.date) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `repeat.until ${v.repeat.until} is before this session's own date ${v.date}`,
-          path: ['repeat', 'until'],
-        });
-      }
-      // The row's own date is the first occurrence, so a `days` list that
-      // excludes it contradicts the row above it rather than narrowing it.
-      const first = weekdayOf(v.date);
-      if (v.repeat.days && !v.repeat.days.includes(first)) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `repeat.days does not include ${first}, the weekday this session starts on`,
-          path: ['repeat', 'days'],
-        });
-      }
     }
   });
 
@@ -218,7 +165,6 @@ export const eventImportSchema = z
 
 export type EventImport = z.infer<typeof eventImportSchema>;
 type ImportSession = z.infer<typeof importSessionSchema>;
-type ImportRepeat = z.infer<typeof importRepeatSchema>;
 
 /** How many sessions one document may write, repeats expanded. */
 export const MAX_IMPORT_SESSIONS = 1000;
@@ -281,9 +227,6 @@ interface PlannedSession {
   warnLabel: string;
 }
 
-const describeRepeat = (repeat: ImportRepeat): string =>
-  repeat.days ? `repeats ${repeat.days.join(', ')}` : 'repeats every day';
-
 /**
  * Turn each row of the document into the sessions it stands for. A row with no
  * `repeat` is itself; a row with one becomes a session per day it lands on.
@@ -309,46 +252,21 @@ export function planSessions(
       continue;
     }
 
-    // Checked here rather than one occurrence at a time: an `until` past the
-    // end of the event is a single mistake, and reporting it as the first of
-    // twenty out-of-range sessions would hide which one it is.
-    if (repeat.until > eventEndDate) {
-      throw badRequest(
-        `${label}: repeats until ${repeat.until}, after the event ends ${eventEndDate}`,
-      );
-    }
-
-    const onlyOn = repeat.days ? new Set<string>(repeat.days) : null;
-    const skipped = new Set(repeat.except ?? []);
-    const skipsUsed = new Set<string>();
+    const { dates, unusedExcepts } = repeatDays(session.date as string, repeat, {
+      eventEndDate,
+      // A row may not expand past what the whole document is allowed, and the
+      // rows already planned have spent part of that budget.
+      max: MAX_IMPORT_SESSIONS - planned.length,
+      label,
+    });
     const warnLabel = `${label} (${describeRepeat(repeat)})`;
-    let occurrences = 0;
-
-    for (let ms = dateToUtcMs(session.date as string); ms <= dateToUtcMs(repeat.until); ms += DAY_MS) {
-      const date = utcMsToDate(ms);
-      if (onlyOn && !onlyOn.has(weekdayOf(date))) continue;
-      if (skipped.has(date)) {
-        skipsUsed.add(date);
-        continue;
-      }
+    for (const date of dates) {
       planned.push({ row: { ...row, date }, errorLabel: `${label} on ${date}`, warnLabel });
-      occurrences += 1;
-      if (planned.length > MAX_IMPORT_SESSIONS) {
-        throw badRequest(
-          `${label}: the document expands to more than ${MAX_IMPORT_SESSIONS} sessions`,
-        );
-      }
-    }
-
-    if (occurrences === 0) {
-      throw badRequest(`${label}: repeats until ${repeat.until} but lands on no day at all`);
     }
     // A skip that skips nothing is the shape a mistyped date takes, and it is
     // invisible in the result otherwise: the grid just quietly has that day.
-    for (const date of repeat.except ?? []) {
-      if (!skipsUsed.has(date)) {
-        warn(`${warnLabel} does not fall on ${date}, so excepting that day does nothing`);
-      }
+    for (const date of unusedExcepts) {
+      warn(`${warnLabel} does not fall on ${date}, so excepting that day does nothing`);
     }
   }
 

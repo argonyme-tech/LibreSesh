@@ -91,21 +91,24 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   Noticed 2026-08-31: `pruneAudit` deletes by `event_id`, so these rows also
   grow without limit — slowly (they are all rare actions), but forever.
 
-- **The importer can repeat a session, but only into a new event, and only
-  from curl.** `repeat: { until, days, except }` landed 2026-08-31, so a long
-  programme's daily officials and fixed track hours are three rows rather than
-  sixty. Two halves of the same job are still missing:
-  - **Importing into an *existing* event.** The route only creates. There is no
-    way to add twenty days to the event you are already running, which is the
-    case that asked for repeats in the first place. Wants
-    `POST /events/:slug/import`, gated on event admin rather than the instance
-    key, matching rooms/tracks/tags to the existing ones by name instead of
-    creating duplicates — same transaction and same `dryRun` as now.
-  - **Any UI at all.** Both routes are curl-only, so "prepopulate my event"
-    is currently a JSON file and a shell. The obvious front door is a
-    *duplicate a day* action on the grid — pick a day, pick the days to copy it
-    to — which is the same expansion `planSessions` already does, behind a
-    button instead of a document.
+- **The importer still only creates an event, and is still curl-only.**
+  Repeats landed 2026-08-31 in both front doors — a `repeat` key on a document
+  row, and the **Repeat** control in the session form — so a long programme's
+  daily officials and fixed track hours are a few rows or a few clicks rather
+  than sixty of either. What is left of that job:
+  - **Importing into an *existing* event.** The route only creates, so a whole
+    transcribed programme still cannot be dropped into the event you are
+    already running; the session form is the only way in, one session (or one
+    run) at a time. Wants `POST /events/:slug/import`, gated on event admin
+    rather than the instance key, matching rooms/tracks/tags to the existing
+    ones by name instead of creating duplicates — same transaction and same
+    `dryRun` as now.
+  - **A UI for the importer itself.** `POST /events/import` is curl plus a JSON
+    file, which is right for a transcription and wrong for everything else.
+  - **Duplicate a day.** The repeat control repeats *one* session; copying a
+    whole day's programme onto other days is still hand work. Same expansion,
+    a different front door — an action on the day rail rather than in the
+    session form.
 
   Two smaller things noticed alongside: `POST /events/:slug/clone` copies rooms
   and tags but **not tracks**, which post-date it and look simply forgotten;
@@ -180,6 +183,15 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   server-side, so everything below shipped on a read-through alone (no browser
   in this dev container, no component tests). Each wants a real look, ideally
   on a phone. From 2026-08-31:
+  - the **Repeat** control in the session form — the only part of it with no
+    automated coverage, since the server route is tested and the modal is not.
+    Worth watching: the weekday chips wrapping under `sm` inside a `FormGrid`
+    that is already two columns; that the start day's chip reads as *fixed*
+    rather than broken when clicking it does nothing; and that the live count
+    and the **Create N sessions** button track the *Until* select as it moves.
+    Then create a real run of ten and confirm the grid fills without a reload —
+    the client applies each created session itself and the server also
+    broadcasts them, so a double-apply would show up here first;
   - **Manage Event is seven tabs now** (Programme / People / Permissions /
     Settings / Trash / Backup / Audit) with the choice in `?tab=`. Check the
     tab strip wraps sanely on a narrow screen, and that arrow-key navigation

@@ -2,6 +2,16 @@ import { useMemo, useState } from 'react';
 import type { PersonDto, RoomDto, Role, SessionDto, TagDto, TrackDto } from '@shared/types';
 import type { SessionWrite } from '../lib/api';
 import { fmtMin, place } from '../lib/format';
+import {
+  checkRepeat,
+  MAX_REPEAT_DAYS,
+  repeatDates,
+  weekdayOf,
+  WEEKDAY_LABELS,
+  WEEKDAYS_MONDAY_FIRST,
+  type Repeat,
+  type Weekday,
+} from '@shared/repeat';
 import { zonedTimeToUtc } from '@shared/time';
 import { SpeakerCombobox, type SpeakerChoice } from './SpeakerCombobox';
 import {
@@ -13,6 +23,7 @@ import {
   Modal,
   PrimaryButton,
   SecondaryButton,
+  Toggle,
   inputClass,
 } from './ui';
 
@@ -34,7 +45,9 @@ export interface SessionModalProps {
   dayEndMin: number;
   saving: boolean;
   onCancel: () => void;
-  onSave: (body: SessionWrite) => void;
+  /** `repeat` asks for the same session on every day of a run. What comes back
+   *  is that many independent sessions — see `shared/repeat.ts`. */
+  onSave: (body: SessionWrite, repeat?: Repeat) => void;
   onDelete?: () => void;
 }
 
@@ -83,6 +96,38 @@ export function SessionModal({
   );
   const [error, setError] = useState<string | null>(null);
 
+  // Repeating is for building a programme, so it belongs to organisers and to
+  // sessions that do not exist yet. Editing one day of a run edits that day:
+  // the sessions a run creates are independent from the moment they land, and
+  // the form does not pretend otherwise.
+  const lastDay = days[days.length - 1] ?? day;
+  const canRepeat = isAdmin && !session && day < lastDay;
+  const [repeating, setRepeating] = useState(false);
+  const [untilChoice, setUntilChoice] = useState(lastDay);
+  const [weekdays, setWeekdays] = useState<Weekday[]>(WEEKDAYS_MONDAY_FIRST);
+
+  // Both are clamped on read rather than corrected in an effect: changing the
+  // day above can invalidate either, and a run that silently repaired itself
+  // while you looked at it would be worse than one that just stays right.
+  const until = untilChoice > day ? untilChoice : lastDay;
+  const startWeekday = weekdayOf(day);
+  const runDays = useMemo(() => {
+    const chosen = new Set(weekdays);
+    // The day picked above is the first occurrence, so its weekday is not
+    // something the chips get to switch off.
+    chosen.add(startWeekday);
+    return WEEKDAYS_MONDAY_FIRST.filter((d) => chosen.has(d));
+  }, [weekdays, startWeekday]);
+
+  const repeat: Repeat | undefined =
+    canRepeat && repeating
+      ? { until, ...(runDays.length < 7 ? { days: runDays } : {}) }
+      : undefined;
+  const runCount = repeat ? repeatDates(day, repeat).dates.length : 1;
+  const repeatProblem = repeat
+    ? checkRepeat(day, repeat, { eventEndDate: lastDay, max: MAX_REPEAT_DAYS })
+    : null;
+
   const save = () => {
     if (!title.trim()) {
       setError('A title is required');
@@ -103,6 +148,10 @@ export function SessionModal({
       setError('A livestream link must start with http:// or https://');
       return;
     }
+    if (repeatProblem) {
+      setError(repeatProblem);
+      return;
+    }
     onSave({
       roomId,
       type: isAdmin ? type : undefined,
@@ -114,7 +163,7 @@ export function SessionModal({
       endsAt: zonedTimeToUtc(day, startMin + durMin, timezone).toISOString(),
       tagIds,
       trackId,
-    });
+    }, repeat);
   };
 
   const heading = session ? 'Edit session' : isAdmin ? 'Add session' : 'Propose an open session';
@@ -235,6 +284,62 @@ export function SessionModal({
         </Field>
       </FormGrid>
 
+      {canRepeat && (
+        <Field label="Repeat">
+          <Toggle
+            checked={repeating}
+            onChange={setRepeating}
+            label="Put this session on more than one day"
+          />
+          {repeating && (
+            <div className="mt-3 space-y-3">
+              <FormGrid cols={2}>
+                <Field label="Until">
+                  <select
+                    value={until}
+                    onChange={(e) => setUntilChoice(e.target.value)}
+                    className={inputClass}
+                  >
+                    {days
+                      .filter((d) => d > day)
+                      .map((d) => (
+                        <option key={d} value={d}>
+                          {dayLabels[d] ?? d}
+                        </option>
+                      ))}
+                  </select>
+                </Field>
+                <Field label="On these days">
+                  <div className="flex flex-wrap gap-1.5">
+                    {WEEKDAYS_MONDAY_FIRST.map((d) => (
+                      <Chip
+                        key={d}
+                        active={runDays.includes(d)}
+                        onClick={() => {
+                          if (d === startWeekday) return;
+                          setWeekdays((prev) =>
+                            prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d],
+                          );
+                        }}
+                      >
+                        {WEEKDAY_LABELS[d]}
+                      </Chip>
+                    ))}
+                  </div>
+                </Field>
+              </FormGrid>
+              <p className="text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+                {repeatProblem ??
+                  `Creates ${runCount} separate ${runCount === 1 ? 'session' : 'sessions'}, ` +
+                    `the first on ${dayLabels[day] ?? day}.`}{' '}
+                They are not linked: moving or deleting one afterwards leaves the rest where
+                they are, so a day that runs late is a day you fix on its own.
+              </p>
+            </div>
+          )}
+        </Field>
+      )}
+
       <Field label="Tags">
         <div className="flex flex-wrap gap-1.5">
           {tags.length === 0 && <span className="text-xs text-stone-400 dark:text-stone-500">No tags yet.</span>}
@@ -308,8 +413,11 @@ export function SessionModal({
         <SecondaryButton className="ml-auto" onClick={onCancel}>
           Cancel
         </SecondaryButton>
-        <PrimaryButton onClick={save} disabled={saving || allowedRooms.length === 0}>
-          {saving ? 'Saving…' : 'Save'}
+        <PrimaryButton
+          onClick={save}
+          disabled={saving || allowedRooms.length === 0 || repeatProblem !== null}
+        >
+          {saving ? 'Saving…' : runCount > 1 ? `Create ${runCount} sessions` : 'Save'}
         </PrimaryButton>
       </div>
     </Modal>

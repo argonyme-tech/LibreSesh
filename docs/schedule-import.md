@@ -172,6 +172,12 @@ The session's own `date` is the first occurrence, `until` is the last, and
 every matching day in between gets one. Twenty days of three daily officials is
 three rows.
 
+The session form does the same thing for one session at a time — **Repeat**,
+under the day and time — and shares this rule, so a run the form offers is a
+run this document could have said. Use the form for a session or two inside an
+event that already exists; use a document when a whole programme is being
+transcribed at once.
+
 **What lands is ordinary sessions.** There is no series, no link between them,
 nothing that remembers they were written as one line: twenty rows that can each
 be dragged, retitled, given a different speaker or deleted on their own. That

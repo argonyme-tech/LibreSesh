@@ -20,6 +20,7 @@ import type {
   TagDto,
   TrackDto,
 } from '@shared/types';
+import type { Repeat } from '@shared/repeat';
 
 /** Error carrying the server's machine-readable code, so callers can react to
  *  `stale`, `overlap` or `rate_limited` specifically. */
@@ -183,6 +184,10 @@ export const api = {
 
   createSession: (slug: string, body: SessionWrite) =>
     request<SessionDto>('POST', `/e/${encode(slug)}/sessions`, body),
+  /** The same session on every day of a run. Organisers only; see `repeat.ts`
+   *  for why what comes back is a plain list and not a series. */
+  createSessionRepeat: (slug: string, body: SessionWrite & { repeat: Repeat }) =>
+    request<{ sessions: SessionDto[] }>('POST', `/e/${encode(slug)}/sessions/repeat`, body),
   updateSession: (slug: string, id: number, body: Partial<SessionWrite> & { expectedUpdatedAt?: string }) =>
     request<SessionDto>('PATCH', `/e/${encode(slug)}/sessions/${id}`, body),
   deleteSession: (slug: string, id: number) =>
