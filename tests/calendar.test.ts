@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { SessionDto } from '../server/src/shared/types.js';
-import { drawnAt, overlappingIds, type DragTarget } from '../web/src/components/Calendar.js';
+import {
+  competingIds,
+  drawnAt,
+  overlappingIds,
+  type DragTarget,
+} from '../web/src/components/Calendar.js';
 
 /** Only the fields overlappingIds actually reads. */
 const placed = (id: number, roomId: number, startMin: number, endMin: number) => ({
@@ -96,5 +101,47 @@ describe('drawnAt', () => {
     expect(drawnAt({ ...row, columnIndex: -1 }, null, 4).columnIndex).toBe(0);
     expect(drawnAt(row, target({ columnIndex: 9 }), 4).columnIndex).toBe(3);
     expect(drawnAt(row, null, 0).columnIndex).toBe(0);
+  });
+});
+
+/** A session that holds the floor, and one that does not. */
+const hold = (id: number, roomId: number, startMin: number, endMin: number) => ({
+  session: { id, roomId, blocksOpenBooking: true } as SessionDto,
+  startMin,
+  endMin,
+});
+
+describe('competingIds', () => {
+  it('finds nothing when no session holds the floor', () => {
+    expect(competingIds([])).toEqual(new Set());
+    expect(competingIds([placed(1, 1, 600, 660), placed(2, 2, 600, 660)])).toEqual(new Set());
+  });
+
+  it('flags a session running against a hold, in any room', () => {
+    const ids = competingIds([hold(1, 1, 600, 660), placed(2, 2, 600, 660)]);
+    expect(ids).toEqual(new Set([2]));
+  });
+
+  it('flags a partial overlap on either side', () => {
+    expect(competingIds([hold(1, 1, 600, 660), placed(2, 2, 570, 610)])).toEqual(new Set([2]));
+    expect(competingIds([hold(1, 1, 600, 660), placed(2, 2, 650, 690)])).toEqual(new Set([2]));
+  });
+
+  it('leaves back-to-back sessions alone', () => {
+    expect(competingIds([hold(1, 1, 600, 660), placed(2, 2, 660, 720)])).toEqual(new Set());
+    expect(competingIds([hold(1, 1, 600, 660), placed(2, 2, 540, 600)])).toEqual(new Set());
+  });
+
+  it('never flags the hold itself, or a second hold', () => {
+    expect(competingIds([hold(1, 1, 600, 660), hold(2, 2, 600, 660)])).toEqual(new Set());
+  });
+
+  it('flags a session once even when it runs against two holds', () => {
+    const ids = competingIds([
+      hold(1, 1, 600, 660),
+      hold(2, 2, 650, 700),
+      placed(3, 3, 610, 690),
+    ]);
+    expect(ids).toEqual(new Set([3]));
   });
 });

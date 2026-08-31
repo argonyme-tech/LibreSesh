@@ -149,6 +149,11 @@ export interface SessionDto {
   /** null when the event has no tracks, or the session is not on one. */
   trackId: number | null;
   type: SessionType;
+  /** This session holds the floor: while it runs, attendees may not place an
+   *  open session anywhere in the event. Official sessions only, and only an
+   *  organiser can set it. Speakers and organisers are not stopped by it —
+   *  what they place is badged as competing instead. */
+  blocksOpenBooking: boolean;
   title: string;
   description: string;
   /** Resolved from the linked person; empty when the session has no speaker. */

@@ -174,6 +174,7 @@ export function toSessionDto(
     roomId: row.room_id,
     trackId: row.track_id,
     type: row.type,
+    blocksOpenBooking: row.blocks_open_booking === 1,
     title: row.title,
     description: row.description,
     speaker: speakerName,

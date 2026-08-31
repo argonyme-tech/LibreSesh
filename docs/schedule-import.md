@@ -114,6 +114,7 @@ Both are optional, and both are declared here or not at all.
 | `description` | | Markdown, up to 5000 characters |
 | `speaker` | | Free text. Matches an existing profile in this event, or creates an unclaimed one |
 | `type` | | `official` (default) or `open` |
+| `blocksOpenBooking` | | `true` holds the floor: while this session runs, attendees can add nothing anywhere in the event. Official sessions only. Default `false` |
 | `date`, `start`, `end` | ✓ | Local date and wall-clock times — see below |
 | `startsAt`, `endsAt` | | ISO instants instead, for a document a program wrote |
 | `repeat` | | Say the row once, land it on every day it happens — see below |
@@ -203,6 +204,7 @@ row it came from:
 sessions[3] "Opening keynote": no room called "Balcony" is declared
 sessions[3] "Opening keynote": 2026-07-04 is outside the event dates 2026-09-14…2026-09-15
 sessions[3] "Opening keynote": Start time must land on a 5-minute step
+sessions[3] "Opening keynote": only an official session can hold the floor
 Two rooms are both called "Main hall"
 ```
 

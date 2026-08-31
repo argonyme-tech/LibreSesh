@@ -6,6 +6,25 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **A session can hold the floor.** An organiser can mark an official session
+  *everyone should be at this* — a keynote, the closing plenary — and while it
+  runs an attendee cannot add a session anywhere in the event, not even in a
+  room that allows booking. The schedule shades the hour with the session's
+  name across it, so the rule is visible before anyone runs into it. It is a
+  mark on the session rather than a switch on the event, because at a real
+  unconference most of what is "official" is registration, coffee and a track
+  that runs all afternoon: a rule keyed on the type would have closed the grid
+  for the whole event instead of protecting the keynote. Partial overlaps count
+  — a session starting ten minutes early and running through it is exactly the
+  case the rule is for — while back-to-back is not competing. Organisers and
+  speakers are not stopped, since a speaker with a talk to give is part of the
+  programme rather than someone it is being protected from; what they place is
+  badged **competing** on the grid. Sessions booked before the mark went on
+  stay where they are and stay editable: refusing a title fix afterwards would
+  punish an attendee for the organiser's later decision. Repeats carry the mark
+  onto every day of a run, and the JSON importer takes it as
+  `blocksOpenBooking`.
+
 - **The session form can put one session on many days.** Adding a session as an
   organiser now offers **Repeat**: an *Until* day, a row of weekday chips, and a
   live count — *Creates 15 separate sessions* — with the button following suit

@@ -154,6 +154,18 @@ describe('event import from JSON', () => {
     expect(result.counts.people).toBe(1);
   });
 
+  it('lands a session that holds the floor, and holds it against attendees', async () => {
+    const doc = document();
+    doc.sessions[0] = { ...doc.sessions[0]!, blocksOpenBooking: true };
+    await post(doc);
+    const row = harness.db
+      .prepare<[string], { blocks_open_booking: number }>(
+        'SELECT blocks_open_booking FROM sessions WHERE title = ?',
+      )
+      .get('Opening keynote');
+    expect(row?.blocks_open_booking).toBe(1);
+  });
+
   describe('dry run', () => {
     it('reports the same counts and writes nothing', async () => {
       const result = await post(document(), { dryRun: true });
@@ -186,6 +198,14 @@ describe('event import from JSON', () => {
       const message = await failure(doc, 400);
       expect(message).toContain('sessions[0] "Opening keynote"');
       expect(message).toContain('Balcony');
+    });
+
+    it('refuses a hold on an open session, naming the row', async () => {
+      const doc = document();
+      doc.sessions[0] = { ...doc.sessions[0]!, type: 'open', blocksOpenBooking: true };
+      const message = await failure(doc, 400);
+      expect(message).toContain('sessions[0] "Opening keynote"');
+      expect(message).toMatch(/official/i);
     });
 
     it('refuses an undeclared track or tag', async () => {

@@ -80,6 +80,8 @@ const importSessionSchema = z
     track: trimmed(60).nullish(),
     tags: z.array(trimmed(40)).max(20).optional(),
     type: z.enum(['official', 'open']).optional(),
+    /** Holds the floor: attendees can place nothing while this one runs. */
+    blocksOpenBooking: z.boolean().optional(),
     title: trimmed(120),
     description: optionalTrimmed(5000).optional(),
     /** Free text, matched to an existing profile or given a new unclaimed one. */
@@ -385,9 +387,10 @@ export function importEvent(
 
     const insertSession = db.prepare(
       `INSERT INTO sessions
-        (event_id, room_id, track_id, type, title, description, speaker, speaker_id,
-         livestream_url, starts_at, ends_at, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, '', ?, '', ?, ?, ?, ?, ?)`,
+        (event_id, room_id, track_id, type, blocks_open_booking, title, description,
+         speaker, speaker_id, livestream_url, starts_at, ends_at, created_by,
+         created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, '', ?, ?, ?, ?, ?)`,
     );
     const linkTag = db.prepare(
       'INSERT OR IGNORE INTO session_tags (session_id, tag_id) VALUES (?, ?)',
@@ -450,12 +453,17 @@ export function importEvent(
         session.speaker ? { speakerName: session.speaker } : {},
         null,
       );
+      const sessionType = session.type ?? 'official';
+      if (session.blocksOpenBooking && sessionType !== 'official') {
+        throw badRequest(`${errorLabel}: only an official session can hold the floor`);
+      }
       const sessionId = Number(
         insertSession.run(
           eventId,
           roomId,
           trackId,
-          session.type ?? 'official',
+          sessionType,
+          session.blocksOpenBooking ? 1 : 0,
           session.title,
           session.description ?? '',
           speakerId,
