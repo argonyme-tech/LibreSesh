@@ -245,6 +245,16 @@ All notable changes to this project are documented here.
 
 ### Changed
 
+- **Arrange is admin-only.** It used to appear for attendees too, whenever the
+  event had any open-booking room. Arrange is a whole-grid drag mode, though,
+  and the grid is the organiser's instrument: an attendee has at most one open
+  session of their own on it, and dragging is a clumsy way to move the one
+  thing you may touch past everything you may not. They still change that
+  session's time, room and length through **Edit session** — the same edit,
+  named rather than aimed at. The server never knew about Arrange; it gates the
+  underlying edit, and that rule is unchanged. This also settles a disagreement
+  with the README, which has always said organisers arrange by drag and drop.
+
 - **The schema is one file again.** Seventeen migrations squashed into
   `001_baseline.sql`, done now because no instance yet holds data and this is
   the only moment it is free. Four of the old files existed solely to backfill

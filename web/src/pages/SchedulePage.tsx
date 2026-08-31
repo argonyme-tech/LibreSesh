@@ -565,10 +565,14 @@ export function SchedulePage() {
 
   const role = bundle.role;
   const canWrite = role !== "viewer" && !event.archived;
-  const canArrange =
-    !event.archived &&
-    (role === "admin" ||
-      (role === "user" && bundle.rooms.some((r) => r.openBooking)));
+  // Admin-only. Arrange is a whole-grid drag mode, and the grid is the
+  // organiser's instrument: an attendee has at most one open session of their
+  // own on it, and dragging is a clumsy way to move the one thing you may
+  // touch past everything you may not. They still edit that session — time,
+  // room and length included — through Edit session, which is the same change
+  // made by naming it rather than by aiming at it. The server never knew about
+  // Arrange; it gates the underlying edit, and that rule is unchanged.
+  const canArrange = !event.archived && role === "admin";
 
   // Ordered coach-marks. Role-conditional controls are dropped here; the Tour
   // itself also skips any target that isn't in the DOM. Not memoised because
@@ -1078,7 +1082,9 @@ export function SchedulePage() {
             dayStartMin={event.dayStartMin}
             dayEndMin={event.dayEndMin}
             nowMin={nowMin}
-            arrange={arrange}
+            // Guarded, not just hidden: the toggle disappears when the role
+            // changes but the state it left behind does not.
+            arrange={arrange && canArrange}
             canEdit={canEdit}
             onOpen={openSession}
             onMove={(s, startMin, durMin, roomId) =>
