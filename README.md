@@ -48,6 +48,7 @@ web/               Vite React app
 scripts/           seed.ts, create-event.ts, decrypt-backup.ts
 assets/            brand source SVGs (the app builds from copies under web/)
 tests/             Vitest suites
+docs/              long-form guides, and example documents the tests exercise
 deploy/            Dockerfile, compose, Caddyfile, systemd unit, backup script
 design/mockup.jsx  approved UI reference — never imported
 ARCHITECTURE.md    how it fits together, and the threat model
@@ -224,12 +225,10 @@ photo of a programme:
   },
   "rooms": [{ "name": "Main hall", "capacity": 200 }, { "name": "Side room" }],
   "tracks": [{ "name": "Design" }],
-  "tags": [{ "name": "beginner" }],
   "sessions": [
     {
       "room": "Main hall",
       "track": "Design",
-      "tags": ["beginner"],
       "title": "Opening keynote",
       "speaker": "Ada Lovelace",
       "date": "2026-06-01",
@@ -240,23 +239,17 @@ photo of a programme:
 }
 ```
 
-- **Rooms, tracks and tags are declared once and referred to by name.** A
-  session naming one that is not declared is refused rather than invented — a
-  typo growing a fourth column is much harder to spot in a grid than an error.
-  Room order is column order.
-- **Times are local to the event's timezone.** `date`/`start`/`end` as printed;
-  `24:00` is a valid end. A document a program wrote may use `startsAt`/`endsAt`
-  ISO instants instead, but not both forms in one session.
-- **Passwords are optional.** Leave them out and a phrase is generated per role
-  and returned once in the response, exactly as when an event is created in the
-  UI. The importer is *not* made an admin by password — whoever holds the admin
-  phrase is.
-- **All or nothing.** Everything lands in one transaction, so a document that
-  fails on its last row leaves nothing behind. Fix the file and run it again.
-- **Errors versus warnings.** Contradictions are refused with the row that
-  caused them (`sessions[3] "Opening keynote": …`). Things that are merely
-  suspicious — a session outside the hours the schedule shows, two sessions
-  double-booked in one room — come back in `warnings` and are still imported.
+Rooms, tracks and tags are declared once and referred to by name — a session
+naming one that was not declared is refused rather than invented — and room
+order is column order. Everything lands in one transaction, so a document that
+fails on its last row leaves nothing behind. Contradictions are refused naming
+the row that caused them; a session outside the visible hours or double-booked
+against another is imported and named in `warnings` instead.
+
+**[docs/schedule-import.md](docs/schedule-import.md)** is the full field
+reference, the error and warning catalogue, and the photo-to-document workflow.
+[`docs/examples/schedule-import.example.json`](docs/examples/schedule-import.example.json)
+is a template to copy; the test suite dry-runs it, so it cannot go stale.
 
 An event's own `export.json` is *not* an import document: it is a record of
 ids, and this is a description of a schedule. There is still no route that

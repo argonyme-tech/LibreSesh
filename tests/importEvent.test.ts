@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ImportResult } from '../server/src/importEvent.js';
 import { localDate, localMinuteOfDay } from '../server/src/shared/time.js';
@@ -276,6 +277,17 @@ describe('event import from JSON', () => {
     const result = await post(doc);
     expect(result.counts.sessions).toBe(1);
     expect(result.warnings).toEqual([]);
+  });
+
+  // The template is what anyone starts from, so a stale one is worse than
+  // none. This is the only thing that keeps it honest.
+  it('imports the example document shipped in docs/', async () => {
+    const path = new URL('../docs/examples/schedule-import.example.json', import.meta.url);
+    const doc = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+    const result = await post(doc, { dryRun: true });
+
+    expect(result.warnings).toEqual([]);
+    expect(result.counts).toEqual({ rooms: 3, tracks: 2, tags: 2, sessions: 4, people: 2 });
   });
 
   it('refuses a document with both time forms, or a key it does not know', async () => {

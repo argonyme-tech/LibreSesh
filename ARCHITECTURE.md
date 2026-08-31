@@ -395,6 +395,11 @@ Nothing reads an export back. Doing so would need decisions this route does not
 have to make — a new slug, fresh ids, and what to do with authorship that names
 identities the target instance has never met.
 
+The document format itself is documented for the people writing one, in
+`docs/schedule-import.md`; `docs/examples/schedule-import.example.json` is the
+template, and the test suite dry-runs that exact file so it cannot drift from
+the schema.
+
 ### Migrations
 
 Numbered `.sql` files in `server/migrations/`, applied at boot, each in its own
