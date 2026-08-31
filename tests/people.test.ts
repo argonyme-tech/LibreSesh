@@ -312,4 +312,51 @@ describe('speaker profiles', () => {
       }
     });
   });
+
+  /**
+   * Deleting a profile removes it from the roster; it does not remove the
+   * person. They keep their identity, their role and their name in the event —
+   * and, since migration 017, the ability to have a profile again.
+   */
+  describe('deleting a claimed profile', () => {
+    it('leaves its owner signed in, with their role and name', async () => {
+      await user.patch('/api/e/testconf/me').send({ displayName: 'Ada' }).expect(200);
+      const mine = await user.patch('/api/e/testconf/me/profile').send({ name: 'Ada' });
+      await admin.delete(`/api/e/testconf/people/${mine.body.id}`).expect(204);
+
+      const bundle = await user.get('/api/e/testconf/bundle').expect(200);
+      expect(bundle.body.role).toBe('user');
+      expect(bundle.body.displayName).toBe('Ada');
+      expect(bundle.body.people).toHaveLength(0);
+    });
+
+    it('lets them make a new one — the tombstone no longer holds their slot', async () => {
+      const mine = await user.patch('/api/e/testconf/me/profile').send({ name: 'Ada' });
+      await admin.delete(`/api/e/testconf/people/${mine.body.id}`).expect(204);
+
+      const again = await user.patch('/api/e/testconf/me/profile').send({ name: 'Ada again' });
+      expect(again.status).toBeLessThan(300);
+      expect(again.body.id).not.toBe(mine.body.id);
+      expect(again.body.isMine).toBe(true);
+
+      // And the deleted row keeps its owner, for the audit trail.
+      const tombstone = harness.db
+        .prepare('SELECT identity_id, deleted_at FROM people WHERE id = ?')
+        .get(mine.body.id) as { identity_id: number | null; deleted_at: string | null };
+      expect(tombstone.identity_id).not.toBeNull();
+      expect(tombstone.deleted_at).not.toBeNull();
+    });
+
+    it('is safe to do to yourself — an organiser keeps their own event', async () => {
+      const mine = await admin.patch('/api/e/testconf/me/profile').send({ name: 'The organiser' });
+      await admin.delete(`/api/e/testconf/people/${mine.body.id}`).expect(204);
+
+      const bundle = await admin.get('/api/e/testconf/bundle').expect(200);
+      expect(bundle.body.role).toBe('admin');
+      // Still able to manage, and to give themselves a profile again.
+      await admin.post('/api/e/testconf/rooms').send({ name: 'Hall' }).expect(201);
+      const again = await admin.patch('/api/e/testconf/me/profile').send({ name: 'The organiser' });
+      expect(again.status).toBeLessThan(300);
+    });
+  });
 });

@@ -164,6 +164,19 @@ All notable changes to this project are documented here.
 
 ### Fixed
 
+- **Deleting someone's profile no longer bars them from having one.** The
+  uniqueness rule behind "one profile per person per event" covered deleted
+  rows too, so a soft-deleted profile went on holding its owner's slot. The
+  next time that attendee edited their profile the insert hit `UNIQUE
+  constraint failed: people.event_id, people.identity_id` and they got an
+  opaque 500 — permanently, with nothing they could do about it. Migration 017
+  narrows the index to live rows. The tombstone keeps its `identity_id`, so the
+  record of who owned it survives for the audit trail.
+
+  Deleting a profile was, and remains, only that: the person stays signed in
+  with their role and their name in the event, including when an organiser
+  deletes their own profile from the People list.
+
 - **A restart no longer signs the room out — and a name you had is no longer a
   dead end.** Without `COOKIE_SECRET` the signing key was invented at every
   boot, so each restart invalidated every identity cookie: visitors came back

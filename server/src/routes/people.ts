@@ -244,8 +244,9 @@ export function peopleRoutes(ctx: Ctx): Router {
         ctx.db
           .prepare('UPDATE proposals SET speaker_id = ? WHERE speaker_id = ?')
           .run(survivor.id, loser.id);
-        // The loser's claim must be nulled before the survivor takes it —
-        // (event_id, identity_id) is unique.
+        // The loser's claim must be nulled before the survivor takes it:
+        // (event_id, identity_id) is unique among live rows, and the loser is
+        // still live at this point in the transaction.
         ctx.db
           .prepare('UPDATE people SET identity_id = NULL, deleted_at = ? WHERE id = ?')
           .run(now, loser.id);
