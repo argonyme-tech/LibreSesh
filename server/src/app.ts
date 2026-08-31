@@ -14,6 +14,7 @@ import { agendaRoutes, calendarRoutes } from './routes/agenda.js';
 import { auditRoutes } from './routes/audit.js';
 import { attendeeRoutes } from './routes/attendees.js';
 import { backupRoutes, exportRoutes } from './routes/backup.js';
+import { breakRoutes } from './routes/breaks.js';
 import { bundleRoutes } from './routes/bundle.js';
 import { contributionRoutes } from './routes/contributions.js';
 import { eventAuthRoutes } from './routes/eventAuth.js';
@@ -70,6 +71,7 @@ export function createApp(db: Db, config: Config): App {
   event.use(roomRoutes(ctx));
   event.use(tagRoutes(ctx));
   event.use(trackRoutes(ctx));
+  event.use(breakRoutes(ctx));
   event.use(sessionRoutes(ctx));
   event.use(proposalRoutes(ctx));
   event.use(contributionRoutes(ctx));

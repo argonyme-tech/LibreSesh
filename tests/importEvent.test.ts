@@ -94,7 +94,7 @@ describe('event import from JSON', () => {
   it('builds the event, its rooms, tracks, tags and sessions', async () => {
     const result = await post(document());
 
-    expect(result.counts).toEqual({ rooms: 2, tracks: 2, tags: 1, sessions: 2, people: 1 });
+    expect(result.counts).toEqual({ rooms: 2, tracks: 2, tags: 1, breaks: 0, sessions: 2, people: 1 });
     expect(result.warnings).toEqual([]);
 
     const admin = await actorWithRole(harness, 'photoconf', result.generatedPasswords.adminPassword!);
@@ -166,23 +166,30 @@ describe('event import from JSON', () => {
     expect(row?.blocks_open_booking).toBe(1);
   });
 
-  it('lands a break, and never warns that it overlaps the room', async () => {
+  it('lands the breaks it declares, every day by default', async () => {
+    const doc = document() as Record<string, unknown>;
+    doc.breaks = [
+      { label: 'Lunch', start: '12:00', end: '14:00' },
+      { label: 'Dinner', start: '19:00', end: '21:00', date: (doc.sessions as { date: string }[])[0]!.date },
+    ];
+    const result = await post(doc as Parameters<typeof post>[0]);
+    expect(result.counts.breaks).toBe(2);
+    const rows = harness.db
+      .prepare<[], { label: string; start_min: number; end_min: number; date: string | null }>(
+        'SELECT label, start_min, end_min, date FROM breaks ORDER BY start_min',
+      )
+      .all();
+    expect(rows).toEqual([
+      { label: 'Lunch', start_min: 720, end_min: 840, date: null },
+      { label: 'Dinner', start_min: 1140, end_min: 1260, date: expect.any(String) },
+    ]);
+  });
+
+  it('imports a session that carried the retired background flag, and says so', async () => {
     const doc = document();
-    // Lunch sits over the session already in that room; that is not a clash.
-    doc.sessions.push({
-      room: doc.sessions[0]!.room,
-      title: 'Lunch',
-      background: true,
-      date: doc.sessions[0]!.date,
-      start: doc.sessions[0]!.start,
-      end: doc.sessions[0]!.end,
-    });
+    doc.sessions[0] = { ...doc.sessions[0]!, background: true };
     const result = await post(doc);
-    expect(result.warnings.filter((w) => w.includes('overlaps'))).toEqual([]);
-    const row = harness.db
-      .prepare<[string], { background: number }>('SELECT background FROM sessions WHERE title = ?')
-      .get('Lunch');
-    expect(row?.background).toBe(1);
+    expect(result.warnings.some((w) => w.includes('breaks are their own list'))).toBe(true);
   });
 
   describe('dry run', () => {
@@ -191,7 +198,7 @@ describe('event import from JSON', () => {
 
       expect(result.dryRun).toBe(true);
       expect(result.eventId).toBeNull();
-      expect(result.counts).toEqual({ rooms: 2, tracks: 2, tags: 1, sessions: 2, people: 1 });
+      expect(result.counts).toEqual({ rooms: 2, tracks: 2, tags: 1, breaks: 0, sessions: 2, people: 1 });
 
       const events = (await agentFor(harness).get('/api/events').expect(200)).body as unknown[];
       expect(events).toHaveLength(0);
@@ -227,12 +234,12 @@ describe('event import from JSON', () => {
       expect(message).toMatch(/official/i);
     });
 
-    it('refuses a break on an open session, naming the row', async () => {
-      const doc = document();
-      doc.sessions[0] = { ...doc.sessions[0]!, type: 'open', background: true };
-      const message = await failure(doc, 400);
-      expect(message).toContain('sessions[0] "Opening keynote"');
-      expect(message).toMatch(/break/i);
+    it('refuses a break pinned to a day outside the event', async () => {
+      const doc = document() as Record<string, unknown>;
+      doc.breaks = [{ label: 'Lunch', start: '12:00', end: '14:00', date: '2030-01-01' }];
+      const message = await failure(doc as Parameters<typeof failure>[0], 400);
+      expect(message).toContain('breaks[0] "Lunch"');
+      expect(message).toMatch(/outside the event dates/i);
     });
 
     it('refuses an undeclared track or tag', async () => {
@@ -473,7 +480,14 @@ describe('event import from JSON', () => {
     const result = await post(doc, { dryRun: true });
 
     expect(result.warnings).toEqual([]);
-    expect(result.counts).toEqual({ rooms: 3, tracks: 2, tags: 2, sessions: 6, people: 2 });
+    expect(result.counts).toEqual({
+      rooms: 3,
+      tracks: 2,
+      tags: 2,
+      breaks: 2,
+      sessions: 6,
+      people: 2,
+    });
   });
 
   it('refuses a document with both time forms, or a key it does not know', async () => {

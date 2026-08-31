@@ -145,26 +145,3 @@ describe('competingIds', () => {
     expect(ids).toEqual(new Set([3]));
   });
 });
-
-/** A break: drawn as a band, competing for nothing. */
-const brk = (id: number, roomId: number, startMin: number, endMin: number, holds = false) => ({
-  session: { id, roomId, background: true, blocksOpenBooking: holds } as SessionDto,
-  startMin,
-  endMin,
-});
-
-describe('competingIds and breaks', () => {
-  it('does not flag a session running through a break', () => {
-    expect(competingIds([brk(1, 1, 720, 780), placed(2, 2, 730, 770)])).toEqual(new Set());
-  });
-
-  it('does not flag the break itself when something holds the floor', () => {
-    const ids = competingIds([hold(1, 1, 720, 780), brk(2, 2, 720, 780)]);
-    expect(ids).toEqual(new Set());
-  });
-
-  it('still flags sessions against a break that also holds the floor', () => {
-    const ids = competingIds([brk(1, 1, 1140, 1260, true), placed(2, 2, 1200, 1300)]);
-    expect(ids).toEqual(new Set([2]));
-  });
-});

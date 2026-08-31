@@ -70,6 +70,25 @@ const importTrackSchema = z.object({ name: trimmed(60), color: colorSchema.optio
 const importTagSchema = z.object({ name: trimmed(40), color: colorSchema.optional() });
 
 /**
+ * Lunch, dinner, coffee. Wall-clock times like everything else in this
+ * document, and no `date` means every day of the event — which is how a
+ * printed schedule says it, and usually the only thing anyone has to type.
+ */
+const importBreakSchema = z
+  .object({
+    label: trimmed(60),
+    start: startTimeSchema,
+    end: endTimeSchema,
+    /** One day only. Omit for every day. */
+    date: dateSchema.optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (minuteOfDay(v.end) <= minuteOfDay(v.start)) {
+      ctx.addIssue({ code: 'custom', path: ['end'], message: 'A break must end after it starts' });
+    }
+  });
+
+/**
  * A session names its room; a room is never invented from a session. A typo
  * that quietly grew a fourth column would be far harder to spot in a grid than
  * a rejection naming the row it came from.
@@ -82,7 +101,8 @@ const importSessionSchema = z
     type: z.enum(['official', 'open']).optional(),
     /** Holds the floor: attendees can place nothing while this one runs. */
     blocksOpenBooking: z.boolean().optional(),
-    /** Lunch, dinner, a break: a grey band across the schedule, blocking nobody. */
+    /** Retired: breaks are their own top-level list now, not a session flag.
+     *  Still accepted so an older document imports, and warned about. */
     background: z.boolean().optional(),
     title: trimmed(120),
     description: optionalTrimmed(5000).optional(),
@@ -163,6 +183,7 @@ export const eventImportSchema = z
     rooms: z.array(importRoomSchema).max(100).optional(),
     tracks: z.array(importTrackSchema).max(60).optional(),
     tags: z.array(importTagSchema).max(200).optional(),
+    breaks: z.array(importBreakSchema).max(40).optional(),
     sessions: z.array(importSessionSchema).max(1000).optional(),
   })
   .strict();
@@ -177,6 +198,7 @@ export interface ImportCounts {
   rooms: number;
   tracks: number;
   tags: number;
+  breaks: number;
   sessions: number;
   /** Profiles created for speaker names nobody in this event answered to. */
   people: number;
@@ -292,6 +314,7 @@ export function importEvent(
   const rooms = doc.rooms ?? [];
   const tracks = doc.tracks ?? [];
   const tags = doc.tags ?? [];
+  const breaks = doc.breaks ?? [];
   const sessions = doc.sessions ?? [];
 
   if (rooms.length === 0 && sessions.length > 0) {
@@ -387,12 +410,43 @@ export function importEvent(
       tagIds.set(key(tag.name), Number(id));
     }
 
+    // Breaks name no room and reference nothing, so they land before the grid
+    // and nothing downstream has to know about them.
+    const insertBreak = db.prepare(
+      `INSERT INTO breaks (event_id, label, start_min, end_min, date, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    );
+    for (const [index, row] of breaks.entries()) {
+      if (row.date && (row.date < event.start_date || row.date > event.end_date)) {
+        throw badRequest(
+          `breaks[${index}] "${row.label}": ${row.date} is outside the event dates ` +
+            `${event.start_date}…${event.end_date}`,
+        );
+      }
+      const startMin = minuteOfDay(row.start);
+      const endMin = minuteOfDay(row.end);
+      if (startMin % 5 !== 0 || endMin % 5 !== 0) {
+        throw badRequest(
+          `breaks[${index}] "${row.label}": times land on a 5-minute step`,
+        );
+      }
+      // Same reasoning as a session outside the viewport: in the database and
+      // off the top of the grid reads as an import that failed.
+      if (startMin < event.day_start_min || endMin > event.day_end_min) {
+        warn(
+          `breaks[${index}] "${row.label}" runs outside the hours the schedule shows and will ` +
+            'not be visible until you widen them in Settings',
+        );
+      }
+      insertBreak.run(eventId, row.label, startMin, endMin, row.date ?? null, now);
+    }
+
     const insertSession = db.prepare(
       `INSERT INTO sessions
-        (event_id, room_id, track_id, type, blocks_open_booking, background, title,
+        (event_id, room_id, track_id, type, blocks_open_booking, title,
          description, speaker, speaker_id, livestream_url, starts_at, ends_at,
          created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', ?, '', ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, '', ?, ?, ?, ?, ?)`,
     );
     const linkTag = db.prepare(
       'INSERT OR IGNORE INTO session_tags (session_id, tag_id) VALUES (?, ?)',
@@ -459,8 +513,11 @@ export function importEvent(
       if (session.blocksOpenBooking && sessionType !== 'official') {
         throw badRequest(`${errorLabel}: only an official session can hold the floor`);
       }
-      if (session.background && sessionType !== 'official') {
-        throw badRequest(`${errorLabel}: only an official session can be a break`);
+      if (session.background) {
+        warn(
+          'A session marked `background` was imported as an ordinary session — breaks are ' +
+            'their own list now, declared once with `breaks` and drawn behind the whole grid',
+        );
       }
       const sessionId = Number(
         insertSession.run(
@@ -469,7 +526,6 @@ export function importEvent(
           trackId,
           sessionType,
           session.blocksOpenBooking ? 1 : 0,
-          session.background ? 1 : 0,
           session.title,
           session.description ?? '',
           speakerId,
@@ -495,21 +551,15 @@ export function importEvent(
         );
       }
 
-      // A break is not competing for the room, so it neither raises an overlap
-      // warning nor becomes one for the next row. Lunch sits over the whole
-      // afternoon by design, and warning about it every time would bury the
-      // double-bookings that are real.
-      if (!session.background) {
-        const inRoom = placed.get(roomId) ?? [];
-        const clash = inRoom.find(
-          (other) => other.startsAt < endsAt.getTime() && other.endsAt > startsAt.getTime(),
-        );
-        if (clash) {
-          warn(`${warnLabel} overlaps ${clash.label} in "${session.room}"`);
-        }
-        inRoom.push({ startsAt: startsAt.getTime(), endsAt: endsAt.getTime(), label: warnLabel });
-        placed.set(roomId, inRoom);
+      const inRoom = placed.get(roomId) ?? [];
+      const clash = inRoom.find(
+        (other) => other.startsAt < endsAt.getTime() && other.endsAt > startsAt.getTime(),
+      );
+      if (clash) {
+        warn(`${warnLabel} overlaps ${clash.label} in "${session.room}"`);
       }
+      inRoom.push({ startsAt: startsAt.getTime(), endsAt: endsAt.getTime(), label: warnLabel });
+      placed.set(roomId, inRoom);
     }
 
     // Every profile in a brand-new event was made by this import, from a
@@ -526,6 +576,7 @@ export function importEvent(
         rooms: rooms.length,
         tracks: tracks.length,
         tags: tags.length,
+        breaks: breaks.length,
         sessions: planned.length,
         people: people.n,
       },

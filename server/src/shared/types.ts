@@ -154,11 +154,6 @@ export interface SessionDto {
    *  organiser can set it. Speakers and organisers are not stopped by it —
    *  what they place is badged as competing instead. */
   blocksOpenBooking: boolean;
-  /** Programme furniture — lunch, dinner, the coffee break. Drawn as a grey
-   *  band across the whole schedule rather than a block in one room's column,
-   *  and it stops nobody: running a session through lunch is allowed, which is
-   *  what separates this from `blocksOpenBooking`. Official sessions only. */
-  background: boolean;
   title: string;
   description: string;
   /** Resolved from the linked person; empty when the session has no speaker. */
@@ -217,6 +212,23 @@ export interface TrackDto {
   sortOrder: number;
 }
 
+/**
+ * Lunch, dinner, the coffee break. Belongs to the event rather than to a room
+ * or a session: it is drawn behind the whole grid, nobody is listed as running
+ * it, and it cannot be opened — it is there so the schedule reads honestly and
+ * nobody books over it by accident.
+ */
+export interface BreakDto {
+  id: number;
+  label: string;
+  /** Local minutes since midnight in the event's timezone. */
+  startMin: number;
+  /** Exclusive. 1440 is midnight closing the day. */
+  endMin: number;
+  /** 'YYYY-MM-DD' for one day only; null means every day of the event. */
+  date: string | null;
+}
+
 export interface BundleDto {
   event: EventDto;
   role: Role;
@@ -227,6 +239,9 @@ export interface BundleDto {
   tags: TagDto[];
   /** Empty unless the organiser has defined any. */
   tracks: TrackDto[];
+  /** Lunch and friends, ordered by time. Drawn behind the grid on every day
+   *  they apply to; `date` null means all of them. */
+  breaks: BreakDto[];
   sessions: SessionDto[];
   people: PersonDto[];
   /** Pitches waiting for a slot, plus those already placed. */
@@ -278,6 +293,8 @@ export interface EventExport {
   }[];
   tracks: { id: number; name: string; color: string; sortOrder: number }[];
   tags: { id: number; name: string; color: string }[];
+  /** Local minutes of day; `date` null means every day of the event. */
+  breaks: { id: number; label: string; startMin: number; endMin: number; date: string | null }[];
   people: {
     id: number;
     name: string;
@@ -383,6 +400,9 @@ export type ChangeType =
   | 'track.created'
   | 'track.updated'
   | 'track.deleted'
+  | 'break.created'
+  | 'break.updated'
+  | 'break.deleted'
   | 'proposal.created'
   | 'proposal.updated'
   | 'proposal.deleted'

@@ -1,5 +1,6 @@
 import type {
   AttendeeDto,
+  BreakDto,
   AuditPageDto,
   BundleDto,
   ContributionDto,
@@ -161,6 +162,15 @@ export const api = {
   deleteTrack: (slug: string, id: number) =>
     request<void>('DELETE', `/e/${encode(slug)}/tracks/${id}`),
 
+  // Breaks — lunch, dinner, coffee. Event furniture, so organisers only, and
+  // there is nothing to read back on its own: the bundle carries them all.
+  createBreak: (slug: string, body: BreakWrite) =>
+    request<BreakDto>('POST', `/e/${encode(slug)}/breaks`, body),
+  updateBreak: (slug: string, id: number, body: BreakWrite) =>
+    request<BreakDto>('PATCH', `/e/${encode(slug)}/breaks/${id}`, body),
+  deleteBreak: (slug: string, id: number) =>
+    request<void>('DELETE', `/e/${encode(slug)}/breaks/${id}`),
+
   person: (slug: string, id: number) =>
     request<PersonDetailDto>('GET', `/e/${encode(slug)}/people/${id}`),
   createPerson: (slug: string, body: PersonWrite) =>
@@ -298,9 +308,6 @@ export interface SessionWrite {
   /** Organisers only, official sessions only: while this runs, attendees may
    *  place nothing anywhere in the event. */
   blocksOpenBooking?: boolean;
-  /** Organisers only, official sessions only: lunch, dinner, a break — drawn
-   *  as a grey band across the schedule, and it stops nobody. */
-  background?: boolean;
   title: string;
   description?: string;
   /** Link to an existing person, or `null` to detach. */
@@ -314,6 +321,15 @@ export interface SessionWrite {
   tagIds?: number[];
   /** `null` clears the track; omitting the key leaves it as it was. */
   trackId?: number | null;
+}
+
+export interface BreakWrite {
+  label: string;
+  /** Local minutes since midnight, on the 5-minute grid. */
+  startMin: number;
+  endMin: number;
+  /** One day only; null or omitted means every day of the event. */
+  date?: string | null;
 }
 
 export interface ProposalWrite {

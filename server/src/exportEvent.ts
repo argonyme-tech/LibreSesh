@@ -1,5 +1,6 @@
 import type { Db, EventRow } from './db.js';
 import type {
+  BreakRow,
   ContributionRow,
   PersonRow,
   ProposalRow,
@@ -35,6 +36,11 @@ export function exportEvent(db: Db, event: EventRow): EventExport {
   const rooms = db
     .prepare<[number], RoomRow>(
       'SELECT * FROM rooms WHERE event_id = ? AND deleted_at IS NULL ORDER BY sort_order, id',
+    )
+    .all(eventId);
+  const breaks = db
+    .prepare<[number], BreakRow>(
+      'SELECT * FROM breaks WHERE event_id = ? ORDER BY start_min, date IS NOT NULL, id',
     )
     .all(eventId);
   const tracks = db
@@ -145,6 +151,13 @@ export function exportEvent(db: Db, event: EventRow): EventExport {
       sortOrder: t.sort_order,
     })),
     tags: tags.map((t) => ({ id: t.id, name: t.name, color: t.color })),
+    breaks: breaks.map((b) => ({
+      id: b.id,
+      label: b.label,
+      startMin: b.start_min,
+      endMin: b.end_min,
+      date: b.date,
+    })),
     people: people.map((p) => ({
       id: p.id,
       name: p.name,
@@ -160,7 +173,6 @@ export function exportEvent(db: Db, event: EventRow): EventExport {
       trackId: s.track_id,
       type: s.type,
       blocksOpenBooking: s.blocks_open_booking === 1,
-      background: s.background === 1,
       title: s.title,
       description: s.description,
       speakerId: s.speaker_id,

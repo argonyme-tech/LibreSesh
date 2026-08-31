@@ -3,6 +3,7 @@ import type { BundleDto, SessionDetailDto } from '../shared/types.js';
 import { atLeast } from '../auth.js';
 import type { Ctx } from '../context.js';
 import type {
+  BreakRow,
   ContributionRow,
   PersonRow,
   RoomRow,
@@ -14,6 +15,7 @@ import { NameResolver, eventDisplayName } from '../eventIdentity.js';
 import {
   speakerNames,
   tagIdsBySession,
+  toBreakDto,
   toContributionDto,
   toEventDto,
   toPersonDto,
@@ -51,6 +53,14 @@ export function bundleRoutes(ctx: Ctx): Router {
     const tracks = ctx.db
       .prepare<[number], TrackRow>(
         'SELECT * FROM tracks WHERE event_id = ? AND deleted_at IS NULL ORDER BY sort_order, id',
+      )
+      .all(eventId);
+    // Ordered by clock, and every-day rows first within a minute: the grid
+    // draws them in this order, so the one that applies to more days is the
+    // one that ends up underneath.
+    const breaks = ctx.db
+      .prepare<[number], BreakRow>(
+        'SELECT * FROM breaks WHERE event_id = ? ORDER BY start_min, date IS NOT NULL, id',
       )
       .all(eventId);
     const sessions = ctx.db
@@ -92,6 +102,7 @@ export function bundleRoutes(ctx: Ctx): Router {
       rooms: rooms.map(toRoomDto),
       tags: tags.map(toTagDto),
       tracks: tracks.map(toTrackDto),
+      breaks: breaks.map(toBreakDto),
       sessions: sessions.map((s) =>
         toSessionDto(
           s,

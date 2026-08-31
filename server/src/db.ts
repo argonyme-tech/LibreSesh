@@ -67,6 +67,21 @@ export interface TagRow {
   deleted_at: string | null;
 }
 
+/**
+ * Lunch, dinner, the coffee break. Event furniture, drawn behind the grid and
+ * attached to no room. `date` null means every day of the event.
+ */
+export interface BreakRow {
+  id: number;
+  event_id: number;
+  label: string;
+  /** Local minutes since midnight in the event's timezone. */
+  start_min: number;
+  end_min: number;
+  date: string | null;
+  created_at: string;
+}
+
 export interface SessionRow {
   id: number;
   event_id: number;
@@ -75,8 +90,6 @@ export interface SessionRow {
   type: 'official' | 'open';
   /** 1 = while this runs, attendees may place nothing anywhere in the event. */
   blocks_open_booking: number;
-  /** 1 = drawn as a band across the schedule, not a block in a room column. */
-  background: number;
   title: string;
   description: string;
   speaker: string;
