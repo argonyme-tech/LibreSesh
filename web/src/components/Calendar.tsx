@@ -117,15 +117,46 @@ export function timeClashPairs(
   return out;
 }
 
-interface DragState {
+/**
+ * Where a dragged block is drawn, in absolute grid coordinates rather than as
+ * an offset from the session's own row.
+ *
+ * Absolute is what makes the drop stable. The server echoes our own PATCH back
+ * down the SSE stream and writes that frame *before* the response, so the
+ * session row normally reaches us first, already carrying its new time and
+ * room. An offset would then be added on top of the value it was meant to
+ * produce — the block would leap twice as far as the drag, and only snap into
+ * place once the response cleared the hold. Absolute coordinates make the echo
+ * a no-op: the block is already drawn exactly where the echo says it is.
+ */
+export interface DragTarget {
   id: number;
   mode: 'move' | 'resize';
-  deltaMin: number;
-  deltaRoom: number;
+  startMin: number;
   durMin: number;
+  columnIndex: number;
   /** Dropped, and the PATCH has not come back yet. The block stays where it
    *  was dropped until it does. */
   pending?: boolean;
+}
+
+/**
+ * Where to draw a block: its own row, or — while it is dragged or held after a
+ * drop — the drag target, which wins outright and is never combined with the
+ * row. `columnIndex` is clamped here because a row can name a column the grid
+ * is not showing.
+ */
+export function drawnAt(
+  row: { startMin: number; durMin: number; columnIndex: number },
+  target: DragTarget | null,
+  columnCount: number,
+): { startMin: number; durMin: number; columnIndex: number } {
+  const at = target ?? row;
+  return {
+    startMin: at.startMin,
+    durMin: at.durMin,
+    columnIndex: clamp(at.columnIndex, 0, Math.max(0, columnCount - 1)),
+  };
 }
 
 /**
@@ -205,7 +236,7 @@ export function Calendar({
   onOpen,
   onMove,
 }: CalendarProps) {
-  const [drag, setDrag] = useState<DragState | null>(null);
+  const [drag, setDrag] = useState<DragTarget | null>(null);
   // A block whose PATCH is still in flight must not be picked up again: the
   // second request would race the first and lose on `expectedUpdatedAt`.
   const pending = useRef<number | null>(null);
@@ -241,6 +272,10 @@ export function Calendar({
 
       const startX = event.clientX;
       const startY = event.clientY;
+      // Read once, at pointer-down: the block's own column can change under a
+      // live drag when someone else moves it, and the drag should follow the
+      // pointer from where it was picked up, not jump.
+      const fromIndex = columns.findIndex((c) => c.id === columnOf(session));
       const isTouch = event.pointerType !== 'mouse';
       let armed = !isTouch;
       let moved = false;
@@ -250,7 +285,7 @@ export function Calendar({
 
       const arm = () => {
         armed = true;
-        setDrag({ id: session.id, mode, deltaMin: 0, deltaRoom: 0, durMin });
+        setDrag({ id: session.id, mode, startMin, durMin, columnIndex: fromIndex });
       };
       if (isTouch) holdTimer.current = window.setTimeout(arm, TOUCH_HOLD_MS);
       else arm();
@@ -271,11 +306,17 @@ export function Calendar({
             SNAP,
             dayEndMin - startMin,
           );
-          setDrag({ id: session.id, mode, deltaMin: 0, deltaRoom: 0, durMin: nextDur });
+          setDrag({ id: session.id, mode, startMin, durMin: nextDur, columnIndex: fromIndex });
         } else {
           deltaMin = snap((ev.clientY - startY) / PX_PER_MIN);
           deltaRoom = moveBetweenColumns ? Math.round((ev.clientX - startX) / COL_W) : 0;
-          setDrag({ id: session.id, mode, deltaMin, deltaRoom, durMin });
+          setDrag({
+            id: session.id,
+            mode,
+            startMin: startMin + deltaMin,
+            durMin,
+            columnIndex: fromIndex + deltaRoom,
+          });
         }
       };
 
@@ -294,10 +335,13 @@ export function Calendar({
        * Hold the block where it was dropped until the server answers. Dropping
        * the drag state here instead would repaint the block at its old
        * position for a whole round trip and then jump it forward when the
-       * PATCH lands. A rejected move still snaps back — just at the moment we
-       * learn it failed, which is the only moment that means anything.
+       * PATCH lands. Because the hold is absolute (see `DragTarget`), the
+       * server's own echo arriving mid-hold moves nothing, and releasing the
+       * hold onto an already-updated row moves nothing either. A rejected move
+       * still snaps back — just at the moment we learn it failed, which is the
+       * only moment that means anything.
        */
-      const settle = (held: DragState, result: void | Promise<void>) => {
+      const settle = (held: DragTarget, result: void | Promise<void>) => {
         setDrag(held);
         pending.current = session.id;
         void Promise.resolve(result).finally(() => {
@@ -321,7 +365,7 @@ export function Calendar({
             return;
           }
           settle(
-            { id: session.id, mode, deltaMin: 0, deltaRoom: 0, durMin: nextDur, pending: true },
+            { id: session.id, mode, startMin, durMin: nextDur, columnIndex: fromIndex, pending: true },
             onMove(session, startMin, nextDur, session.roomId),
           );
           return;
@@ -329,7 +373,6 @@ export function Calendar({
         // Clamp before holding, so the block waits exactly where it will land
         // rather than where the pointer happened to be.
         const newStart = clamp(startMin + deltaMin, dayStartMin, dayEndMin - durMin);
-        const fromIndex = columns.findIndex((c) => c.id === columnOf(session));
         const toIndex = clamp(fromIndex + deltaRoom, 0, columns.length - 1);
         // Safe because deltaRoom is pinned to 0 unless the columns are rooms,
         // and then a column id *is* a room id.
@@ -341,14 +384,7 @@ export function Calendar({
           return;
         }
         settle(
-          {
-            id: session.id,
-            mode,
-            deltaMin: newStart - startMin,
-            deltaRoom: toIndex - fromIndex,
-            durMin,
-            pending: true,
-          },
+          { id: session.id, mode, startMin: newStart, durMin, columnIndex: toIndex, pending: true },
           onMove(session, newStart, durMin, roomId),
         );
       };
@@ -466,13 +502,18 @@ export function Calendar({
 
           {placed.map(({ session, startMin, durMin, endMin }, blockIndex) => {
             const active = drag?.id === session.id ? drag : null;
-            const effectiveStart = startMin + (active?.mode === 'move' ? active.deltaMin : 0);
-            const effectiveDur = active?.mode === 'resize' ? active.durMin : durMin;
-            const roomIndex = clamp(
-              columns.findIndex((c) => c.id === columnOf(session)) +
-                (active?.mode === 'move' ? active.deltaRoom : 0),
-              0,
-              Math.max(0, columns.length - 1),
+            const {
+              startMin: effectiveStart,
+              durMin: effectiveDur,
+              columnIndex: roomIndex,
+            } = drawnAt(
+              {
+                startMin,
+                durMin,
+                columnIndex: columns.findIndex((c) => c.id === columnOf(session)),
+              },
+              active,
+              columns.length,
             );
             const lane = lanes.get(session.id) ?? { lane: 0, lanes: 1 };
             const width = (COL_W - 8) / lane.lanes;

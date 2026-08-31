@@ -309,6 +309,21 @@ All notable changes to this project are documented here.
 
 ### Fixed
 
+- **A dropped block no longer leaps past where you put it.** The server writes
+  the SSE `change` frame *before* it answers the PATCH, and the broker echoes to
+  every subscriber including the one that made the write — so your own move
+  normally comes back down the stream first. The calendar held a dropped block
+  as an offset from the session's own row, and once the echo had already moved
+  that row the offset was added on top of the value it was meant to produce:
+  the block jumped twice as far as the drag, then snapped into place when the
+  response cleared the hold. The hold is now absolute grid coordinates
+  (`DragTarget`), drawn through `drawnAt`, where the drag target wins outright
+  and is never combined with the row — so the echo moves nothing and releasing
+  the hold onto an already-updated row moves nothing either. A live drag also
+  no longer gets yanked sideways when another organiser moves the same block.
+  **Partial:** a residual flicker on drop is still reported and is now a
+  backlog item — the horizontal lane re-layout is the leading suspect.
+
 - **Deleting someone's profile no longer bars them from having one.** The
   uniqueness rule behind "one profile per person per event" covered deleted
   rows too, so a soft-deleted profile went on holding its owner's slot. The
