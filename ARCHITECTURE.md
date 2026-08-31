@@ -390,6 +390,20 @@ Three consequences worth knowing:
   top of the grid, which reads as a failed import, so it comes back as a
   warning naming the row and pointing at Settings. Double bookings warn too:
   admins are allowed them, and the grid badges them.
+- **A repeat expands, it does not persist.** `repeat` on a session row says
+  "every day until the 20th", or "mon, wed, fri, except the 7th", and
+  `planSessions` turns it into one ordinary session per day *before* anything
+  is written. There is no series table, no series id, nothing downstream that
+  knows a repeat existed. That is the whole design decision: this schedule is
+  last-write-wins rows that anyone with the role can drag, retitle or delete,
+  and a series entity would have to answer "does moving Tuesday move all of
+  them?" on the first edit of the first day. Repetition is authoring
+  convenience, and it stops at the door. The cost is real and stated in
+  `docs/schedule-import.md` — changing a repeated session afterwards means
+  changing each day — which is why the dry run matters more here than
+  anywhere else. It also refuses `startsAt`/`endsAt`: a repeat is a claim about
+  the printed clock, each day is resolved through the event timezone
+  separately, and that is what keeps 14:00 at 14:00 across a clock change.
 
 Nothing reads an export back. Doing so would need decisions this route does not
 have to make — a new slug, fresh ids, and what to do with authorship that names

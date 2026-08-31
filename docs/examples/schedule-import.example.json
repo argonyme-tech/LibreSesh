@@ -34,6 +34,15 @@
   "sessions": [
     {
       "room": "Main hall",
+      "title": "Morning circle",
+      "description": "Same room, same time, every day of the event.",
+      "date": "2026-09-14",
+      "start": "09:00",
+      "end": "09:20",
+      "repeat": { "until": "2026-09-15" }
+    },
+    {
+      "room": "Main hall",
       "track": "Commons",
       "tags": ["beginner"],
       "title": "Opening keynote: what we owe each other",

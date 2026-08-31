@@ -279,6 +279,145 @@ describe('event import from JSON', () => {
     expect(result.warnings).toEqual([]);
   });
 
+  describe('repeats', () => {
+    /** A week-long event with one repeating row and nothing else in it. */
+    const weekly = (repeat: unknown, overrides: Record<string, unknown> = {}) => {
+      const doc = document();
+      doc.event = { ...doc.event, startDate: '2026-06-01', endDate: '2026-06-07' };
+      doc.sessions = [
+        {
+          room: 'Main hall',
+          title: 'Morning circle',
+          date: '2026-06-01',
+          start: '09:00',
+          end: '09:30',
+          repeat,
+          ...overrides,
+        } as (typeof doc.sessions)[number],
+      ];
+      return doc;
+    };
+
+    const datesOf = async (slug: string, password: string): Promise<string[]> => {
+      const admin = await actorWithRole(harness, slug, password);
+      const bundle = (await admin.get(`/api/e/${slug}/bundle`).expect(200)).body as {
+        sessions: { startsAt: string }[];
+      };
+      return bundle.sessions
+        .map((s) => localDate(new Date(s.startsAt), TEST_TIMEZONE))
+        .sort((a, b) => a.localeCompare(b));
+    };
+
+    it('lands one ordinary session on every day of the run', async () => {
+      const result = await post(weekly({ until: '2026-06-07' }));
+
+      expect(result.counts.sessions).toBe(7);
+      expect(result.warnings).toEqual([]);
+      expect(await datesOf('photoconf', result.generatedPasswords.adminPassword!)).toEqual([
+        '2026-06-01',
+        '2026-06-02',
+        '2026-06-03',
+        '2026-06-04',
+        '2026-06-05',
+        '2026-06-06',
+        '2026-06-07',
+      ]);
+    });
+
+    it('lands only on the weekdays it names', async () => {
+      // 2026-06-01 is a Monday, so the run is Mon, Wed, Fri.
+      const result = await post(weekly({ until: '2026-06-07', days: ['mon', 'wed', 'fri'] }));
+
+      expect(result.counts.sessions).toBe(3);
+      expect(await datesOf('photoconf', result.generatedPasswords.adminPassword!)).toEqual([
+        '2026-06-01',
+        '2026-06-03',
+        '2026-06-05',
+      ]);
+    });
+
+    it('skips the days it excepts, and says so when a skip skips nothing', async () => {
+      const result = await post(
+        weekly({ until: '2026-06-03', except: ['2026-06-02', '2026-06-30'] }),
+      );
+
+      expect(result.counts.sessions).toBe(2);
+      expect(await datesOf('photoconf', result.generatedPasswords.adminPassword!)).toEqual([
+        '2026-06-01',
+        '2026-06-03',
+      ]);
+      // The one outside the run is the shape a mistyped date takes.
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0]).toContain('2026-06-30');
+    });
+
+    /**
+     * The reason a repeat refuses instants. Berlin's clocks go back on
+     * 2026-10-25, so these three sessions are 24, 25 and 24 hours apart — and
+     * all three start at 14:00, which is what the printed programme says.
+     */
+    it('keeps the printed time across a clock change', async () => {
+      const doc = document();
+      doc.event = { ...doc.event, startDate: '2026-10-24', endDate: '2026-10-26' };
+      doc.sessions = [
+        {
+          room: 'Main hall',
+          title: 'Tech track',
+          date: '2026-10-24',
+          start: '14:00',
+          end: '16:00',
+          repeat: { until: '2026-10-26' },
+        } as (typeof doc.sessions)[number],
+      ];
+      const result = await post(doc);
+      expect(result.counts.sessions).toBe(3);
+
+      const admin = await actorWithRole(harness, 'photoconf', result.generatedPasswords.adminPassword!);
+      const bundle = (await admin.get('/api/e/photoconf/bundle').expect(200)).body as {
+        sessions: { startsAt: string }[];
+      };
+      const starts = bundle.sessions.map((s) => localMinuteOfDay(new Date(s.startsAt), TEST_TIMEZONE));
+      expect(starts).toEqual([840, 840, 840]);
+    });
+
+    it('warns once about the whole run, not once a day', async () => {
+      const doc = weekly({ until: '2026-06-07' });
+      doc.event = { ...doc.event, dayStartMin: 600 };
+      const result = await post(doc);
+
+      expect(result.counts.sessions).toBe(7);
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0]).toContain('repeats every day');
+      expect(result.warnings[0]).toContain('outside the hours');
+    });
+
+    it('refuses a run that contradicts the row above it', async () => {
+      expect(await failure(weekly({ until: '2026-05-30' }), 400)).toContain('before this session');
+      // 2026-06-01 is a Monday, and a run that excludes its own first day is
+      // two statements about when it starts.
+      expect(await failure(weekly({ until: '2026-06-07', days: ['tue'] }), 400)).toContain(
+        'does not include mon',
+      );
+      expect(await failure(weekly({ until: '2026-06-30' }), 400)).toContain(
+        'after the event ends 2026-06-07',
+      );
+      expect(
+        await failure(weekly({ until: '2026-06-07', except: ['2026-06-01'], days: ['mon'] }), 400),
+      ).toContain('lands on no day at all');
+    });
+
+    it('refuses to repeat a session written as instants', async () => {
+      const doc = weekly({ until: '2026-06-07' }, {
+        date: undefined,
+        start: undefined,
+        end: undefined,
+        startsAt: '2026-06-01T07:00:00.000Z',
+        endsAt: '2026-06-01T08:00:00.000Z',
+      });
+      expect(await failure(doc, 400)).toContain('repeat needs date/start/end');
+    });
+  });
+
   // The template is what anyone starts from, so a stale one is worse than
   // none. This is the only thing that keeps it honest.
   it('imports the example document shipped in docs/', async () => {
@@ -287,7 +426,7 @@ describe('event import from JSON', () => {
     const result = await post(doc, { dryRun: true });
 
     expect(result.warnings).toEqual([]);
-    expect(result.counts).toEqual({ rooms: 3, tracks: 2, tags: 2, sessions: 4, people: 2 });
+    expect(result.counts).toEqual({ rooms: 3, tracks: 2, tags: 2, sessions: 6, people: 2 });
   });
 
   it('refuses a document with both time forms, or a key it does not know', async () => {

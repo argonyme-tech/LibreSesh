@@ -57,7 +57,8 @@ The response is the same either way:
 ```
 
 `eventId` is `null` on a dry run — nothing was written, so there is no id to
-give. **Keep `generatedPasswords`**: they are stored hashed and that response
+give. `counts.sessions` is what actually lands, repeats expanded, so it is the
+first thing to read back against the programme. **Keep `generatedPasswords`**: they are stored hashed and that response
 is the only place they can ever be read.
 
 ## The document
@@ -115,6 +116,7 @@ Both are optional, and both are declared here or not at all.
 | `type` | | `official` (default) or `open` |
 | `date`, `start`, `end` | ✓ | Local date and wall-clock times — see below |
 | `startsAt`, `endsAt` | | ISO instants instead, for a document a program wrote |
+| `repeat` | | Say the row once, land it on every day it happens — see below |
 
 **Rooms, tracks and tags are declared once and referred to by name.** Matching
 ignores case and collapses whitespace, because transcription is not consistent —
@@ -142,6 +144,48 @@ meant.
 Times must land on a five-minute step and run between 5 minutes and 8 hours,
 the same rules the session form applies.
 
+## Repeating a session
+
+Most of a long programme is the same thing every day: the two officials that
+open and close it, the track that always runs 14:00–16:00, the meal nobody
+writes down twice. `repeat` says that once.
+
+```json
+{
+  "room": "Main hall",
+  "track": "Tech",
+  "title": "Tech track",
+  "date": "2026-09-14",
+  "start": "14:00",
+  "end": "16:00",
+  "repeat": { "until": "2026-10-02", "days": ["mon", "tue", "wed", "thu", "fri"] }
+}
+```
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `until` | ✓ | `YYYY-MM-DD`, inclusive. Must not be after the event's `endDate` |
+| `days` | | `mon`…`sun`. Omit it for every day |
+| `except` | | Dates the run skips — a holiday, an excursion day |
+
+The session's own `date` is the first occurrence, `until` is the last, and
+every matching day in between gets one. Twenty days of three daily officials is
+three rows.
+
+**What lands is ordinary sessions.** There is no series, no link between them,
+nothing that remembers they were written as one line: twenty rows that can each
+be dragged, retitled, given a different speaker or deleted on their own. That
+is deliberate. A schedule is edited constantly, and a series that fought back
+the first time one day's keynote moved an hour would cost more than the typing
+it saved. The flip side is the honest one: **changing a repeating session after
+the import means changing each day**, so dry-run until the run is right.
+
+`repeat` needs `date`/`start`/`end` and refuses `startsAt`/`endsAt`. A repeat is
+a claim about the printed clock — "14:00 every day" — and each day is resolved
+through the event's timezone separately, so a run that crosses a clock change
+stays at 14:00 instead of sliding by an hour halfway through. An instant cannot
+say that, so a document that tries is refused rather than quietly reinterpreted.
+
 ## What is refused, and what is only flagged
 
 Contradictions **inside the document** are refused. The whole import is one
@@ -156,6 +200,17 @@ sessions[3] "Opening keynote": Start time must land on a 5-minute step
 Two rooms are both called "Main hall"
 ```
 
+A repeat is refused when it contradicts the row it sits on — an `until` before
+the session's own date, a `days` list that leaves out the weekday it starts on,
+an `until` past the end of the event, or a combination of `days` and `except`
+that lands on no day at all. Once expanded, each occurrence is checked like any
+other session, and a message that names one names its date:
+
+```
+sessions[3] "Morning circle" on 2026-09-19: no room called "Balcony" is declared
+sessions[3] "Morning circle": repeats until 2026-10-04, after the event ends 2026-10-02
+```
+
 A session outside the event's own declared dates is refused because the dates
 and the session are in the same file: one of the two is a transcription error,
 and refusing says which.
@@ -168,6 +223,14 @@ anyway, because both are things an organiser is allowed to do:
   Widening `dayStartMin`/`dayEndMin` in Manage Event → Settings reveals it.
 - *overlaps …* — two sessions double-booked in one room. Organisers may do
   this, and the grid badges the clash.
+- *excepting that day does nothing* — a `repeat.except` date the run never
+  reaches, which is the shape a mistyped date takes and is otherwise invisible:
+  the grid just quietly has that day.
+
+A warning about a repeating row is reported once and names the rule rather than
+a date — `sessions[0] "Morning circle" (repeats every day) runs outside the
+hours…` — because it is equally true of every occurrence, and twenty copies of
+it would bury the warnings that differ.
 
 ## From a photo to a document
 

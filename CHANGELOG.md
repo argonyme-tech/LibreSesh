@@ -6,6 +6,28 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **An imported session can repeat.** A three-week programme is mostly the same
+  thing every day — the officials that open and close it, the track that always
+  runs 14:00–16:00 — and the importer made you type each one out per day.
+  A session row now takes `repeat: { until, days, except }`: `until` is the
+  inclusive last day, `days` names weekdays (omit it for every day), `except`
+  lists the days the run skips. Twenty days of three daily officials is three
+  rows. What lands is *ordinary sessions* — no series, no series id, nothing
+  that remembers they were one line — because this schedule is last-write-wins
+  rows anyone can drag, retitle or delete, and a series entity would have to
+  answer "does moving Tuesday move all of them?" on the first edit. The cost is
+  stated rather than hidden: changing a repeated session afterwards means
+  changing each day. `repeat` refuses `startsAt`/`endsAt` and resolves each day
+  through the event timezone separately, so a run across a clock change stays
+  at the printed time instead of sliding an hour halfway through. A repeat that
+  contradicts its own row is refused (an `until` before the session's date, a
+  `days` list without the weekday it starts on, an `until` past the end of the
+  event, a `days`/`except` pair that lands on no day at all); an `except` the
+  run never reaches warns. Warnings about a repeating row are reported once and
+  name the rule rather than a date, since they are true of every occurrence.
+  `docs/schedule-import.md` and the shipped template cover it, and
+  ARCHITECTURE.md §Importing a schedule records why there is no series.
+
 - **A session can be opened as a full page.** The panel is right for glancing
   at a session while the grid stays behind it, and wrong for a session that has
   collected forty notes. `/e/:slug/s/:id/full` — reached by ⤢ in the panel's

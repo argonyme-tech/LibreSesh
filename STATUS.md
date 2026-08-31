@@ -91,15 +91,36 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   Noticed 2026-08-31: `pruneAudit` deletes by `event_id`, so these rows also
   grow without limit — slowly (they are all rare actions), but forever.
 
-- **Nothing imports an event *export*.** `POST /events/import` now builds an
-  event from a JSON schedule — rooms, tracks, tags and sessions, named rather
-  than numbered, so a transcribed programme can be imported (2026-08-31). What
-  it does not do is read `GET /export.json` back: an export is a record of ids,
-  instants and authorship belonging to identities the target instance has never
-  seen, and reading one back wants a new slug, fresh ids and a decision about
-  those names. So the encrypted whole-DB backup is still the only restore path.
-  Also still missing: importing into an *existing* event (this only creates
-  one), and any UI at all — the route is curl-only.
+- **The importer can repeat a session, but only into a new event, and only
+  from curl.** `repeat: { until, days, except }` landed 2026-08-31, so a long
+  programme's daily officials and fixed track hours are three rows rather than
+  sixty. Two halves of the same job are still missing:
+  - **Importing into an *existing* event.** The route only creates. There is no
+    way to add twenty days to the event you are already running, which is the
+    case that asked for repeats in the first place. Wants
+    `POST /events/:slug/import`, gated on event admin rather than the instance
+    key, matching rooms/tracks/tags to the existing ones by name instead of
+    creating duplicates — same transaction and same `dryRun` as now.
+  - **Any UI at all.** Both routes are curl-only, so "prepopulate my event"
+    is currently a JSON file and a shell. The obvious front door is a
+    *duplicate a day* action on the grid — pick a day, pick the days to copy it
+    to — which is the same expansion `planSessions` already does, behind a
+    button instead of a document.
+
+  Two smaller things noticed alongside: `POST /events/:slug/clone` copies rooms
+  and tags but **not tracks**, which post-date it and look simply forgotten;
+  and a track carries no time of its own, so "Tech runs 14:00–16:00" is said by
+  a repeating session rather than by the track. Track defaults in the import
+  document would be cheap; `start_min`/`end_min` on the `tracks` table is the
+  bigger version and changes what a track means in the session form, the grid
+  and the filters — worth doing only to make the app *enforce* track hours.
+
+- **Nothing imports an event *export*.** `POST /events/import` builds an event
+  from a JSON schedule, but does not read `GET /export.json` back: an export is
+  a record of ids, instants and authorship belonging to identities the target
+  instance has never seen, and reading one back wants a new slug, fresh ids and
+  a decision about those names. So the encrypted whole-DB backup is still the
+  only restore path.
 
 - **Compact button overrides do nothing.** `SecondaryButton className="py-1"`
   and the `py-1.5` variants in DetailSheet, ProfilePage, ProposalBoard and
