@@ -38,6 +38,12 @@ export function EventListPage() {
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
           <Link
+            to="/import"
+            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs font-semibold text-stone-700 hover:border-stone-500 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-300 dark:hover:border-stone-400"
+          >
+            Import
+          </Link>
+          <Link
             to="/new"
             className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs font-semibold text-stone-700 hover:border-stone-500 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-300 dark:hover:border-stone-400"
           >
@@ -53,6 +59,10 @@ export function EventListPage() {
           No events yet.{' '}
           <Link to="/new" className="underline">
             Create the first one
+          </Link>{' '}
+          or{' '}
+          <Link to="/import" className="underline">
+            import a schedule
           </Link>
           .
         </EmptyState>

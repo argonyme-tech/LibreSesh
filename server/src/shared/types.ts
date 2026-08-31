@@ -39,6 +39,34 @@ export interface GeneratedPasswords {
   adminPassword?: string;
 }
 
+/** What one import document put on the grid, repeats already expanded. */
+export interface ImportCounts {
+  rooms: number;
+  tracks: number;
+  tags: number;
+  breaks: number;
+  sessions: number;
+  /** Profiles created for speaker names nobody in this event answered to. */
+  people: number;
+}
+
+/**
+ * The answer to an import, and to the dry run that rehearses it. Shared because
+ * the screen that shows a rehearsal is the same screen that shows the real
+ * thing — only `dryRun` and `eventId` tell them apart.
+ */
+export interface ImportResult {
+  slug: string;
+  /** Absent on a dry run: nothing was written, so there is no id to give. */
+  eventId: number | null;
+  dryRun: boolean;
+  counts: ImportCounts;
+  /** Things worth a second look that are not reasons to refuse the import. */
+  warnings: string[];
+  /** Only the passwords this instance invented, shown once. */
+  generatedPasswords: GeneratedPasswords;
+}
+
 export interface EventSummary {
   slug: string;
   name: string;

@@ -30,10 +30,11 @@ import { audit } from './audit.js';
 import { type Config, isDemoEvent } from './config.js';
 import type { Db, EventRow } from './db.js';
 import { badRequest, conflict, HttpError } from './errors.js';
-import { resolveEventPasswords, type PasswordField } from './eventPasswords.js';
+import { resolveEventPasswords } from './eventPasswords.js';
 import { assertValidTimes } from './sessionRules.js';
 import { describeRepeat, repeatDays, repeatSchema } from './repeat.js';
 import { nextRoomColor } from './shared/roomColors.js';
+import type { ImportResult } from './shared/types.js';
 import { localDate, localMinuteOfDay, zonedTimeToUtc } from './shared/time.js';
 import { resolveSpeaker } from './speakers.js';
 import {
@@ -194,27 +195,7 @@ type ImportSession = z.infer<typeof importSessionSchema>;
 /** How many sessions one document may write, repeats expanded. */
 export const MAX_IMPORT_SESSIONS = 1000;
 
-export interface ImportCounts {
-  rooms: number;
-  tracks: number;
-  tags: number;
-  breaks: number;
-  sessions: number;
-  /** Profiles created for speaker names nobody in this event answered to. */
-  people: number;
-}
-
-export interface ImportResult {
-  slug: string;
-  /** Absent on a dry run: nothing was written, so there is no id to give. */
-  eventId: number | null;
-  dryRun: boolean;
-  counts: ImportCounts;
-  /** Things worth a second look that are not reasons to refuse the import. */
-  warnings: string[];
-  /** Only the passwords this instance invented, shown once. */
-  generatedPasswords: Partial<Record<PasswordField, string>>;
-}
+export type { ImportCounts, ImportResult } from './shared/types.js';
 
 /** Thrown to roll a dry run back once it has produced its answer. */
 class DryRunFinished extends Error {

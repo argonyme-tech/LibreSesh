@@ -20,6 +20,16 @@ The test suite dry-runs that exact file, so it is never stale.
 The route is guarded by the **instance password**, like creating an event by
 hand, because it makes an event rather than editing one.
 
+### In the browser
+
+**`/import`** is the same route with a screen in front of it, and is the way in
+if you have a schedule rather than a terminal. Paste the document or pick the
+file, press **Check it**, and read what would land; **Import** unlocks once that
+rehearsal succeeds and locks again the moment you edit the document, so what you
+approve is always what you send.
+
+### From the command line
+
 ```bash
 # 1. Rehearse. Validates everything, reports what would land, writes nothing.
 curl -X POST 'https://your-host/api/events/import?dryRun=1' \
@@ -34,8 +44,8 @@ curl -X POST 'https://your-host/api/events/import' \
   --data @schedule.json
 ```
 
-Do step 1. A wrong transcription and a right one look identical until something
-reads them, and the dry run is the only thing that reads one without keeping
+Do step 1 — the screen at `/import` will not let you skip it. A wrong
+transcription and a right one look identical until something reads them, and the dry run is the only thing that reads one without keeping
 it. It takes the same path as the real import and rolls back at the end, so
 every check a real import would make has already run.
 
@@ -299,7 +309,7 @@ guess, since a wrong name creates a profile someone then has to merge away.
 - **It only creates events, never updates one.** There is no way to add a day
   to an event that already exists, or to re-run a corrected document over the
   top of a previous import. Delete the event and import again.
-- **It has no UI.** The route is curl-only for now.
 - **Request bodies are capped at 256 KB**, which is a large schedule but not an
   unlimited one. A document over the cap is rejected by Express before this
-  route sees it, as a `413`.
+  route sees it, as a `413` naming the limit; `/import` checks the size before
+  sending, so a wrong file is caught with the file still in hand.

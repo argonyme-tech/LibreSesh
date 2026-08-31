@@ -6,6 +6,19 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **Importing a schedule no longer needs a terminal.** `POST /api/events/import`
+  has been able to build a whole event from one JSON document for a while, but
+  only through curl, which serves the person running the server and not the
+  person holding the programme. `/import` puts a screen on it: paste the
+  document or pick the file, press **Check it**, read what would land, then
+  import. The check is not optional — the dry run is the real transaction rolled
+  back, so the counts and warnings shown are the ones the import would produce,
+  and **Import** stays locked until a rehearsal of that exact text has
+  succeeded. Editing the document locks it again, because a result that no
+  longer describes what is in the box is worse than no result. Bad JSON is
+  caught before the request is made and reported by line and column rather than
+  by byte offset.
+
 - **Search that finds a session on any day.** The header has a search box that
   spans the whole programme, not just the day on screen: it drops down the best
   five hits with the day, time, room and the matched words in bold, the arrow

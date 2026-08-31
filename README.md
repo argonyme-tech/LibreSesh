@@ -220,6 +220,9 @@ grid of sessions — from one JSON document. It is guarded by the instance
 password, like creating an event by hand, because it makes an event rather than
 editing one.
 
+**[`/import`](/import)** is that route with a screen in front of it: paste the
+document, check it, import. Everything below is the same thing from a terminal.
+
 ```bash
 # Rehearse first: this validates everything and writes nothing.
 curl -X POST 'https://your-host/api/events/import?dryRun=1' \
