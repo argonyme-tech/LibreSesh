@@ -6,6 +6,18 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **A session can be opened as a full page.** The panel is right for glancing
+  at a session while the grid stays behind it, and wrong for a session that has
+  collected forty notes. `/e/:slug/s/:id/full` — reached by ⤢ in the panel's
+  header — renders the same session full-width: two columns from `lg`, with the
+  discussion given the width and the things you act with (star, edit, composer)
+  in a sticky rail beside it, and nothing collapsed, since reading all of it is
+  what the page is for. The event bar stays for context; the weeks, filters and
+  day rail belong to the grid and are dropped. **Back to the schedule** returns
+  to the panel with your filters intact. Both presentations are one component
+  (`SessionDetail`), so a new field or permission rule cannot land in one and
+  miss the other.
+
 - **The session panel grows on a desktop, and long discussions collapse.** The
   detail panel was a fixed `sm:w-96` at every width above `sm`, so on a wide
   screen the description, the three contribution lists and the composer all

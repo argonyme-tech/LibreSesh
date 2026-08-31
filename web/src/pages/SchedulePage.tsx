@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useMatch, useNavigate, useParams } from "react-router-dom";
 import type {
   ContributionDto,
   ContributionKind,
@@ -20,6 +20,7 @@ import { useFilters } from "../lib/useFilters";
 import { useMe } from "../lib/useMe";
 import { Calendar, PX_PER_MIN, timeClashPairs } from "../components/Calendar";
 import { DetailSheet } from "../components/DetailSheet";
+import { SessionDetail } from "../components/SessionDetail";
 import { Gate } from "../components/Gate";
 import { ListView } from "../components/ListView";
 import { Logo } from "../components/Logo";
@@ -344,6 +345,17 @@ export function SchedulePage() {
   const selected = sessionId
     ? bundle?.sessions.find((s) => s.id === Number(sessionId))
     : undefined;
+
+  // `/s/:id/full` renders the same session as a page instead of a panel. It
+  // stays on this component rather than becoming its own route component
+  // because every handler the detail needs — star, edit, delete, contribute,
+  // hide — is defined here, along with the live stream that keeps it current.
+  // Falling back to the grid when the id matches nothing means a stale link
+  // lands somewhere useful instead of on an empty page.
+  const fullPage = useMatch("/e/:slug/s/:sessionId/full") !== null && !!selected;
+  const sheetUrl = selected
+    ? `/e/${slug}/s/${selected.id}${window.location.search}`
+    : `/e/${slug}`;
 
   const { loadContributions } = data;
   useEffect(() => {
@@ -703,264 +715,307 @@ export function SchedulePage() {
           </div>
         </div>
 
-        {weeks.length > 1 && (
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-1.5 px-4 pb-2">
-            {weeks.map((week, i) => {
-              const first = week[0] as string;
-              const last = week[week.length - 1] as string;
-              const count = week.reduce((n, d) => n + (perDay.get(d) ?? 0), 0);
-              const holdsToday = week.includes(today);
-              return (
-                <button
-                  key={first}
-                  type="button"
-                  onClick={() => filters.set({ day: holdsToday ? today : first })}
-                  aria-pressed={i === weekIndex}
-                  aria-label={`Week ${i + 1}, ${dayRangeLabel(first, last)}, ${count} sessions`}
-                  className={`rounded-full border px-3 py-1 text-xs font-medium ${
-                    i === weekIndex
-                      ? "border-stone-900 bg-stone-900 text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-900"
-                      : "border-stone-300 text-stone-600 hover:border-stone-500 dark:border-stone-600 dark:text-stone-300 dark:hover:border-stone-400"
-                  }`}
-                >
-                  Week {i + 1}
-                  <span className="ml-1.5 text-stone-400 dark:text-stone-500">
-                    {dayRangeLabel(first, last)}
-                  </span>
-                  {holdsToday && !week.includes(day) && (
-                    <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-accent align-middle" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 pb-3">
-          <div
-            data-tour="days"
-            className="flex overflow-x-auto rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 p-0.5 no-scrollbar"
-          >
-            {stripDays.map((d) => {
-              const label = dayLabel(d, today);
-              return (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => filters.set({ day: d })}
-                  aria-pressed={day === d}
-                  className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium ${
-                    day === d
-                      ? "bg-stone-900 dark:bg-stone-100 dark:text-stone-900 text-white"
-                      : "text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
-                  } ${day !== d && (perDay.get(d) ?? 0) === 0 ? "opacity-40" : ""}`}
-                >
-                  {label.top}{" "}
-                  <span
-                    className={
-                      day === d
-                        ? "text-stone-300 dark:text-stone-600"
-                        : "text-stone-400 dark:text-stone-500"
-                    }
+        {/* Everything below the event bar belongs to the grid — weeks,
+            filters, the day rail. The full-page session view keeps the bar
+            for its context and drops the rest. */}
+        {!fullPage && (
+          <>
+          {weeks.length > 1 && (
+            <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-1.5 px-4 pb-2">
+              {weeks.map((week, i) => {
+                const first = week[0] as string;
+                const last = week[week.length - 1] as string;
+                const count = week.reduce((n, d) => n + (perDay.get(d) ?? 0), 0);
+                const holdsToday = week.includes(today);
+                return (
+                  <button
+                    key={first}
+                    type="button"
+                    onClick={() => filters.set({ day: holdsToday ? today : first })}
+                    aria-pressed={i === weekIndex}
+                    aria-label={`Week ${i + 1}, ${dayRangeLabel(first, last)}, ${count} sessions`}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                      i === weekIndex
+                        ? "border-stone-900 bg-stone-900 text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-900"
+                        : "border-stone-300 text-stone-600 hover:border-stone-500 dark:border-stone-600 dark:text-stone-300 dark:hover:border-stone-400"
+                    }`}
                   >
-                    {label.sub}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div
-            data-tour="view"
-            className="flex rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 p-0.5"
-          >
-            {(["cal", "list"] as const).map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => filters.set({ view: v })}
-                aria-pressed={view === v}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-                  view === v
-                    ? "bg-stone-900 dark:bg-stone-100 dark:text-stone-900 text-white"
-                    : "text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
-                }`}
-              >
-                {v === "cal" ? "Grid" : "List"}
-              </button>
-            ))}
-          </div>
-
-          {/* Only when the event has tracks, and only in the grid — the list
-              is an agenda in time order, with no columns to lay out. */}
-          {hasTracks && view === "cal" && (
-            <div
-              data-tour="axis"
-              className="flex rounded-lg border border-stone-300 bg-white p-0.5 dark:border-stone-600 dark:bg-stone-900"
-            >
-              {(["room", "track"] as const).map((a) => (
-                <button
-                  key={a}
-                  type="button"
-                  onClick={() => filters.set({ axis: a })}
-                  aria-pressed={axis === a}
-                  className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-                    axis === a
-                      ? "bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900"
-                      : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800"
-                  }`}
-                >
-                  {a === "room" ? "Rooms" : "Tracks"}
-                </button>
-              ))}
+                    Week {i + 1}
+                    <span className="ml-1.5 text-stone-400 dark:text-stone-500">
+                      {dayRangeLabel(first, last)}
+                    </span>
+                    {holdsToday && !week.includes(day) && (
+                      <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-accent align-middle" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
 
-          {/* Everyone needs the board: attendees pitch there, viewers can
-              register interest. It sits with the other ways of looking at the
-              programme, not up with the account chrome. */}
-          <Link
-            data-tour="pitches"
-            to={`/e/${slug}/proposals`}
-            className="rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 px-3 py-2 text-xs font-medium text-stone-600 dark:text-stone-300 hover:border-stone-400 dark:hover:border-stone-500"
-          >
-            Pitches
-            {bundle.proposals.filter((p) => p.placedSessionId === null).length >
-              0 && (
-              <span className="ml-1 text-stone-400 dark:text-stone-500">
-                {bundle.proposals.filter((p) => p.placedSessionId === null)
-                  .length}
-              </span>
-            )}
-          </Link>
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 pb-3">
+            <div
+              data-tour="days"
+              className="flex overflow-x-auto rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 p-0.5 no-scrollbar"
+            >
+              {stripDays.map((d) => {
+                const label = dayLabel(d, today);
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => filters.set({ day: d })}
+                    aria-pressed={day === d}
+                    className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium ${
+                      day === d
+                        ? "bg-stone-900 dark:bg-stone-100 dark:text-stone-900 text-white"
+                        : "text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+                    } ${day !== d && (perDay.get(d) ?? 0) === 0 ? "opacity-40" : ""}`}
+                  >
+                    {label.top}{" "}
+                    <span
+                      className={
+                        day === d
+                          ? "text-stone-300 dark:text-stone-600"
+                          : "text-stone-400 dark:text-stone-500"
+                      }
+                    >
+                      {label.sub}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
 
-          <button
-            type="button"
-            data-tour="now"
-            onClick={jumpToNow}
-            className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-stone-900 shadow-sm hover:brightness-95"
-          >
-            ● Now {fmtMin(nowMinuteOfDay(timezone))}
-          </button>
+            <div
+              data-tour="view"
+              className="flex rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 p-0.5"
+            >
+              {(["cal", "list"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => filters.set({ view: v })}
+                  aria-pressed={view === v}
+                  className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+                    view === v
+                      ? "bg-stone-900 dark:bg-stone-100 dark:text-stone-900 text-white"
+                      : "text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+                  }`}
+                >
+                  {v === "cal" ? "Grid" : "List"}
+                </button>
+              ))}
+            </div>
 
-          {/* Manage / Arrange / Add travel together at every width — an
-              organiser's three actions belong in one place, not split between
-              the header and here. Each keeps its glyph and drops its label
-              below `sm`, which is what buys the room on a phone. */}
-          <div className="ml-auto flex items-center gap-2">
-            {role === "admin" && (
-              <Link
-                data-tour="manage"
-                to={`/e/${slug}/admin`}
-                aria-label="Manage Event"
-                title="Manage Event"
-                className="flex items-center gap-1.5 rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 px-3 py-2 text-xs font-medium text-stone-600 dark:text-stone-300 hover:border-stone-400 dark:hover:border-stone-500"
+            {/* Only when the event has tracks, and only in the grid — the list
+                is an agenda in time order, with no columns to lay out. */}
+            {hasTracks && view === "cal" && (
+              <div
+                data-tour="axis"
+                className="flex rounded-lg border border-stone-300 bg-white p-0.5 dark:border-stone-600 dark:bg-stone-900"
               >
-                <span aria-hidden="true">⚙</span>
-                <span className="hidden sm:inline">Manage Event</span>
-              </Link>
+                {(["room", "track"] as const).map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => filters.set({ axis: a })}
+                    aria-pressed={axis === a}
+                    className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+                      axis === a
+                        ? "bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900"
+                        : "text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800"
+                    }`}
+                  >
+                    {a === "room" ? "Rooms" : "Tracks"}
+                  </button>
+                ))}
+              </div>
             )}
-            {canArrange && (
-              <button
-                type="button"
-                data-tour="arrange"
-                onClick={() => setArrange((a) => !a)}
-                aria-pressed={arrange}
-                aria-label={arrange ? "Done arranging" : "Arrange sessions"}
-                title={arrange ? "Done arranging" : "Arrange sessions"}
-                className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium ${
-                  arrange
-                    ? "border-stone-900 bg-stone-900 dark:bg-stone-100 dark:text-stone-900 text-white"
-                    : "border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 text-stone-600 dark:text-stone-300 hover:border-stone-400 dark:hover:border-stone-500"
-                }`}
-              >
-                <span aria-hidden="true">{arrange ? "✓" : "↕"}</span>
-                <span className="hidden sm:inline">
-                  {arrange ? "Done arranging" : "Arrange Sessions"}
+
+            {/* Everyone needs the board: attendees pitch there, viewers can
+                register interest. It sits with the other ways of looking at the
+                programme, not up with the account chrome. */}
+            <Link
+              data-tour="pitches"
+              to={`/e/${slug}/proposals`}
+              className="rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 px-3 py-2 text-xs font-medium text-stone-600 dark:text-stone-300 hover:border-stone-400 dark:hover:border-stone-500"
+            >
+              Pitches
+              {bundle.proposals.filter((p) => p.placedSessionId === null).length >
+                0 && (
+                <span className="ml-1 text-stone-400 dark:text-stone-500">
+                  {bundle.proposals.filter((p) => p.placedSessionId === null)
+                    .length}
                 </span>
-              </button>
-            )}
-            {canWrite && (
-              <button
-                type="button"
-                data-tour="add"
-                onClick={() => setEditing({})}
-                aria-label="Add session"
-                title="Add session"
-                className="flex items-center gap-1.5 rounded-lg bg-stone-900 dark:bg-stone-100 dark:text-stone-900 px-3 py-2 text-xs font-semibold text-white hover:bg-stone-700 dark:hover:bg-stone-300"
-              >
-                <span aria-hidden="true">+</span>
-                <span className="hidden sm:inline">Add session</span>
-              </button>
-            )}
-          </div>
-        </div>
+              )}
+            </Link>
 
-        <div className="mx-auto max-w-6xl overflow-x-auto px-4 pb-3 no-scrollbar">
-          <div
-            data-tour="filters"
-            className="flex items-center gap-1.5 whitespace-nowrap"
-          >
-            <input
-              value={filters.q}
-              onChange={(e) => filters.set({ q: e.target.value })}
-              placeholder="Search title, speaker…"
-              aria-label="Search sessions"
-              className="w-40 shrink-0 rounded-full border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 px-3 py-1 text-xs outline-none focus:border-stone-500 dark:focus:border-stone-400"
-            />
-            <Chip
-              active={filters.soon}
-              onClick={() => filters.set({ soon: !filters.soon })}
+            <button
+              type="button"
+              data-tour="now"
+              onClick={jumpToNow}
+              className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-stone-900 shadow-sm hover:brightness-95"
             >
-              Now / next
-            </Chip>
-            <Chip
-              active={filters.mine}
-              onClick={() => filters.set({ mine: !filters.mine })}
-            >
-              <span
-                className={
-                  filters.mine ? "" : "text-amber-500 dark:text-amber-400"
-                }
-              >
-                ★
-              </span>{" "}
-              My agenda ({starredIds.size})
-            </Chip>
-            <span className="mx-1 h-4 w-px shrink-0 bg-stone-300 dark:bg-stone-600" />
-            {bundle.rooms.map((r) => (
-              <Chip
-                key={r.id}
-                active={filters.rooms.includes(r.id)}
-                onClick={() => filters.toggleRoom(r.id)}
-              >
-                {r.name}
-              </Chip>
-            ))}
-            <span className="mx-1 h-4 w-px shrink-0 bg-stone-300 dark:bg-stone-600" />
-            {bundle.tags.map((t) => (
-              <Chip
-                key={t.id}
-                dot={t.color}
-                active={filters.tags.includes(t.id)}
-                onClick={() => filters.toggleTag(t.id)}
-              >
-                {t.name}
-              </Chip>
-            ))}
-            {filters.active && (
-              <button
-                type="button"
-                onClick={filters.clear}
-                className="shrink-0 rounded-full px-2.5 py-1 text-xs font-medium text-stone-500 dark:text-stone-400 underline hover:text-stone-800 dark:hover:text-stone-200"
-              >
-                Clear all
-              </button>
-            )}
+              ● Now {fmtMin(nowMinuteOfDay(timezone))}
+            </button>
+
+            {/* Manage / Arrange / Add travel together at every width — an
+                organiser's three actions belong in one place, not split between
+                the header and here. Each keeps its glyph and drops its label
+                below `sm`, which is what buys the room on a phone. */}
+            <div className="ml-auto flex items-center gap-2">
+              {role === "admin" && (
+                <Link
+                  data-tour="manage"
+                  to={`/e/${slug}/admin`}
+                  aria-label="Manage Event"
+                  title="Manage Event"
+                  className="flex items-center gap-1.5 rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 px-3 py-2 text-xs font-medium text-stone-600 dark:text-stone-300 hover:border-stone-400 dark:hover:border-stone-500"
+                >
+                  <span aria-hidden="true">⚙</span>
+                  <span className="hidden sm:inline">Manage Event</span>
+                </Link>
+              )}
+              {canArrange && (
+                <button
+                  type="button"
+                  data-tour="arrange"
+                  onClick={() => setArrange((a) => !a)}
+                  aria-pressed={arrange}
+                  aria-label={arrange ? "Done arranging" : "Arrange sessions"}
+                  title={arrange ? "Done arranging" : "Arrange sessions"}
+                  className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium ${
+                    arrange
+                      ? "border-stone-900 bg-stone-900 dark:bg-stone-100 dark:text-stone-900 text-white"
+                      : "border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 text-stone-600 dark:text-stone-300 hover:border-stone-400 dark:hover:border-stone-500"
+                  }`}
+                >
+                  <span aria-hidden="true">{arrange ? "✓" : "↕"}</span>
+                  <span className="hidden sm:inline">
+                    {arrange ? "Done arranging" : "Arrange Sessions"}
+                  </span>
+                </button>
+              )}
+              {canWrite && (
+                <button
+                  type="button"
+                  data-tour="add"
+                  onClick={() => setEditing({})}
+                  aria-label="Add session"
+                  title="Add session"
+                  className="flex items-center gap-1.5 rounded-lg bg-stone-900 dark:bg-stone-100 dark:text-stone-900 px-3 py-2 text-xs font-semibold text-white hover:bg-stone-700 dark:hover:bg-stone-300"
+                >
+                  <span aria-hidden="true">+</span>
+                  <span className="hidden sm:inline">Add session</span>
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+
+          <div className="mx-auto max-w-6xl overflow-x-auto px-4 pb-3 no-scrollbar">
+            <div
+              data-tour="filters"
+              className="flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <input
+                value={filters.q}
+                onChange={(e) => filters.set({ q: e.target.value })}
+                placeholder="Search title, speaker…"
+                aria-label="Search sessions"
+                className="w-40 shrink-0 rounded-full border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 px-3 py-1 text-xs outline-none focus:border-stone-500 dark:focus:border-stone-400"
+              />
+              <Chip
+                active={filters.soon}
+                onClick={() => filters.set({ soon: !filters.soon })}
+              >
+                Now / next
+              </Chip>
+              <Chip
+                active={filters.mine}
+                onClick={() => filters.set({ mine: !filters.mine })}
+              >
+                <span
+                  className={
+                    filters.mine ? "" : "text-amber-500 dark:text-amber-400"
+                  }
+                >
+                  ★
+                </span>{" "}
+                My agenda ({starredIds.size})
+              </Chip>
+              <span className="mx-1 h-4 w-px shrink-0 bg-stone-300 dark:bg-stone-600" />
+              {bundle.rooms.map((r) => (
+                <Chip
+                  key={r.id}
+                  active={filters.rooms.includes(r.id)}
+                  onClick={() => filters.toggleRoom(r.id)}
+                >
+                  {r.name}
+                </Chip>
+              ))}
+              <span className="mx-1 h-4 w-px shrink-0 bg-stone-300 dark:bg-stone-600" />
+              {bundle.tags.map((t) => (
+                <Chip
+                  key={t.id}
+                  dot={t.color}
+                  active={filters.tags.includes(t.id)}
+                  onClick={() => filters.toggleTag(t.id)}
+                >
+                  {t.name}
+                </Chip>
+              ))}
+              {filters.active && (
+                <button
+                  type="button"
+                  onClick={filters.clear}
+                  className="shrink-0 rounded-full px-2.5 py-1 text-xs font-medium text-stone-500 dark:text-stone-400 underline hover:text-stone-800 dark:hover:text-stone-200"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
+          </div>
+          </>
+        )}
       </header>
 
+      {fullPage && selected ? (
+        <main className="mx-auto max-w-5xl px-4 py-6">
+          <Link
+            to={sheetUrl}
+            className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-stone-500 underline hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200"
+          >
+            <span aria-hidden="true">←</span>
+            Back to the schedule
+          </Link>
+          {/* `collapseAt={null}`: the panel collapses long discussions to keep
+              the composer reachable, and this page is where you come to read
+              the rest, so collapsing here would defeat the trip. */}
+          <SessionDetail
+            session={selected}
+            slug={slug}
+            rooms={bundle.rooms}
+            tags={bundle.tags}
+            contributions={data.contributions[selected.id]}
+            role={role}
+            me={me}
+            timezone={timezone}
+            canEdit={canEdit(selected)}
+            archived={event.archived}
+            starred={starredIds.has(selected.id)}
+            userLabel={event.userRoleLabel}
+            layout="page"
+            collapseAt={null}
+            onToggleStar={() => void toggleStar(selected)}
+            onEdit={() => setEditing({ session: selected })}
+            onDelete={() => void deleteSession(selected)}
+            onAdd={addContribution}
+            onRemoveContribution={(id) => void removeContribution(id)}
+            onToggleHidden={(c) => void toggleHidden(c)}
+          />
+        </main>
+      ) : (
       <main className="mx-auto max-w-6xl px-0 sm:px-4">
         {showClashBanner && (
           <div className="mx-4 mt-2 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-100 dark:bg-amber-950/60 p-3 text-amber-900 dark:text-amber-200 sm:mx-0">
@@ -1103,8 +1158,9 @@ export function SchedulePage() {
           </section>
         )}
       </main>
+      )}
 
-      {selected && (
+      {selected && !fullPage && (
         <DetailSheet
           session={selected}
           slug={slug}
@@ -1118,6 +1174,7 @@ export function SchedulePage() {
           archived={event.archived}
           starred={starredIds.has(selected.id)}
           userLabel={event.userRoleLabel}
+          expandTo={`/e/${slug}/s/${selected.id}/full`}
           onClose={closeSession}
           onToggleStar={() => void toggleStar(selected)}
           onEdit={() => setEditing({ session: selected })}

@@ -25,6 +25,9 @@ export function App() {
           <Route path="/e/:slug" element={<SchedulePage />} />
           {/* Session detail is deep-linkable and renders over the schedule. */}
           <Route path="/e/:slug/s/:sessionId" element={<SchedulePage />} />
+          {/* The same page: it holds every handler the detail needs, and
+              renders the session full-width instead of as a panel. */}
+          <Route path="/e/:slug/s/:sessionId/full" element={<SchedulePage />} />
           <Route path="/e/:slug/proposals" element={<ProposalBoard />} />
           <Route path="/e/:slug/p/:personId" element={<ProfilePage />} />
           <Route path="/e/:slug/admin" element={<AdminPage />} />
