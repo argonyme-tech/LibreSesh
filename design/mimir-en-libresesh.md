@@ -164,10 +164,19 @@ momento de la curva.
 
 - La elección es SIEMPRE del humano (D8); Mímir compone abanicos con condición de
   descarte, no recomienda "la mejor".
-- 🔴 **HUECO — el contenido del catálogo lo vuelca el facilitador** (su pool de
-  dinámicas, fuentes IIFACe/Briggs/Mindell de su corpus). Mímir NO rellena el
-  catálogo con dinámicas genéricas de internet. Hasta el volcado, el catálogo
-  nace vacío con esta nota visible.
+- **El volcado EXISTE en el vault del facilitador** (verificado 2026-09-01):
+  ~90 fichas propias (21 del Camino del Elder indexadas en
+  `APUNTES/catalogo_dinamicas.md` + seis apuntes de dinámicas prácticas, con
+  plantilla `FUENTES/DINAMICAS/_PLANTILLA_DINAMICA.md`) + el compendio de 700
+  como cantera (catálogo, no doctrina). Pipeline de ingesta: fichas del vault →
+  `catalog.json` del servicio. Reglas del volcado:
+  - **Derechos**: de fichas con copyright (Camino del Elder) entran metadatos e
+    índice; los pasos completos se citan y se leen en la fuente, no se copian.
+  - **`dominio_ruben`** (usada/vista/leída) viaja al catálogo como badge — una
+    dinámica corrida por el facilitador pesa más que una leída.
+  - Campo sin fuente → `⚠️ sin fuente`, no se rellena a ojo.
+  - El compendio de 700 NO entra en bloque: es cantera; entra ficha a ficha con
+    criterio (las fichas dicen el cómo, no el cuándo-no).
 
 ## 6 · Sistemas de toma de decisión
 
