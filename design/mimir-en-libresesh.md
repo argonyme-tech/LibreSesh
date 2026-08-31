@@ -202,6 +202,15 @@ entrelazadas, un solo Mímir.**
 - Motor compartido: mismo Mímir, prompts distintos por app; los aprendizajes
   (anonimizados, al nivel de principio) pueden fluir entre ambas según la ética
   del corpus.
+- **Únicas pero entrelazadas** (matiz del facilitador): Mímir Orgs es una app
+  ÚNICA de modelos organizativos con varios servicios (compartir estrategias
+  entre organizaciones, canalizar grupos, facilitación); LibreSesh es específica
+  de eventos — buen ejemplo del que copiar/inspirarse en ciertas soluciones,
+  no la base de código de Orgs.
+- **Chat de "seguimiento de procesos"** (reuniones): en AMBAS apps — hilos de
+  seguimiento por reunión/proceso donde Mímir acompaña (cosecha, acuerdos,
+  próximos pasos), con las reglas de siempre (F13, memoria de proceso no de
+  personas, autoría humana visible).
 
 ⚠️ Es un PROYECTO NUEVO del ecosistema, no una feature de este fork: debe pasar por su
 alta formal (clasificación Tronco/Ramas, hogar en el vault, plan propio). Esta sección
