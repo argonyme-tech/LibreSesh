@@ -28,6 +28,7 @@
     "typecheck": "tsc -p server/tsconfig.json --noEmit && tsc -p web/tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.122.0",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "12.11.1",
     "cookie-parser": "^1.4.7",

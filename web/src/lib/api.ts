@@ -204,6 +204,21 @@ export const api = {
     request<EventDto>('PATCH', `/e/${encode(slug)}/settings`, body),
 
   // Proposal pool — the unconference pitch board (SPEC §8).
+  /** Mímir add-on. Catalog content lives server-side in the data dir. */
+  mimirCatalog: (slug: string) =>
+    request<{ version: number; dynamics: Record<string, unknown>[] }>(
+      'GET',
+      `/e/${encode(slug)}/mimir/catalog`,
+    ),
+  mimirStatus: (slug: string) =>
+    request<{ engine: boolean; prompt: boolean; model: string }>(
+      'GET',
+      `/e/${encode(slug)}/mimir/status`,
+    ),
+  mimirChat: (slug: string, messages: { role: 'user' | 'assistant'; content: string }[]) =>
+    request<{ reply: string; model: string }>('POST', `/e/${encode(slug)}/mimir/chat`, {
+      messages,
+    }),
   createProposal: (slug: string, body: ProposalWrite) =>
     request<ProposalDto>('POST', `/e/${encode(slug)}/proposals`, body),
   updateProposal: (slug: string, id: number, body: ProposalWrite) =>

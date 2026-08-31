@@ -825,6 +825,14 @@ export function SchedulePage() {
             )}
           </Link>
 
+          {/* Mímir add-on: the co-facilitator's own tab. Indigo = Mímir. */}
+          <Link
+            to={`/e/${slug}/mimir`}
+            className="rounded-lg border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 px-3 py-2 text-xs font-medium text-indigo-700 dark:text-indigo-300 hover:border-indigo-400 dark:hover:border-indigo-500"
+          >
+            ◆ Mímir
+          </Link>
+
           {/* Mímir add-on: advisory rhythm notes. Renders nothing when the
               schedule has nothing to flag. */}
           <RhythmCheck sessions={bundle.sessions} rooms={bundle.rooms} />

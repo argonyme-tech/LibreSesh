@@ -25,6 +25,7 @@ import { sessionRoutes } from './routes/sessions.js';
 import { settingsRoutes } from './routes/settings.js';
 import { trashRoutes } from './routes/trash.js';
 import { streamRoutes } from './routes/stream.js';
+import { mimirRoutes } from './routes/mimir.js';
 import { tagRoutes } from './routes/tags.js';
 import { trackRoutes } from './routes/tracks.js';
 import { Broker } from './sse.js';
@@ -67,6 +68,7 @@ export function createApp(db: Db, config: Config): App {
   event.use(roomRoutes(ctx));
   event.use(tagRoutes(ctx));
   event.use(trackRoutes(ctx));
+  event.use(mimirRoutes(ctx));
   event.use(sessionRoutes(ctx));
   event.use(proposalRoutes(ctx));
   event.use(contributionRoutes(ctx));

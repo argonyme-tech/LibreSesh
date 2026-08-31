@@ -256,6 +256,29 @@ export const permissionsSchema = z.record(
 /** Mímir add-on: the decision phases a pitch can sit in. */
 export const proposalPhases = ['concern', 'inquiry', 'proposal', 'decision'] as const;
 
+/** Mímir add-on: catalog upload. Content is validated loosely — the schema of
+ *  record is design/catalog.schema.json; here we guard shape and size only. */
+export const mimirCatalogSchema = z.object({
+  version: z.number().int().min(1),
+  dynamics: z.array(z.record(z.unknown())).max(2000),
+});
+
+export const mimirPromptSchema = z.object({
+  prompt: z.string().min(1).max(200_000),
+});
+
+export const mimirChatSchema = z.object({
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(['user', 'assistant']),
+        content: z.string().min(1).max(20_000),
+      }),
+    )
+    .min(1)
+    .max(80),
+});
+
 export const proposalSchema = z.object({
   title: trimmed(120),
   description: optionalTrimmed(5000).optional(),
