@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
 import { requireRole } from '../auth.js';
 import { audit } from '../audit.js';
@@ -28,6 +29,18 @@ export function mimirRoutes(ctx: Ctx): Router {
     ctx.config.databasePath === ':memory:' ? null : dirname(ctx.config.databasePath);
   const catalogPath = dataDir ? join(dataDir, 'catalog.json') : null;
   const promptPath = dataDir ? join(dataDir, 'mimir-prompt.md') : null;
+  // Shipped default (CC BY-NC-SA, public upstream). dist/routes/ -> server/.
+  const defaultPromptPath = join(
+    dirname(fileURLToPath(import.meta.url)),
+    '..',
+    '..',
+    'mimir-prompt.default.md',
+  );
+  const loadPrompt = (): string | null => {
+    if (promptPath && existsSync(promptPath)) return readFileSync(promptPath, 'utf8');
+    if (existsSync(defaultPromptPath)) return readFileSync(defaultPromptPath, 'utf8');
+    return null;
+  };
 
   const EMPTY = { version: 1, dynamics: [] as unknown[] };
 
@@ -93,7 +106,7 @@ export function mimirRoutes(ctx: Ctx): Router {
   router.get('/mimir/status', requireRole(ctx.db, 'admin'), (_req, res) => {
     res.json({
       engine: Boolean(process.env.MIMIR_API_KEY),
-      prompt: Boolean(promptPath && existsSync(promptPath)),
+      prompt: loadPrompt() !== null,
       model: process.env.MIMIR_MODEL ?? 'claude-opus-5',
     });
   });
@@ -117,9 +130,8 @@ export function mimirRoutes(ctx: Ctx): Router {
           return;
         }
         const systemText =
-          promptPath && existsSync(promptPath)
-            ? readFileSync(promptPath, 'utf8')
-            : 'Eres Mímir, asistente de procesos de un facilitador humano. Señalas y devuelves; nunca decides. (Prompt completo no cargado: súbelo con PUT /mimir/prompt.)';
+          loadPrompt() ??
+          'Eres Mímir, asistente de procesos de un facilitador humano. Señalas y devuelves; nunca decides. (Prompt completo no cargado: súbelo con PUT /mimir/prompt.)';
 
         const client = new Anthropic({ apiKey });
         const response = await client.messages.create({
