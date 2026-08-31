@@ -242,6 +242,14 @@ export function NewEventPage() {
           {busy ? 'Creating…' : 'Create event'}
         </PrimaryButton>
       </div>
+
+      <p className="mt-4 text-xs text-stone-500 dark:text-stone-400">
+        Already have the programme written down?{' '}
+        <Link to="/import" className="underline">
+          Import a schedule
+        </Link>{' '}
+        instead — it builds the rooms, tracks and sessions in one go.
+      </p>
     </div>
   );
 }

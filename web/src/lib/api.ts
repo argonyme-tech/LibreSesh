@@ -8,6 +8,7 @@ import type {
   EventDto,
   EventSummary,
   GeneratedPasswords,
+  ImportResult,
   LinkCodeDto,
   Me,
   PersonDetailDto,
@@ -100,6 +101,15 @@ export const api = {
       body,
       { 'X-Instance-Key': instanceKey },
     ),
+  /**
+   * Build a whole event from one JSON document. `dryRun` validates and reports
+   * without writing — the same code path, rolled back at the end, which is the
+   * only way to find out whether a transcription is right.
+   */
+  importEvent: (instanceKey: string, doc: unknown, { dryRun = false } = {}) =>
+    request<ImportResult>('POST', `/events/import${dryRun ? '?dryRun=1' : ''}`, doc, {
+      'X-Instance-Key': instanceKey,
+    }),
   cloneEvent: (
     slug: string,
     body: {
