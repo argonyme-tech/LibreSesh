@@ -230,6 +230,29 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
 ## Low Priority / Ideas
 
+- **A real series, and a root event other events inherit from.** Deferred
+  2026-08-31, deliberately and not for want of time. `repeat` expands to
+  ordinary rows precisely because the event it was built for is one whose
+  sessions *drift* — the planned 14:00 becomes 14:20 on the day, and a series
+  that asked "does moving Tuesday move all of them?" would be answering the
+  wrong question every single time. So the shipped design is right for this
+  event, and the two ideas below are right for a different one, where a
+  programme is planned centrally and holds:
+  - **A series.** A repeat that persists, so editing the rule re-times every
+    day at once. Wants a `session_series` table, a decision about what an edit
+    to one occurrence means (detach? fork the rule?), and the grid to say which
+    sessions are governed rather than free — none of which is worth carrying
+    for an event that overrides its own plan daily.
+  - **Events inheriting from a root.** A recurring meetup or a multi-city
+    conference where the rooms, tracks, tags and the shape of a day are
+    declared once and each instance overrides what differs. Today the closest
+    thing is `POST /events/:slug/clone`, which is a copy and forgets its
+    parent. Inheritance is a different data model, not a bigger clone.
+
+  Both wait for a version that has an event asking for them. Filing them here
+  rather than building them keeps the current answer honest: repetition is an
+  authoring convenience and it stops at the door.
+
 - **Quadratic voting on pitches.** Floated 2026-08-31 for a future instance,
   explicitly not for this one: it changes what a vote *is* (a budget spent
   across pitches, not a click per pitch), so it wants its own schema and its
