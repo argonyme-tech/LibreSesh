@@ -169,14 +169,22 @@ momento de la curva.
   `APUNTES/catalogo_dinamicas.md` + seis apuntes de dinámicas prácticas, con
   plantilla `FUENTES/DINAMICAS/_PLANTILLA_DINAMICA.md`) + el compendio de 700
   como cantera (catálogo, no doctrina). Pipeline de ingesta: fichas del vault →
-  `catalog.json` del servicio. Reglas del volcado:
-  - **Derechos**: de fichas con copyright (Camino del Elder) entran metadatos e
-    índice; los pasos completos se citan y se leen en la fuente, no se copian.
-  - **`dominio_ruben`** (usada/vista/leída) viaja al catálogo como badge — una
-    dinámica corrida por el facilitador pesa más que una leída.
+  `catalog.json` del servicio. Reglas del volcado (decisiones del facilitador, 01-09):
+  - **Derechos**: el material comprado/adquirido entra COMPLETO en el catálogo
+    del despliegue propio — pero **nunca en este repo público** (sería
+    redistribuirlo). El contenido del catálogo vive en los datos privados del
+    servicio (volumen `/data`); el repo lleva solo el esquema y fichas de
+    ejemplo sin derechos.
+  - **El compendio de 700 SÍ entra**, con **escala de calidad**: ingesta con
+    criterio que marca las principales/mejores. Niveles: `cantera` (entra con
+    metadatos) → `destacada` (propuesta por Mímir según completitud de ficha y
+    encaje con la escalera de profundidad de la escuela) → `validada`
+    (confirmada por el facilitador). Mímir propone la escala; **el humano la
+    valida** — el criterio final nunca es de la máquina.
+  - **`dominio`** (usada/vista/leída) viaja al catálogo como badge — una
+    dinámica corrida por el facilitador pesa más que una leída. En todo lo
+    público el facilitador aparece como **Argon** (alias), nunca su nombre.
   - Campo sin fuente → `⚠️ sin fuente`, no se rellena a ojo.
-  - El compendio de 700 NO entra en bloque: es cantera; entra ficha a ficha con
-    criterio (las fichas dicen el cómo, no el cuándo-no).
 
 ## 6 · Sistemas de toma de decisión
 
