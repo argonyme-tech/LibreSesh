@@ -120,7 +120,10 @@ export function SessionModal({
   const heading = session ? 'Edit session' : isAdmin ? 'Add session' : 'Propose an open session';
 
   return (
-    <Modal title={heading} onClose={onCancel}>
+    // `wide`: the form is mostly two- and three-column FormGrids (day, start,
+    // duration; room and track), and at the default `max-w-md` every one of
+    // them collapsed to a single column on a desktop that had room for three.
+    <Modal title={heading} onClose={onCancel} wide>
       {!isAdmin && (
         <p className="-mt-2 mb-3 text-xs text-stone-500 dark:text-stone-400">
           Open sessions live in rooms that anyone may book, and stay editable by you.

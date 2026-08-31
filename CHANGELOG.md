@@ -6,6 +6,19 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **The session panel grows on a desktop, and long discussions collapse.** The
+  detail panel was a fixed `sm:w-96` at every width above `sm`, so on a wide
+  screen the description, the three contribution lists and the composer all
+  wrapped early while the grid behind them had room to spare; it now steps up
+  through `lg` and `xl`. The session editor was the same shape of problem — its
+  two- and three-column field grids collapsed to one column at the default
+  modal width — and is now `wide`. Separately, each contribution kind shows
+  only its most recent three, with **Show N earlier notes** above the list and
+  a count beside the heading: a busy open session gathers notes faster than
+  anyone reads them, and all of them at once pushed the composer off the
+  bottom of the panel. The collapsed window keeps the *tail* rather than the
+  head, because the newest note is the one the panel is open for.
+
 - **The schedule header keeps the brand mark on a phone.** The header put the
   full wordmark beside the event name at every width, and below `sm` the two
   competed for a line that isn't wide enough for both — the event name, the one
