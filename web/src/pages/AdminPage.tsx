@@ -457,6 +457,9 @@ export function AdminPage() {
       toast.show('Permissions saved');
     } catch (err) {
       fail(err);
+      // Rethrown, not swallowed: the matrix flips its switch the moment it is
+      // clicked and needs to know to put it back.
+      throw err;
     }
   };
 

@@ -324,6 +324,20 @@ All notable changes to this project are documented here.
   **Partial:** a residual flicker on drop is still reported and is now a
   backlog item — the horizontal lane re-layout is the leading suspect.
 
+- **A permission switch moves when you click it.** The matrix drew each
+  checkbox straight from the saved bundle with nothing held locally, so the
+  click painted the new state, React's next render put it straight back, and it
+  flicked forward again a round trip later — three states for one click, the
+  middle one a lie. Each switch now carries an optimistic value until the saved
+  matrix catches up, compared by value rather than by when the request resolved,
+  since the response and the server's SSE echo of it race and either may land
+  first. The comparison ignores role order on purpose: the server returns a
+  capability in `ROLE_ORDER` once an override row exists but in the capability's
+  own declared order while it sits at its defaults, so a switch flipped back to
+  default comes home as the same set in a different order. A rejected save now
+  puts the switch back — `savePermissions` was swallowing the error, which would
+  have left the optimistic value standing over a change that never happened.
+
 - **Deleting someone's profile no longer bars them from having one.** The
   uniqueness rule behind "one profile per person per event" covered deleted
   rows too, so a soft-deleted profile went on holding its owner's slot. The

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Role } from '@shared/types';
 import { CAPABILITIES, type Capability, type PermissionMatrix } from '@shared/capabilities';
 import {
@@ -11,6 +11,49 @@ import {
 } from '../components/ui';
 
 const ROLES: Role[] = ['viewer', 'user', 'speaker', 'admin'];
+
+/**
+ * Order-insensitive on purpose. The server hands a capability back in
+ * `ROLE_ORDER` once it has stored an override, but in the capability's own
+ * declared order while it still sits at its defaults — so a switch flipped
+ * back to default returns the same set in a different order, and comparing
+ * position would leave the optimistic value stranded on top of it forever.
+ */
+const sameRoles = (a: Role[], b: Role[]): boolean =>
+  a.length === b.length && a.every((r) => b.includes(r));
+
+/**
+ * The saved matrix with any still-unconfirmed switch laid over it, in canonical
+ * role order.
+ *
+ * A switch has to move the instant it is clicked — a checkbox paints itself on
+ * click and React puts it straight back on the next render, so with nothing
+ * held locally the switch visibly flicks back and then flicks forward again a
+ * round trip later. The overlay is what it is drawn from until the saved value
+ * catches up.
+ */
+export function overlay(
+  saved: Partial<PermissionMatrix>,
+  optimistic: Partial<PermissionMatrix>,
+  capability: Capability,
+): Role[] {
+  return optimistic[capability] ?? saved[capability] ?? [];
+}
+
+/**
+ * Drop every optimistic entry the saved matrix has caught up with, keeping the
+ * object identity when nothing changed so this can run on each render pass.
+ */
+export function settled(
+  saved: Partial<PermissionMatrix>,
+  optimistic: Partial<PermissionMatrix>,
+): Partial<PermissionMatrix> {
+  const entries = Object.entries(optimistic) as [Capability, Role[]][];
+  const unsettled = entries.filter(([cap, roles]) => !sameRoles(roles, saved[cap] ?? []));
+  return unsettled.length === entries.length
+    ? optimistic
+    : (Object.fromEntries(unsettled) as Partial<PermissionMatrix>);
+}
 
 export interface AdminPermissionsProps {
   permissions: Partial<PermissionMatrix>;
@@ -33,6 +76,8 @@ export function AdminPermissions({
   onUnlock,
 }: AdminPermissionsProps) {
   const [busy, setBusy] = useState<string | null>(null);
+  // Switches that have been clicked but whose save has not come back yet.
+  const [optimistic, setOptimistic] = useState<Partial<PermissionMatrix>>({});
   // Each toggle saves the instant it is clicked and there is no undo, so the
   // matrix opens read-only. Nothing here is reversible by a second glance:
   // switching moderation off for organisers-but-one is invisible until someone
@@ -59,13 +104,27 @@ export function AdminPermissions({
       ? userRoleLabel.trim() || 'Attendee'
       : { viewer: 'Viewer', speaker: 'Speaker', admin: 'Organiser' }[role as Exclude<Role, 'user'>];
 
+  // The saved matrix arrives from two directions — the save's own response and
+  // the server's SSE echo of it — and either may land first. Retiring an
+  // optimistic entry by comparing it with the saved value, rather than when the
+  // request resolves, means neither order can leave the switch out of step.
+  useEffect(() => {
+    setOptimistic((current) => settled(permissions, current));
+  }, [permissions]);
+
   const toggle = async (capability: Capability, role: Role, next: boolean) => {
     if (busy) return;
-    const current = permissions[capability] ?? [];
+    const current = overlay(permissions, optimistic, capability);
     const updated = next ? [...current, role] : current.filter((r) => r !== role);
+    const canonical = ROLES.filter((r) => updated.includes(r));
+    setOptimistic((o) => ({ ...o, [capability]: canonical }));
     setBusy(`${capability}:${role}`);
     try {
-      await onChange({ [capability]: ROLES.filter((r) => updated.includes(r)) });
+      await onChange({ [capability]: canonical });
+    } catch {
+      // Put the switch back where the server still has it; `onChange` has
+      // already reported why.
+      setOptimistic(({ [capability]: _rejected, ...rest }) => rest);
     } finally {
       setBusy(null);
     }
@@ -130,7 +189,7 @@ export function AdminPermissions({
           </thead>
           <tbody>
             {CAPABILITIES.map((cap) => {
-              const allowed = permissions[cap.id] ?? [];
+              const allowed = overlay(permissions, optimistic, cap.id);
               return (
                 <tr
                   key={cap.id}
