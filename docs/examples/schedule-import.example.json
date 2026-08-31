@@ -1,0 +1,72 @@
+{
+  "format": "libresesh.event",
+  "version": 1,
+
+  "event": {
+    "name": "Valley Unconference 2026",
+    "slug": "valley-2026",
+    "timezone": "Europe/Berlin",
+    "startDate": "2026-09-14",
+    "endDate": "2026-09-15",
+    "dayStartMin": 540,
+    "dayEndMin": 1140,
+    "userRoleLabel": "participant"
+  },
+
+  "rooms": [
+    {
+      "name": "Main hall",
+      "description": "Ground floor, step-free access, induction loop.",
+      "capacity": 200,
+      "color": "#BFD7E8"
+    },
+    { "name": "Workshop room", "capacity": 40 },
+    { "name": "The Barn", "capacity": 60, "openBooking": true }
+  ],
+
+  "tracks": [
+    { "name": "Commons", "color": "#7FB069" },
+    { "name": "Infrastructure" }
+  ],
+
+  "tags": [{ "name": "beginner" }, { "name": "hands-on", "color": "#E2A03F" }],
+
+  "sessions": [
+    {
+      "room": "Main hall",
+      "track": "Commons",
+      "tags": ["beginner"],
+      "title": "Opening keynote: what we owe each other",
+      "description": "Markdown is fine here.\n\nTwo days, one question.",
+      "speaker": "Ada Lovelace",
+      "date": "2026-09-14",
+      "start": "09:30",
+      "end": "10:30"
+    },
+    {
+      "room": "Workshop room",
+      "track": "Infrastructure",
+      "tags": ["hands-on"],
+      "title": "Running SQLite in anger",
+      "speaker": "Grace Hopper",
+      "date": "2026-09-14",
+      "start": "11:00",
+      "end": "12:30"
+    },
+    {
+      "room": "The Barn",
+      "type": "open",
+      "title": "Open space: whatever we bring",
+      "date": "2026-09-14",
+      "start": "14:00",
+      "end": "15:00"
+    },
+    {
+      "room": "Main hall",
+      "title": "Closing circle",
+      "date": "2026-09-15",
+      "start": "16:00",
+      "end": "17:00"
+    }
+  ]
+}

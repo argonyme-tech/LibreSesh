@@ -3,13 +3,13 @@ import { badRequest } from './errors.js';
 import { isValidTimezone } from './shared/time.js';
 
 /** Trimmed string that must still have content after trimming. */
-const trimmed = (max: number) =>
+export const trimmed = (max: number) =>
   z
     .string()
     .transform((s) => s.trim())
     .pipe(z.string().min(1).max(max));
 
-const optionalTrimmed = (max: number) =>
+export const optionalTrimmed = (max: number) =>
   z
     .string()
     .transform((s) => s.trim())

@@ -48,6 +48,7 @@ web/               Vite React app
 scripts/           seed.ts, create-event.ts, decrypt-backup.ts
 assets/            brand source SVGs (the app builds from copies under web/)
 tests/             Vitest suites
+docs/              long-form guides, and example documents the tests exercise
 deploy/            Dockerfile, compose, Caddyfile, systemd unit, backup script
 design/mockup.jsx  approved UI reference — never imported
 ARCHITECTURE.md    how it fits together, and the threat model
@@ -192,6 +193,67 @@ attempts, and nobody can edit it — organisers included. It keeps the newest
 arrive. Settings changes the number, and 0 keeps everything. That is a real
 trade rather than a detail: a low cap means someone making a great many edits
 can push an earlier action off the end.
+
+### Importing a schedule from JSON
+
+`POST /api/events/import` builds a whole event — rooms, tracks, tags and a full
+grid of sessions — from one JSON document. It is guarded by the instance
+password, like creating an event by hand, because it makes an event rather than
+editing one.
+
+```bash
+# Rehearse first: this validates everything and writes nothing.
+curl -X POST 'https://your-host/api/events/import?dryRun=1' \
+  -H "X-Instance-Key: $INSTANCE_ADMIN_PASSWORD" \
+  -H 'Content-Type: application/json' --data @schedule.json
+
+# Then drop the ?dryRun=1 to keep it.
+```
+
+The document is written the way a schedule is printed — room names and
+wall-clock times, no ids — so it can be typed by hand or transcribed from a
+photo of a programme:
+
+```json
+{
+  "event": {
+    "name": "Photo Conf",
+    "slug": "photoconf",
+    "timezone": "Europe/Berlin",
+    "startDate": "2026-06-01",
+    "endDate": "2026-06-02"
+  },
+  "rooms": [{ "name": "Main hall", "capacity": 200 }, { "name": "Side room" }],
+  "tracks": [{ "name": "Design" }],
+  "sessions": [
+    {
+      "room": "Main hall",
+      "track": "Design",
+      "title": "Opening keynote",
+      "speaker": "Ada Lovelace",
+      "date": "2026-06-01",
+      "start": "09:00",
+      "end": "10:00"
+    }
+  ]
+}
+```
+
+Rooms, tracks and tags are declared once and referred to by name — a session
+naming one that was not declared is refused rather than invented — and room
+order is column order. Everything lands in one transaction, so a document that
+fails on its last row leaves nothing behind. Contradictions are refused naming
+the row that caused them; a session outside the visible hours or double-booked
+against another is imported and named in `warnings` instead.
+
+**[docs/schedule-import.md](docs/schedule-import.md)** is the full field
+reference, the error and warning catalogue, and the photo-to-document workflow.
+[`docs/examples/schedule-import.example.json`](docs/examples/schedule-import.example.json)
+is a template to copy; the test suite dry-runs it, so it cannot go stale.
+
+An event's own `export.json` is *not* an import document: it is a record of
+ids, and this is a description of a schedule. There is still no route that
+reads an export back.
 
 ## Configuration
 

@@ -314,6 +314,31 @@ An admin merging the wrong two people is therefore a real mistake with no undo
 truthful record either way: rows written before the merge keep the actor who
 actually wrote them.
 
+**What becomes of the losing device (the identity #9 scenario).** Merge
+unifies the event's *records*; it cannot unify the human's *devices*, because
+it cannot reach into another browser's cookie jar. So after Ada's laptop
+(identity #7) survives a merge, her phone still holds identity #9 — signed out
+of this event, but the same #9 everywhere, since an identity belongs to the
+device, not to an event (§What a cookie is, exactly). Entering an event never
+mints an identity; only a first-ever visit from a cookie-less browser does.
+From here the phone can go two ways:
+
+- **The right way: device linking.** Ada opens "Link another device" on the
+  laptop and types the phrase on the phone. The phone's cookie is repointed to
+  #7; both devices are now one identity, and #9 goes quiet forever — its row
+  stays, because the audit log points at it and its UID must keep resolving.
+- **The wrong way, which nothing currently prevents: re-entering.** If the
+  phone just passes the gate again, it comes back as #9 — same UID as before,
+  fresh role, none of its old work — and the human is split across two
+  identities again, undoing the organiser's cleanup. The gate does not yet
+  hint "if this is you, link this device instead"; that gap is queued in
+  STATUS.md.
+
+The same fork applies to anyone signed out by a merge who was *not* a
+duplicate — a genuinely different person mistakenly merged simply re-enters
+and is themselves again, minus the work that moved. That, too, is why merge is
+admin-only and confirmed.
+
 ### The audit log, and what "append-only" means here
 
 Every write appends a row: identity, event, action, entity, entity id, time.
@@ -333,6 +358,47 @@ meant to run for years, and the trade is stated in the UI rather than buried.
 Rows with no `event_id` — a whole-database backup, an event created from the
 landing page — belong to the instance rather than any event. They are never
 pruned by an event's cap, and no screen shows them yet.
+
+### Importing a schedule, and why it is not the export read backwards
+
+`POST /api/events/import` (`server/src/importEvent.ts`) creates an event with
+its rooms, tracks, tags and sessions from one JSON document. The obvious design
+would have been to accept what `GET /e/:slug/export.json` produces, and it is
+the wrong one. An export is a record of a database: numeric ids, UTC instants,
+authorship names belonging to identities the reader has never seen. An import
+is a description of a schedule, and the thing being described is almost never
+another LibreSesh instance — it is a printed programme, a conference website, a
+photograph of a wall. So the document has room names where the export has room
+ids, and the wall-clock times that are printed on the schedule where the export
+has instants; the event's own timezone is what turns one into the other.
+
+Three consequences worth knowing:
+
+- **Names are the only handle, so they are checked hard.** Rooms, tracks and
+  tags are declared once each and referred to by name (matched case- and
+  whitespace-insensitively, because transcription is not consistent). A session
+  naming an undeclared room is refused rather than quietly creating it: an
+  invented column is far harder to notice in a grid than an error naming the
+  row, and a document that is run twice should fail the same way both times.
+- **One transaction.** A document that fails on its last session leaves no
+  half-built event, which is what makes "fix the file and run it again" a
+  complete recovery story. `dryRun` uses the same path and rolls back at the
+  end, so a rehearsal exercises every check a real import would.
+- **Errors and warnings are different things.** A session outside the event's
+  own declared dates is a contradiction inside one document and is refused. A
+  session outside the *day viewport* is not — it is in the database and off the
+  top of the grid, which reads as a failed import, so it comes back as a
+  warning naming the row and pointing at Settings. Double bookings warn too:
+  admins are allowed them, and the grid badges them.
+
+Nothing reads an export back. Doing so would need decisions this route does not
+have to make — a new slug, fresh ids, and what to do with authorship that names
+identities the target instance has never met.
+
+The document format itself is documented for the people writing one, in
+`docs/schedule-import.md`; `docs/examples/schedule-import.example.json` is the
+template, and the test suite dry-runs that exact file so it cannot drift from
+the schema.
 
 ### Migrations
 

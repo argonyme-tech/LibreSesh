@@ -47,6 +47,25 @@ All notable changes to this project are documented here.
   of people who have ever seen the event; signing out keeps the entry, minus
   the role.
 
+- **A whole schedule can be imported as JSON.** `POST /api/events/import`
+  builds an event with its rooms, tracks, tags and sessions from one document,
+  guarded by the instance password like creating an event by hand. It is
+  deliberately *not* `export.json` read backwards: an export is a record of
+  ids and instants, while the thing an import usually describes is a printed
+  programme or a photo of one, so the document names rooms, tracks and tags
+  instead of numbering them and takes the wall-clock times the schedule prints,
+  which the event's timezone turns into instants. Everything lands in one
+  transaction, so a document that fails on its last row leaves nothing behind,
+  and `?dryRun=1` runs every check and rolls back — worth doing first, because
+  a wrong transcription and a right one look identical until something reads
+  them. Contradictions are refused with the row that caused them
+  (`sessions[3] "Opening keynote": …`); a session outside the hours the
+  schedule shows, or double-booked against another, is imported and named in
+  `warnings` instead, since both are things an organiser is allowed to do and
+  neither is a reason to throw the file away. Speaker names create unclaimed
+  profiles the way the session form does, and passwords left blank are
+  generated and shown once.
+
 - **The audit log and the roster show ids, not just names.** An entry read
   `Marcel edited person "attendee_4skp9"` — the label resolved, so the id it
   already had was hidden, and neither the actor nor the thing acted on could be
