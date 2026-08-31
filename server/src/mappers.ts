@@ -235,6 +235,7 @@ export function toProposalDto(
     placedSessionId: row.placed_session_id,
     interestCount: extra.interestCount,
     interested: extra.interested,
+    phase: row.phase as ProposalDto['phase'],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

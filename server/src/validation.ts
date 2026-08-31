@@ -253,12 +253,16 @@ export const permissionsSchema = z.record(
 );
 
 /** A pitch: everything a session has except a room and a time. */
+/** Mímir add-on: the decision phases a pitch can sit in. */
+export const proposalPhases = ['concern', 'inquiry', 'proposal', 'decision'] as const;
+
 export const proposalSchema = z.object({
   title: trimmed(120),
   description: optionalTrimmed(5000).optional(),
   speakerId: z.number().int().positive().nullable().optional(),
   speakerName: optionalTrimmed(120).optional(),
   tagIds: z.array(z.number().int().positive()).max(20).optional(),
+  phase: z.enum(proposalPhases).optional(),
 });
 export const proposalPatchSchema = proposalSchema.partial();
 

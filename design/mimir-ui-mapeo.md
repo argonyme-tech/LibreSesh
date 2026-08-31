@@ -22,6 +22,17 @@ aconseja, no conduce). De ahí las tres decisiones raíz:
    tarjeta o aviso. Lo que decide el humano se muestra sin chip. La atribución
    nunca es ambigua.
 
+## 0b · Regla de integración: COMPLEMENTAR, NO MODIFICAR
+*(Decisión del facilitador, 2026-09-01: LibreSesh es el proyecto de otros —
+se respeta su organización.)*
+
+Todo lo de Mímir es **aditivo y auto-contenido**: pestaña propia, badges que
+solo aparecen si se usan, capas activables (ritmo) apagadas por defecto para
+quien no las quiere. **El orden del frontend original no se toca**: ninguna
+vista existente se reestructura, ningún flujo actual cambia de sitio. Un
+usuario que ignore a Mímir ve el LibreSesh de siempre. Esto además facilita
+convivir con el upstream y devolverles algo si algún día lo quieren.
+
 ## 1 · Doctrina → leyes de UX (el mapeo que lo ordena todo)
 
 | Regla del corpus | Ley de UX en LibreSesh |

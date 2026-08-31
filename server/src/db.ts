@@ -105,6 +105,7 @@ export interface ProposalRow {
   speaker_id: number | null;
   created_by: number;
   placed_session_id: number | null;
+  phase: string;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;

@@ -308,6 +308,8 @@ export interface ProposalWrite {
   /** A name that matches nobody creates a person. Used instead of `speakerId`. */
   speakerName?: string;
   tagIds?: number[];
+  /** Mímir add-on: decision phase. Omitted = keep current / start at 'concern'. */
+  phase?: import('@shared/types').ProposalPhase;
 }
 
 export interface PlaceWrite {

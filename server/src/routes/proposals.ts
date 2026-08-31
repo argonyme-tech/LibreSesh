@@ -95,8 +95,8 @@ export function proposalRoutes(ctx: Ctx): Router {
           ctx.db
             .prepare(
               `INSERT INTO proposals
-                (event_id, title, description, speaker_id, created_by, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                (event_id, title, description, speaker_id, created_by, phase, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             )
             .run(
               req.event.id,
@@ -104,6 +104,7 @@ export function proposalRoutes(ctx: Ctx): Router {
               body.description ?? '',
               speakerId,
               req.identity.id,
+              body.phase ?? 'concern',
               now,
               now,
             ).lastInsertRowid,
@@ -146,13 +147,14 @@ export function proposalRoutes(ctx: Ctx): Router {
         const speakerId = resolveSpeaker(ctx.db, req.event.id, body, row.speaker_id);
         ctx.db
           .prepare(
-            `UPDATE proposals SET title = ?, description = ?, speaker_id = ?, updated_at = ?
+            `UPDATE proposals SET title = ?, description = ?, speaker_id = ?, phase = ?, updated_at = ?
               WHERE id = ?`,
           )
           .run(
             body.title ?? row.title,
             body.description ?? row.description,
             speakerId,
+            body.phase ?? row.phase,
             new Date().toISOString(),
             row.id,
           );

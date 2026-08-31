@@ -46,6 +46,36 @@ describe('proposal pool', () => {
     expect(res.body.createdByName).toMatch(/^attendee_/);
   });
 
+  describe('decision phase (Mímir add-on)', () => {
+    it('defaults to concern so vanilla pitches are unchanged', async () => {
+      const res = await pitch(pitcher).expect(201);
+      expect(res.body.phase).toBe('concern');
+    });
+
+    it('accepts an explicit phase on create and on patch', async () => {
+      const res = await pitch(pitcher, { phase: 'inquiry' }).expect(201);
+      expect(res.body.phase).toBe('inquiry');
+      const patched = await pitcher
+        .patch(`/api/e/testconf/proposals/${res.body.id}`)
+        .send({ phase: 'proposal' })
+        .expect(200);
+      expect(patched.body.phase).toBe('proposal');
+    });
+
+    it('keeps the phase when a patch does not mention it', async () => {
+      const res = await pitch(pitcher, { phase: 'decision' }).expect(201);
+      const patched = await pitcher
+        .patch(`/api/e/testconf/proposals/${res.body.id}`)
+        .send({ title: 'Repair café v2' })
+        .expect(200);
+      expect(patched.body.phase).toBe('decision');
+    });
+
+    it('rejects a phase outside the sequence', async () => {
+      await pitch(pitcher, { phase: 'vibes' }).expect(400);
+    });
+  });
+
   it('shows up in the bundle', async () => {
     await pitch(pitcher).expect(201);
     const bundle = await viewer.get('/api/e/testconf/bundle').expect(200);

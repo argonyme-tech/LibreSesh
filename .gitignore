@@ -35,3 +35,4 @@ deploy/data/
 
 # Private hosting notes — not for the public repo
 _planning/deployment-guide.md
+.git-rewrite/

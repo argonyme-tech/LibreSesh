@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import type { BundleDto, ProposalDto } from '@shared/types';
+import type { BundleDto, ProposalDto, ProposalPhase } from '@shared/types';
 import { dateRange } from '@shared/time';
 import { ApiError, api, type PlaceWrite, type ProposalWrite } from '../lib/api';
 import { dayLabel, todayInZone } from '../lib/format';
@@ -11,6 +11,16 @@ import { ProposalModal } from './ProposalModal';
 import { EmptyState, PrimaryButton, SecondaryButton, Spinner, useToast } from './ui';
 
 type Status = 'loading' | 'gate' | 'error' | 'ready';
+
+/** Mímir add-on: display metadata per decision phase. The board only surfaces
+ *  phases once a pitch actually uses one — vanilla events see no change. */
+const PHASES: Record<ProposalPhase, { label: string; glyph: string }> = {
+  concern: { label: 'Concern', glyph: '💭' },
+  inquiry: { label: 'Inquiry', glyph: '🔍' },
+  proposal: { label: 'Proposal', glyph: '📋' },
+  decision: { label: 'Decision', glyph: '◇' },
+};
+const PHASE_ORDER: ProposalPhase[] = ['concern', 'inquiry', 'proposal', 'decision'];
 
 /** The unconference pitch board (SPEC §8). A self-contained page: it fetches
  *  the bundle itself and is reached at `/e/:slug/proposals`. */
@@ -27,6 +37,7 @@ export function ProposalBoard() {
   const [placing, setPlacing] = useState<ProposalDto | null>(null);
   const [saving, setSaving] = useState(false);
   const [busyInterest, setBusyInterest] = useState<number | null>(null);
+  const [phaseFilter, setPhaseFilter] = useState<ProposalPhase | 'all'>('all');
 
   const load = useCallback(async () => {
     setStatus('loading');
@@ -228,13 +239,44 @@ export function ProposalBoard() {
           popular ones on the grid.
         </p>
 
+        {/* Mímir add-on: phase filter, shown only once phases are in use. */}
+        {sorted.some((p) => p.phase !== 'concern') && (
+          <div className="mb-4 flex flex-wrap gap-1.5" role="group" aria-label="Filter by phase">
+            <button
+              type="button"
+              onClick={() => setPhaseFilter('all')}
+              className={`rounded-full border px-2.5 py-1 text-xs ${
+                phaseFilter === 'all'
+                  ? 'border-stone-400 dark:border-stone-500 bg-white dark:bg-stone-800 font-semibold'
+                  : 'border-stone-300 dark:border-stone-700 text-stone-500 dark:text-stone-400'
+              }`}
+            >
+              All
+            </button>
+            {PHASE_ORDER.map((ph) => (
+              <button
+                key={ph}
+                type="button"
+                onClick={() => setPhaseFilter(ph)}
+                className={`rounded-full border px-2.5 py-1 text-xs ${
+                  phaseFilter === ph
+                    ? 'border-indigo-400 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 font-semibold text-indigo-700 dark:text-indigo-300'
+                    : 'border-stone-300 dark:border-stone-700 text-stone-500 dark:text-stone-400'
+                }`}
+              >
+                {PHASES[ph].glyph} {PHASES[ph].label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {sorted.length === 0 ? (
           <EmptyState>
             No pitches yet.{canPitch ? ' Be the first to pitch one.' : ''}
           </EmptyState>
         ) : (
           <ul className="space-y-3">
-            {sorted.map((proposal) => (
+            {(phaseFilter === 'all' ? sorted : sorted.filter((p) => p.phase === phaseFilter)).map((proposal) => (
               <ProposalCard
                 key={proposal.id}
                 proposal={proposal}
@@ -326,7 +368,15 @@ function ProposalCard({
     >
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold leading-snug tracking-tight">{proposal.title}</h2>
+          <h2 className="text-sm font-semibold leading-snug tracking-tight">
+            {proposal.title}
+            {/* Mímir add-on: phase badge — absent on the default phase. */}
+            {proposal.phase !== 'concern' && (
+              <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 align-middle text-[11px] font-medium text-indigo-700 dark:text-indigo-300">
+                {PHASES[proposal.phase].glyph} {PHASES[proposal.phase].label}
+              </span>
+            )}
+          </h2>
           <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">
             {proposal.speaker ? `${proposal.speaker} · ` : ''}pitched by {proposal.createdByName}
           </p>

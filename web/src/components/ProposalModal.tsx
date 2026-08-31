@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { PersonDto, ProposalDto, TagDto } from '@shared/types';
+import type { PersonDto, ProposalDto, ProposalPhase, TagDto } from '@shared/types';
 import type { ProposalWrite } from '../lib/api';
 import { SpeakerCombobox, type SpeakerChoice } from './SpeakerCombobox';
 import {
@@ -41,6 +41,7 @@ export function ProposalModal({
     newName: '',
   });
   const [tagIds, setTagIds] = useState<number[]>(proposal?.tagIds ?? []);
+  const [phase, setPhase] = useState<ProposalPhase>(proposal?.phase ?? 'concern');
   const [error, setError] = useState<string | null>(null);
 
   const save = () => {
@@ -53,6 +54,7 @@ export function ProposalModal({
       description: description.trim(),
       ...(speaker.newName ? { speakerName: speaker.newName } : { speakerId: speaker.speakerId }),
       tagIds,
+      phase,
     });
   };
 
@@ -102,6 +104,25 @@ export function ProposalModal({
               }
             >
               {t.name}
+            </Chip>
+          ))}
+        </div>
+      </Field>
+
+      {/* Mímir add-on: optional decision phase. Defaults to 'concern' and
+          changes nothing for people who ignore it. */}
+      <Field label="Phase" hint="Where this pitch sits in the decision sequence — optional.">
+        <div className="flex flex-wrap gap-1.5">
+          {(
+            [
+              ['concern', '💭 Concern'],
+              ['inquiry', '🔍 Inquiry'],
+              ['proposal', '📋 Proposal'],
+              ['decision', '◇ Decision'],
+            ] as [ProposalPhase, string][]
+          ).map(([ph, label]) => (
+            <Chip key={ph} active={phase === ph} onClick={() => setPhase(ph)}>
+              {label}
             </Chip>
           ))}
         </div>
