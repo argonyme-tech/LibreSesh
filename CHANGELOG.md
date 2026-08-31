@@ -6,6 +6,16 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **The schedule header keeps the brand mark on a phone.** The header put the
+  full wordmark beside the event name at every width, and below `sm` the two
+  competed for a line that isn't wide enough for both — the event name, the one
+  piece of information that changes per page, was the half that truncated. Under
+  `sm` the wordmark is now replaced by the mark alone (the brackets and the
+  calendar, near-square), so the name gets the width back; from `sm` up nothing
+  changes. Both marks ship as a light/dark pair like the other brand artwork,
+  and at 1.3 kB each Vite inlines them, so the phone case costs no extra
+  request. `Logo` grew a `mark` variant for it.
+
 - **Merging two people now merges their work.** `POST /people/:id/merge`
   repointed sessions and pitches but left everything keyed on the loser's
   *identity* — stars, contributions, proposal interest, authorship — where it

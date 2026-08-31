@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 122 94" width="122" height="94" role="img" aria-label="LibreSesh">
+<g fill="none" stroke="#252f31" stroke-width="6.5" stroke-linecap="round">
+    <path d="M17 3 C8 3 8 13 8 21 L8 39 C8 45 3 46 3 46 C3 46 8 47 8 53 L8 71 C8 79 8 89 17 89"></path>
+    <path d="M17 3 C8 3 8 13 8 21 L8 39 C8 45 3 46 3 46 C3 46 8 47 8 53 L8 71 C8 79 8 89 17 89" transform="translate(120,0) scale(-1,1)"></path>
+  </g>
+  <g fill="#252f31">
+    <rect x="42" y="0" width="6" height="14"></rect><rect x="72" y="0" width="6" height="14"></rect><rect x="30" y="12" width="60" height="7"></rect>
+  </g>
+  <g><rect x="30" y="27" width="16" height="16" rx="2" fill="#8b9c8a"></rect><rect x="52" y="27" width="16" height="16" rx="2" fill="#dcdedc"></rect><rect x="74" y="27" width="16" height="16" rx="2" fill="#dcdedc"></rect>
+  <rect x="30" y="49" width="16" height="16" rx="2" fill="#dcdedc"></rect><rect x="52" y="49" width="16" height="16" rx="2" fill="#dcdedc"></rect><rect x="74" y="49" width="16" height="16" rx="2" fill="#dcdedc"></rect>
+  <rect x="30" y="71" width="16" height="16" rx="2" fill="#dcdedc"></rect><rect x="52" y="71" width="16" height="16" rx="2" fill="#dcdedc"></rect><rect x="74" y="71" width="16" height="16" rx="2" fill="#8b9c8a"></rect></g>
+</svg>

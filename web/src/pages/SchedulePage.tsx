@@ -643,7 +643,16 @@ export function SchedulePage() {
             className="flex shrink-0 items-center"
             aria-label="All events"
           >
-            <Logo variant="oneline" className="h-5 w-auto sm:h-6" />
+            {/* Below `sm` the wordmark's width belongs to the event name, so
+                the phone header gets the near-square mark instead. The swap
+                lives on wrappers because Logo spends its own display classes
+                on the theme. */}
+            <span className="flex items-center sm:hidden">
+              <Logo variant="mark" className="h-6 w-auto" />
+            </span>
+            <span className="hidden items-center sm:flex">
+              <Logo variant="oneline" className="h-6 w-auto" />
+            </span>
           </Link>
           <span
             aria-hidden="true"
