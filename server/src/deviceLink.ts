@@ -2,7 +2,7 @@ import { createHash, randomInt } from 'node:crypto';
 import { atLeast } from './auth.js';
 import type { Db, IdentityRow, PersonRow } from './db.js';
 import { claimEventName, eventDisplayName } from './eventIdentity.js';
-import { newIdentityToken } from './identity.js';
+import { newIdentityToken, newPublicId } from './identity.js';
 
 /**
  * Link phrases: `pine-otter-lantern`. Three words beat a hex code because a
@@ -204,9 +204,9 @@ export function mintSpeakerCode(
       identityId = Number(
         db
           .prepare(
-            'INSERT INTO identities (token, display_name, created_at, last_seen_at) VALUES (?, ?, ?, ?)',
+            'INSERT INTO identities (public_id, token, display_name, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)',
           )
-          .run(newIdentityToken(), person.name, now, now).lastInsertRowid,
+          .run(newPublicId(db), newIdentityToken(), person.name, now, now).lastInsertRowid,
       );
       db.prepare('UPDATE people SET identity_id = ? WHERE id = ?').run(identityId, person.id);
     }

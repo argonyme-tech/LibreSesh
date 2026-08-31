@@ -20,6 +20,8 @@
 -- cookie is, exactly.
 CREATE TABLE identities (
   id INTEGER PRIMARY KEY,
+  public_id TEXT NOT NULL UNIQUE,               -- the "UID" shown to admins: 5 random hex
+                                                -- chars, so ids can't be enumerated or counted
   token TEXT NOT NULL UNIQUE,                   -- value inside the signed cookie
   display_name TEXT NOT NULL,
   created_at TEXT NOT NULL,

@@ -30,6 +30,8 @@ export interface EventRow {
 
 export interface IdentityRow {
   id: number;
+  /** The "UID" shown to admins: 5 random hex chars, unique across the instance. */
+  public_id: string;
   token: string;
   display_name: string;
   created_at: string;

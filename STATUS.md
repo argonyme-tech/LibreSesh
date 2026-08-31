@@ -71,10 +71,13 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   done *to* someone: it swaps a cookie, so only that browser can do it. Wants a
   decision before code; written up in ARCHITECTURE.md §Merging two people.
 
-- **Instance-level audit rows have no screen.** A whole-database backup or an
-  event created from the landing page carries no `event_id`, so those rows are
+- **Instance-level audit rows have no screen — and no pruning.** A
+  whole-database backup, an event created from the landing page, or any
+  device-link mint/redeem/failure carries no `event_id`, so those rows are
   invisible in Manage Event → Audit, which is per-event by design. They are the
   instance owner's business and there is no instance admin page to put them on.
+  Noticed 2026-08-31: `pruneAudit` deletes by `event_id`, so these rows also
+  grow without limit — slowly (they are all rare actions), but forever.
 
 - **Nothing imports an event export.** `GET /export.json` writes a complete
   archive of an event and there is no route that reads one back, so the JSON is
@@ -171,7 +174,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   next deploy is their first real run. `deploy/docker-compose.yml`, the Caddy
   front end and `deploy/backup.sh` have never been run at all; treat the first
   VPS deploy as their test. Railway notes: `_planning/deployment-guide.md` §10.
-- **No component test coverage, and no error boundary.** 326 tests, and the
+- **No component test coverage, and no error boundary.** 384 tests, and the
   only web-side ones (`format.test.ts`, `calendar.test.ts`) cover pure
   functions — there is no jsdom/testing-library stack, so nothing renders a
   component. The drag maths, the SSE reducer and the clash detection are the

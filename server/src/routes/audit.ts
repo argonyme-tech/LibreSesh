@@ -106,6 +106,20 @@ export function auditRoutes(ctx: Ctx): Router {
     const names = new NameResolver(ctx.db, req.event.id);
     const labels = labelsFor(ctx.db, page);
 
+    // The UID (public_id) for each actor on this page. Identity row ids never
+    // leave the server; the random hex code is the number admins see.
+    const actorIds = [...new Set(page.flatMap((r) => (r.identity_id === null ? [] : [r.identity_id])))];
+    const uids = new Map(
+      actorIds.length === 0
+        ? []
+        : ctx.db
+            .prepare<number[], { id: number; public_id: string }>(
+              `SELECT id, public_id FROM identities WHERE id IN (${actorIds.map(() => '?').join(',')})`,
+            )
+            .all(...actorIds)
+            .map((r) => [r.id, r.public_id] as const),
+    );
+
     const entries: AuditEntryDto[] = page.map((row) => ({
       id: row.id,
       at: row.at,
@@ -113,7 +127,7 @@ export function auditRoutes(ctx: Ctx): Router {
       // removed, which nothing does today — but the log is append-only and
       // must render whatever it holds.
       actorName: row.identity_id === null ? '' : names.get(row.identity_id),
-      actorId: row.identity_id,
+      actorUid: row.identity_id === null ? null : (uids.get(row.identity_id) ?? null),
       action: row.action,
       entity: row.entity,
       entityId: row.entity_id,

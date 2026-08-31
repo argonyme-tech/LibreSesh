@@ -18,6 +18,25 @@ function randomString(length: number, alphabet: string): string {
 
 export const newIdentityToken = (): string => randomString(TOKEN_LENGTH, BASE62);
 
+const HEX = '0123456789abcdef';
+export const PUBLIC_ID_LENGTH = 5;
+
+/**
+ * The "UID" admins see beside a name. Random hex rather than the row id, so
+ * that knowing one UID reveals nothing about how many identities exist or
+ * what the others are. Five hex chars is ~1M values — collisions stay rare at
+ * any plausible instance size, and the loop absorbs the ones that do happen.
+ */
+export function newPublicId(db: Db): string {
+  const exists = db.prepare<[string], { found: number }>(
+    'SELECT 1 AS found FROM identities WHERE public_id = ?',
+  );
+  for (;;) {
+    const candidate = randomString(PUBLIC_ID_LENGTH, HEX);
+    if (!exists.get(candidate)) return candidate;
+  }
+}
+
 /** One place for the cookie's attributes: minting on first contact and
  *  adopting another device's identity must set exactly the same cookie. */
 export function setIdentityCookie(res: Response, token: string, isProd: boolean): void {
@@ -55,7 +74,7 @@ export function findIdentityByToken(db: Db, token: string): IdentityRow | undefi
  */
 export function identityMiddleware(db: Db, isProd: boolean) {
   const insert = db.prepare(
-    'INSERT INTO identities (token, display_name, created_at, last_seen_at) VALUES (?, ?, ?, ?)',
+    'INSERT INTO identities (public_id, token, display_name, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)',
   );
   const touch = db.prepare('UPDATE identities SET last_seen_at = ? WHERE id = ?');
 
@@ -71,9 +90,11 @@ export function identityMiddleware(db: Db, isProd: boolean) {
     if (!identity) {
       const token = newIdentityToken();
       const displayName = newDisplayName();
-      const info = insert.run(token, displayName, now, now);
+      const publicId = newPublicId(db);
+      const info = insert.run(publicId, token, displayName, now, now);
       identity = {
         id: Number(info.lastInsertRowid),
+        public_id: publicId,
         token,
         display_name: displayName,
         created_at: now,

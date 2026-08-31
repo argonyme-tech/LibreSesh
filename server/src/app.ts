@@ -12,6 +12,7 @@ import { identityMiddleware } from './identity.js';
 import { RateLimiter } from './ratelimit.js';
 import { agendaRoutes, calendarRoutes } from './routes/agenda.js';
 import { auditRoutes } from './routes/audit.js';
+import { attendeeRoutes } from './routes/attendees.js';
 import { backupRoutes, exportRoutes } from './routes/backup.js';
 import { bundleRoutes } from './routes/bundle.js';
 import { contributionRoutes } from './routes/contributions.js';
@@ -76,6 +77,7 @@ export function createApp(db: Db, config: Config): App {
   event.use(trashRoutes(ctx));
   event.use(exportRoutes(ctx));
   event.use(auditRoutes(ctx));
+  event.use(attendeeRoutes(ctx));
   api.use('/e/:slug', event);
 
   api.use((_req, _res, next) => next(notFound('No such endpoint')));

@@ -22,13 +22,13 @@ export interface ProfileMenuProps {
   /** The event's roster, used to find the caller's own profile. */
   people: PersonDto[];
   /**
-   * Your identity id — the row every role, star and authorship of yours hangs
-   * off. Shown only to you, and never on a public profile: it is the same
-   * number at every event on this instance, so putting it beside a name would
-   * link the "Ada" at one event to the "A. Lovelace" at another, which is the
-   * precise thing per-event names exist to prevent.
+   * Your UID — the code every role, star and authorship of yours hangs off.
+   * Shown only to you, and never on a public profile: it is the same code at
+   * every event on this instance, so putting it beside a name would link the
+   * "Ada" at one event to the "A. Lovelace" at another, which is the precise
+   * thing per-event names exist to prevent.
    */
-  identityId: number;
+  publicId: string;
   /** Opens the calendar modal on one of its two halves. */
   onCalendar: (section: 'download' | 'subscribe') => void;
   onSignOut: () => void;
@@ -47,7 +47,7 @@ export function ProfileMenu({
   role,
   userLabel,
   people,
-  identityId,
+  publicId,
   onCalendar,
   onSignOut,
 }: ProfileMenuProps) {
@@ -142,12 +142,14 @@ export function ProfileMenu({
         >
           <div className="border-b border-stone-100 px-3 pb-2 pt-1 dark:border-stone-800">
             <p className="truncate text-xs font-semibold">{displayName}</p>
-            <p
-              title="Your identity on this instance. Quote it to an organiser if two people here share a name."
-              className="font-mono text-xs text-stone-400 dark:text-stone-500"
-            >
-              ({uid(identityId)})
-            </p>
+            {publicId !== "" && (
+              <p
+                title="Your identity on this instance. Quote it to an organiser if two people here share a name."
+                className="font-mono text-xs text-stone-400 dark:text-stone-500"
+              >
+                ({uid(publicId)})
+              </p>
+            )}
           </div>
           <button
             type="button"

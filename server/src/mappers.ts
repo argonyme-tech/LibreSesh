@@ -83,7 +83,7 @@ export function parseLinks(raw: string): PersonLink[] {
 /** Extra columns only organisers are shown; see `PersonDto`. */
 export interface PersonRosterFacts {
   role: Role | null;
-  holderId: number | null;
+  holderUid: string | null;
   codePending: boolean;
 }
 
@@ -100,7 +100,7 @@ export const toPersonDto = (
   claimed: row.identity_id !== null,
   ...(facts === undefined
     ? {}
-    : { role: facts.role, holderId: facts.holderId, codePending: facts.codePending }),
+    : { role: facts.role, holderUid: facts.holderUid, codePending: facts.codePending }),
   updatedAt: row.updated_at,
 });
 
@@ -122,16 +122,17 @@ export function personRosterFacts(db: Db, eventId: number): Map<number, PersonRo
     .prepare<[number, number], {
       id: number;
       role: Role | null;
-      holder_id: number | null;
+      holder_uid: string | null;
       code_pending: number;
     }>(
       // `link_codes.person_id` is unique where set, so this joins at most one
       // code per person.
       `SELECT p.id AS id,
               r.role AS role,
-              p.identity_id AS holder_id,
+              i.public_id AS holder_uid,
               CASE WHEN lc.id IS NOT NULL AND lc.used_at IS NULL THEN 1 ELSE 0 END AS code_pending
          FROM people p
+    LEFT JOIN identities i ON i.id = p.identity_id
     LEFT JOIN roles r ON r.identity_id = p.identity_id AND r.event_id = ?
     LEFT JOIN link_codes lc ON lc.person_id = p.id
         WHERE p.event_id = ? AND p.deleted_at IS NULL`,
@@ -140,7 +141,7 @@ export function personRosterFacts(db: Db, eventId: number): Map<number, PersonRo
   return new Map(
     rows.map((r) => [
       r.id,
-      { role: r.role, holderId: r.holder_id, codePending: r.code_pending === 1 },
+      { role: r.role, holderUid: r.holder_uid, codePending: r.code_pending === 1 },
     ]),
   );
 }

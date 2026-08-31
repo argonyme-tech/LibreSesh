@@ -6,6 +6,30 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **UIDs are now random hex codes, not row numbers.** The identity id shown to
+  admins (and to you, in the menu behind your name) was the database row id —
+  sequential, so `UID: 00012` told anyone that eleven identities came before it
+  and where to guess for the rest. Every identity now carries a `public_id` of
+  5 random hex characters, unique across the instance and shown as
+  `UID: A3F9C`; a UID reveals nothing about how many identities exist and can't
+  be enumerated. It is only a name, never a credential — quoting one proves
+  nothing — and row ids no longer leave the server. Five hex chars is ~1M
+  values, far more than any instance will hold. Went straight into the baseline
+  schema (nothing is deployed yet), so a dev database from before needs
+  deleting once. Per-event row ids beside sessions and profiles are unchanged
+  (`ID: 00012`).
+
+- **Manage Event → People lists everyone who has joined.** The roster only ever
+  showed speaker/host *profiles*, so an organiser — including the one asking
+  "why am I not in the People tab?" — could not see who was actually in their
+  event or match a UID from the audit log to a person. A second table now lists
+  every identity that has ever passed the gate: name, UID, role, a link to
+  their profile if they hold one, and when they were last seen anywhere on the
+  instance. Admin-only (`GET /attendees`). Since reading the schedule requires
+  entering, and entering records a name and a role, this is the complete set
+  of people who have ever seen the event; signing out keeps the entry, minus
+  the role.
+
 - **The audit log and the roster show ids, not just names.** An entry read
   `Marcel edited person "attendee_4skp9"` — the label resolved, so the id it
   already had was hidden, and neither the actor nor the thing acted on could be

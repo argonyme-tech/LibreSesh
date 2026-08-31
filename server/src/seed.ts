@@ -13,7 +13,7 @@
 import { hashPassword } from './auth.js';
 import type { Db } from './db.js';
 import { ROOM_COLORS } from './shared/roomColors.js';
-import { newDisplayName, newIdentityToken } from './identity.js';
+import { newDisplayName, newIdentityToken, newPublicId } from './identity.js';
 import { localDate, zonedTimeToUtc } from './shared/time.js';
 
 export const DEMO_SLUG = 'democonf-2026';
@@ -180,9 +180,9 @@ function createIdentity(db: Db, name?: string): number {
   const now = new Date().toISOString();
   const info = db
     .prepare(
-      'INSERT INTO identities (token, display_name, created_at, last_seen_at) VALUES (?, ?, ?, ?)',
+      'INSERT INTO identities (public_id, token, display_name, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)',
     )
-    .run(newIdentityToken(), name ?? newDisplayName(), now, now);
+    .run(newPublicId(db), newIdentityToken(), name ?? newDisplayName(), now, now);
   return Number(info.lastInsertRowid);
 }
 

@@ -176,12 +176,12 @@ Display names are unique within an event, so nobody can take an organiser's.
 | Tab | What it holds |
 | --- | --- |
 | Programme | Rooms, tracks and tags |
-| People | Speaker and host profiles: who holds each, at what role, and whether their code is still unused |
+| People | Everyone who has joined, plus speaker and host profiles: who holds each, at what role, and whether their code is still unused |
 | Permissions | Which roles may do what at this event |
 | Settings | Name, dates, day bounds, passwords, audit retention, duplicate, archive |
 | Trash | Deleted sessions and contributions, with restore |
 | Backup | The event as JSON, and the encrypted whole-instance download |
-| Audit | Who created, edited, deleted or restored what, by identity id |
+| Audit | Who created, edited, deleted or restored what, by name and UID |
 
 The open tab lives in the URL as `?tab=`, so a link lands a co-organiser on the
 same one.

@@ -153,6 +153,14 @@ this value"* — it stops someone editing their own cookie to a token they
 guessed or stole from a URL — and answers nothing about confidentiality. The
 cookie is `httpOnly`, `SameSite=Lax`, `secure` in production, 400 days.
 
+**The UID is the identity's public face; the token stays secret.** Each
+`identities` row also carries `public_id` — 5 random hex characters, unique on
+the instance — shown as `UID: A3F9C` to you in the profile menu and to admins
+in the audit log and rosters. It is random, not sequential, so a UID reveals
+nothing about how many identities exist and cannot be enumerated; and it is
+*only* a name, never a credential — presenting a UID proves nothing. Row ids
+(`identities.id`) never leave the server.
+
 **When the check fails, the request is simply anonymous.** `cookie-parser` puts
 `false` (not `undefined`) in `req.signedCookies.cid` for a bad signature, and
 `identityMiddleware` treats anything falsy as "no cookie" and mints a fresh
@@ -408,7 +416,7 @@ explicitly *not* built to withstand a targeted attacker with time.
 | --- | --- |
 | Guessing an event password | bcrypt (cost 10); 5 attempts per 15 min per identity **and** per IP, `Retry-After` on the 6th |
 | Guessing a link phrase | Same 5-per-15-min budget as passwords; stored hashed. Device phrases are single-use and die in 10 minutes; speaker codes are four words (~37 bits) and revocable |
-| Casual vandalism of the programme | Soft deletes + restore; `audit` log with identity id, readable by admins at Manage Event → Audit; `hidden` flag for contributions |
+| Casual vandalism of the programme | Soft deletes + restore; `audit` log with actor UIDs, readable by admins at Manage Event → Audit; `hidden` flag for contributions |
 | Spam / flooding | Token buckets per identity and per IP on every write class; server-enforced max lengths |
 | XSS via session or profile text | HTML escaped before markdown parsing; URL scheme allowlist; no `dangerouslySetInnerHTML` on unescaped input |
 | Open redirect | Every client navigation is prefixed with a literal `/e/` |

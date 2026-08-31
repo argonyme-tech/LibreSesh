@@ -6,6 +6,9 @@ export type ContributionKind = 'note' | 'link' | 'question';
 
 export interface Me {
   id: number;
+  /** Your "UID": 5 hex chars, the same at every event on this instance.
+   *  Shown only to you and to admins — never on a public profile. */
+  uid: string;
   /** The name you are offered when entering a new event. Inside an event the
    *  name that counts is `BundleDto.displayName`. */
   displayName: string;
@@ -97,12 +100,12 @@ export interface PersonDto {
    */
   role?: Role | null;
   /**
-   * Organisers only. The identity holding this profile — stable across every
-   * event on the instance, unlike the profile id, which is per event. Absent
-   * for everyone else: printed beside a name in public it would tie one
-   * person's names together between events.
+   * Organisers only. The UID of the identity holding this profile — stable
+   * across every event on the instance, unlike the profile id, which is per
+   * event. Absent for everyone else: printed beside a name in public it would
+   * tie one person's names together between events.
    */
-  holderId?: number | null;
+  holderUid?: string | null;
   /**
    * Organisers only. True when a speaker code minted for this profile has
    * never been redeemed — the phrase is still sitting in an unread email.
@@ -111,6 +114,28 @@ export interface PersonDto {
    */
   codePending?: boolean;
   updatedAt: string;
+}
+
+/**
+ * One row of the admin attendance list: everyone who has ever passed this
+ * event's gate. There is no anonymous read — the whole event router sits
+ * behind `requireRole('viewer')`, and both gate paths write a display name
+ * and a role before letting anyone in — so this is the complete set of
+ * people who have ever seen the event. Logout removes the role but keeps
+ * the name row; the list only grows.
+ */
+export interface AttendeeDto {
+  uid: string;
+  /** Their display name in this event, or their instance-wide default. */
+  name: string;
+  role: Role | null;
+  /** When they first picked a name or received a role here. */
+  joinedAt: string;
+  /** Last request from this identity anywhere on the instance, minute-coarse. */
+  lastSeenAt: string;
+  /** The speaker/host profile they hold in this event, if any. */
+  personId: number | null;
+  isMe: boolean;
 }
 
 export interface PersonDetailDto {
@@ -307,12 +332,12 @@ export interface AuditEntryDto {
   /** The actor's display name in this event. Empty if the row has no actor. */
   actorName: string;
   /**
-   * The actor's identity id — the same number at every event on this instance,
-   * and the only thing about them that never changes. Display names can be
-   * edited, and this log is read precisely when someone wants to know who did
-   * something, so the name alone is not enough. Admin-only, like the endpoint.
+   * The actor's UID — the same at every event on this instance, and the only
+   * thing about them that never changes. Display names can be edited, and
+   * this log is read precisely when someone wants to know who did something,
+   * so the name alone is not enough. Admin-only, like the endpoint.
    */
-  actorId: number | null;
+  actorUid: string | null;
   action: string;
   entity: string;
   entityId: number | null;

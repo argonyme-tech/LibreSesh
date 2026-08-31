@@ -23,16 +23,17 @@ function rolesFor(ctx: Ctx, identityId: number): Record<string, Role> {
 export function meRoutes(ctx: Ctx): Router {
   const router = Router();
 
-  const me = (identityId: number, displayName: string): Me => ({
-    id: identityId,
+  const me = (identity: { id: number; public_id: string }, displayName: string): Me => ({
+    id: identity.id,
+    uid: identity.public_id,
     displayName,
-    roles: rolesFor(ctx, identityId),
+    roles: rolesFor(ctx, identity.id),
     demoMode: ctx.config.demoMode,
     demoEventSlugs: ctx.config.demoEventSlugs,
   });
 
   router.get('/me', limit(ctx.limiter, 'read'), (req, res) => {
-    res.json(me(req.identity.id, req.identity.display_name));
+    res.json(me(req.identity, req.identity.display_name));
   });
 
   router.patch('/me', limit(ctx.limiter, 'write'), (req, res) => {
@@ -40,7 +41,7 @@ export function meRoutes(ctx: Ctx): Router {
     ctx.db
       .prepare('UPDATE identities SET display_name = ? WHERE id = ?')
       .run(displayName, req.identity.id);
-    res.json(me(req.identity.id, displayName));
+    res.json(me(req.identity, displayName));
   });
 
   /** Show a phrase on this device so another one can become you (SPEC §3.1
@@ -97,7 +98,7 @@ export function meRoutes(ctx: Ctx): Router {
       entity: 'identity',
       entityId: req.identity.id,
     });
-    res.json(me(identity.id, identity.display_name));
+    res.json(me(identity, identity.display_name));
   });
 
   return router;

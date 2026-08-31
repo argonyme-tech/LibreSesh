@@ -8,6 +8,7 @@ import { AdminRooms, type RoomDraft } from './AdminRooms';
 import { AdminPermissions } from './AdminPermissions';
 import { AdminBackup } from './AdminBackup';
 import { AdminAudit } from './AdminAudit';
+import { AdminAttendees } from './AdminAttendees';
 import {
   DangerButton,
   Modal,
@@ -739,12 +740,12 @@ export function AdminPage() {
                       unclaimed
                     </span>
                   )}
-                  {person.holderId != null && (
+                  {person.holderUid != null && (
                     <span
                       title="Identity holding this profile — the same at every event on this instance"
                       className="font-mono text-xs text-stone-400 dark:text-stone-500"
                     >
-                      ({uid(person.holderId)})
+                      ({uid(person.holderUid)})
                     </span>
                   )}
                   {person.codePending === true && (
@@ -787,6 +788,7 @@ export function AdminPage() {
               </PrimaryButton>
             </FormRow>
           </Section>
+          <AdminAttendees slug={slug} userLabel={event.userRoleLabel} />
         </div>
       )}
 

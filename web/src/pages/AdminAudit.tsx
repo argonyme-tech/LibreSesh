@@ -61,15 +61,15 @@ function Entry({ entry }: { entry: AuditEntryDto }) {
   return (
     <li className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 border-b border-stone-100 py-2 text-sm last:border-0 dark:border-stone-800">
       <span className="font-medium">{entry.actorName || 'someone'}</span>
-      {/* The identity id, not the name: names are editable and this log is
-          read precisely when someone wants to know who did a thing. The same
-          number identifies them at every event on this instance. */}
-      {entry.actorId !== null && (
+      {/* The UID, not just the name: names are editable and this log is read
+          precisely when someone wants to know who did a thing. The same code
+          identifies them at every event on this instance. */}
+      {entry.actorUid !== null && (
         <span
           title="Identity — the same at every event on this instance"
           className="font-mono text-xs text-stone-400 dark:text-stone-500"
         >
-          ({uid(entry.actorId)})
+          ({uid(entry.actorUid)})
         </span>
       )}
       <span className={TONE[entry.action] ?? 'text-stone-600 dark:text-stone-300'}>{action}</span>
@@ -140,7 +140,7 @@ export function AdminAudit({ slug, auditKeep }: { slug: string; auditKeep: numbe
       ? true
       : [
           e.actorName,
-          e.actorId === null ? '' : uid(e.actorId),
+          e.actorUid === null ? '' : uid(e.actorUid),
           e.action,
           e.entity,
           e.entityLabel,

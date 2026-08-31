@@ -22,12 +22,12 @@ describe('dayRangeLabel', () => {
 });
 
 describe('id formatting', () => {
-  it('pads and labels the two id spaces distinctly', async () => {
+  it('labels the two id spaces distinctly', async () => {
     const { uid, rowId } = await import('../web/src/lib/format.js');
-    expect(uid(12)).toBe('UID: 00012');
+    // UIDs are the server's random hex code, shown uppercased.
+    expect(uid('a3f9c')).toBe('UID: A3F9C');
+    // Row ids are per-event integers, zero-padded to line up in columns.
     expect(rowId(12)).toBe('ID: 00012');
-    expect(uid(7)).toBe('UID: 00007');
-    // Beyond five digits it simply stops padding rather than truncating.
-    expect(uid(123456)).toBe('UID: 123456');
+    expect(rowId(123456)).toBe('ID: 123456');
   });
 });

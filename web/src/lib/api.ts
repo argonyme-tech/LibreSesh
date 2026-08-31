@@ -1,4 +1,5 @@
 import type {
+  AttendeeDto,
   AuditPageDto,
   BundleDto,
   ContributionDto,
@@ -235,6 +236,10 @@ export const api = {
       'GET',
       `/e/${encode(slug)}/audit${before === undefined ? '' : `?before=${before}`}`,
     ),
+
+  /** Everyone who has ever picked a name or held a role at this event —
+   *  admin-only, the other half of the profile roster. */
+  attendees: (slug: string) => request<AttendeeDto[]>('GET', `/e/${encode(slug)}/attendees`),
 
   /** The per-event JSON export is a plain authenticated GET, so the link in
    *  Manage Event downloads it directly — no fetch, no blob, no wrapper. */

@@ -29,7 +29,7 @@ import { getPermissions } from '../permissions.js';
 import { limit } from '../ratelimit.js';
 import { getSession } from '../sessionRules.js';
 
-const UNCLAIMED = { role: null, holderId: null, codePending: false } as const;
+const UNCLAIMED = { role: null, holderUid: null, codePending: false } as const;
 
 /** Read endpoints. The whole event fits comfortably in one JSON payload, so the
  *  client fetches a bundle once and patches it from the SSE stream. */
