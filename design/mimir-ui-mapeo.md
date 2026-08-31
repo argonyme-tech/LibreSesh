@@ -52,6 +52,12 @@ Dos columnas (una en móvil):
    (no disabled: lo que no puedes usar no existe — menos ruido).
 2. **Herramientas** — grid según permiso: Catálogo · Decisiones · Ritmo · Cosecha.
 3. **Mis procesos** — tarjetas de procesos abiertos con estado ⏳/✅ y su chat.
+   Cada tarjeta lleva **botón Compartir** (enlace/código de invitación) y, si es
+   compartido, los **chips de participantes** + el **chip del acuerdo de
+   trabajo** elegido ("acuerdo: consenso a dos ✓"), clicable para renegociar.
+   Al unirse alguien, el primer mensaje de Mímir en el chat compartido es el
+   contrato de colaboración (cómo os organizáis → abanico de acuerdos → eligen
+   los humanos). Las decisiones registradas muestran SIEMPRE quién las tomó.
 4. **Estado del evento** (solo organizador): avisos de ritmo + espejo/cosecha.
 
 ### 2.3 La entrevista — ADAPTATIVA, no cuestionario fijo

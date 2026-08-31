@@ -92,6 +92,32 @@ parada · A8 puerta · A9 devolver → produce la **carta de proceso** del event
 - Opciones mutuamente excluyentes; «todas a la vez» = pregunta mal hecha.
 - Lengua llana del destinatario; la jerga del oficio queda en material interno.
 
+## 3b · Procesos compartidos — el diseño como proyecto colaborativo
+*(Decisión del facilitador, 2026-09-01.)*
+
+Un proceso de diseño (sesión o evento) es un **proyecto con dueño**, que puede
+**compartirse con otros usuarios del evento** para desarrollarlo juntos
+(invitación por enlace/código — coherente con la filosofía sin cuentas).
+
+**Cuando entra la segunda persona, Mímir abre el contrato de colaboración**
+(mini-A1, antes de seguir con el contenido):
+1. Pregunta **cómo se organizan**: ¿quién decide sobre el diseño si no coincidís?
+   ¿qué parte lleva cada cual? ¿qué queda fuera?
+2. **Propone un acuerdo de trabajo** como abanico con condición de descarte
+   (p. ej.: el dueño decide tras escuchar · consenso a dos · reparto por bloques)
+   — **los humanos eligen**, Mímir solo registra. La meta-decisión (A6: quién
+   decide que se ha decidido) queda escrita en el proyecto.
+3. El acuerdo elegido queda **visible en la cabecera del proceso** y es
+   renegociable en cualquier momento por los humanos.
+
+**Reglas del chat compartido:**
+- Todos los participantes ven lo mismo de Mímir (transparencia); las
+  devoluciones van al conjunto, no a un bando.
+- Cada decisión registrada lleva **quién la tomó** — la autoría humana visible.
+- Un desacuerdo entre co-diseñadores se trata **como estructura** (¿falta
+  acuerdo de trabajo? ¿formato de decisión?), nunca como personas; si escala a
+  conflicto personal → deflexión F13 (esto merece un humano; no se almacena).
+
 ## 4 · Chat por proceso
 
 Un chat **por proceso abierto** (no un chat global): cada sesión o evento en diseño
