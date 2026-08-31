@@ -37,30 +37,35 @@ aconseja, no conduce). De ahí las tres decisiones raíz:
 
 ## 2 · Mapa de integración por superficie
 
-### 2.1 Punto de entrada
-- **Desktop:** botón `◆ Mímir` en la top bar, junto a "Manage Event" (mismo peso
-  visual que Arrange Sessions). Índigo sutil.
-- **Móvil:** en la barra inferior/menú — nunca FAB flotante sobre la agenda
-  (taparía sesiones; la agenda manda).
-- Al pulsar: **drawer lateral** (desktop, patrón DetailSheet ya existente) /
-  **bottom-sheet** (móvil). No navega fuera: el contexto de agenda queda visible.
+### 2.1 Punto de entrada — pestaña propia
+*(Decisión del facilitador, 2026-09-01: Mímir tiene su pestaña, el resto del
+frontend no cambia.)*
+- **`◆ Mímir` es una pestaña más** junto a Grid · List · Pitches — mismo patrón
+  de chips que ya existe. En índigo, para que se distinga de las vistas de agenda.
+- **Móvil:** la misma pestaña; nunca FAB flotante sobre la agenda.
 
-### 2.2 El drawer Mímir (hub, contenido según rol)
-Estructura vertical, tres bloques:
-1. **Mis procesos** — tarjetas de procesos abiertos con estado ⏳/✅ y su chat.
-   Tap → chat de ese proceso en el mismo drawer (navegación en pila, con volver).
-2. **Herramientas** — grid de iconos 2×N según permiso: Entrevista · Catálogo ·
-   Decisiones · Ritmo · Infografías. Los que el rol no tiene NO se muestran
+### 2.2 La pestaña Mímir (hub, contenido según rol)
+Dos columnas (una en móvil):
+1. **Empezar algo nuevo** — bifurcación explícita con dos tarjetas grandes:
+   🎤 **Diseñar una sesión** (asistente/proponente/admin) · 🗺 **Proceso del
+   evento** (solo admin). La tarjeta que el rol no tiene NO se muestra
    (no disabled: lo que no puedes usar no existe — menos ruido).
-3. **Estado del evento** (solo organizador): resumen de avisos de ritmo activos
-   + accesos a espejo/cosecha.
+2. **Herramientas** — grid según permiso: Catálogo · Decisiones · Ritmo · Cosecha.
+3. **Mis procesos** — tarjetas de procesos abiertos con estado ⏳/✅ y su chat.
+4. **Estado del evento** (solo organizador): avisos de ritmo + espejo/cosecha.
 
-### 2.3 La entrevista / wizard — conversacional, no formulario
+### 2.3 La entrevista — ADAPTATIVA, no cuestionario fijo
+*(Decisión del facilitador, 2026-09-01.)*
+- **Arranca en abierto**: "Cuéntame en resumen qué quieres hacer en tu sesión"
+  (textarea libre) + opción de **adjuntar documentación** (notas, doc, enlace).
+- **Mímir genera las preguntas desde el resumen y los documentos**: marca lo que
+  ya detectó (✓ propósito, ✓ contexto…) y pregunta SOLO lo que falta — es la
+  regla de instrumento "lo ya sabido no se re-pregunta" hecha flujo.
 - Se presenta **como chat guiado**, no como form: una pregunta por pantalla,
-  respuesta abajo (input o cartas de opción). Es la misma superficie que el chat
+  respuesta abajo (input o cartas de opción). Misma superficie que el chat
   Mímir → un solo modelo mental que aprender.
-- Barra de progreso de pasos con nombres ("Propósito → Movimiento → Formato →
-  Tiempo"), clicable hacia atrás, estado persistente.
+- Barra de progreso ("Resumen → Preguntas → Formato → Tiempo"), clicable hacia
+  atrás, estado persistente.
 - **Filtro A2 con dignidad**: si el propósito no sale, la salida no es error rojo;
   es Mímir diciendo "sin propósito claro, la doctrina sugiere no reservar sala aún
   — ¿lo aparcamos como inquietud en Pitches?" → convierte el fallo en acción.

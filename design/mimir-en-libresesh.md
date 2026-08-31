@@ -64,7 +64,15 @@ Nueva sección `/e/:slug/mimir` — visible para todos los roles, con contenido
 
 Dos ramas, mismo motor:
 
-**Rama sesión (proponente)** — 4 pasos:
+**Entrada común (decisión del facilitador, 2026-09-01): entrevista ADAPTATIVA.**
+Paso 0: "Cuéntame en resumen qué quieres hacer" (texto libre) + opción de
+adjuntar documentación. Mímir extrae lo que ya está (✓ propósito, ✓ contexto…)
+y genera preguntas SOLO para lo que falta — regla "lo ya sabido no se
+re-pregunta". El material adjunto entra con las reglas anti-ancla (§Entrada de
+material preparado del corpus).
+
+**Rama sesión (proponente)** — los 4 elementos a cubrir (preguntados solo si
+no salieron del resumen):
 1. **Propósito** (A2): *«si no puedes definir el propósito, cancélala»* — filtro 1.
 2. **El movimiento** (B1): qué tiene que pasar, en una frase, sin nombrar técnica.
 3. **Formato** (B2): ¿cómo participa quien no habla fácil? — abanico con descarte.
