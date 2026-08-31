@@ -177,6 +177,33 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   across pitches, not a click per pitch), so it wants its own schema and its
   own thinking rather than a column bolted onto `proposal_interest`.
 
+- **Numbered migrations again, before the first deployment that holds data.**
+  Since the squash the working practice has been to edit `001_baseline.sql` in
+  place — `public_id` went in that way on 2026-08-31. That is free exactly
+  while every database is disposable, and stops being free the moment one
+  isn't: the runner tracks migrations by filename, so an edit never reaches a
+  database that already recorded the file, and the symptom is not a migration
+  error but a crash at runtime (`table identities has no column named
+  public_id` on the first request from a new browser). Nothing warns about it —
+  tests build fresh databases every time, and so does a reseed. Low priority
+  because no instance holds data yet, and the remedy until then is to delete
+  and recreate. What it wants is a line in the ARCHITECTURE §Migrations
+  section naming the deploy as the cut-over, so the first `002_*.sql` is
+  written deliberately rather than remembered.
+
+- **Rename "seed" to "mock".** Floated 2026-08-31. Worth knowing before
+  starting that the word means three unrelated things in this tree, and only
+  the first is a mock: the demo fixture generator (`scripts/seed.ts`,
+  `server/src/seed.ts`, `npm run seed` / `seed:long`, the `SEED_*` env vars,
+  `config.seedDemoEvent`, `demoSeed.test.ts`); the test helpers
+  `seedEvent`/`seedRoom`/`seedTag`, which insert real rows through the real
+  schema and are not mocks in any sense — `makeRoom` or `insertRoom` would be
+  the honest rename there; and `identities.display_name`, described as "the
+  seed a newcomer is offered", where the word means a starting value and
+  should not be touched at all. So it is three decisions, not one
+  find-and-replace: 222 identifier hits across the TypeScript alone, plus
+  README, ARCHITECTURE, CHANGELOG and the SPEC.
+
 - **Print / PDF grid.** Unconferences put the grid on a wall. A print
   stylesheet would cover most of it.
 - **Restore for rooms and tags.** `/trash` covers sessions and contributions,
