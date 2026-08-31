@@ -8,6 +8,7 @@ import {
 } from 'react';
 import type { BreakDto, SessionDto, TagDto } from '@shared/types';
 import { fmtMin, place } from '../lib/format';
+import { InfoIcon } from './icons';
 
 export const PX_PER_MIN = 1.6;
 export const COL_W = 176;
@@ -199,17 +200,24 @@ export interface CalendarColumn {
   color: string;
   /** Second line on the column card: seats, booking permission, session count. */
   detail?: ReactNode;
-  /** The fuller story — shown on hover, focus or tap, where the card itself has
-   *  room for one truncated line. Omit it and the card is inert. */
+  /** What the card has no room for — where the room is, what its hours mean.
+   *  Present only when there is something the card does not already say; the
+   *  info button appears with it and is absent without it. */
   info?: ReactNode;
 }
 
 /**
- * A column's header card, and the panel it reveals. The card is 176px wide and
- * the line under the name truncates, so anything longer than a few words —
- * where the room is, how to get in — needs somewhere else to live. Hover and
- * focus open it for mouse and keyboard; a tap opens it on touch, where there
- * is no hover at all.
+ * A column's header card, and the panel behind its info button.
+ *
+ * The card is 176px wide, so what it shows has to be the short version: a name
+ * and a line that truncates. Anything longer — how to find the room, what a
+ * track's hours mean — sits behind the ⓘ, and *only* what the card does not
+ * already say goes there. A panel that repeats the line above it is noise
+ * twice. The button appears only when a column has something more to give, so
+ * its presence is itself the signal that there is more.
+ *
+ * Hover and focus open it for mouse and keyboard; a click opens it on touch,
+ * where there is no hover at all.
  */
 function ColumnCard({ column, alignEnd }: { column: CalendarColumn; alignEnd: boolean }) {
   const [open, setOpen] = useState(false);
@@ -217,29 +225,37 @@ function ColumnCard({ column, alignEnd }: { column: CalendarColumn; alignEnd: bo
   const panelId = `column-info-${column.id}`;
 
   return (
-    <div
-      className="relative shrink-0 px-1"
-      style={{ width: COL_W }}
-      onMouseEnter={() => hasInfo && setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-    >
+    <div className="relative shrink-0 px-1" style={{ width: COL_W }}>
       <div
-        className={`rounded-lg border border-stone-200/80 px-3 py-2 dark:border-stone-700 ${
-          hasInfo ? 'cursor-help' : ''
-        }`}
+        className="rounded-lg border border-stone-200/80 px-3 py-2 dark:border-stone-700"
         // The palette is already washed out; 'cc'/'22' keep it that way
         // in light and dark without maintaining two palettes.
         style={{ background: `${column.color}cc`, borderColor: column.color }}
-        tabIndex={hasInfo ? 0 : undefined}
-        aria-describedby={hasInfo && open ? panelId : undefined}
-        onFocus={() => hasInfo && setOpen(true)}
-        onBlur={() => setOpen(false)}
-        onClick={() => hasInfo && setOpen((v) => !v)}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') setOpen(false);
-        }}
       >
-        <div className="truncate text-xs font-semibold text-stone-900">{column.name}</div>
+        <div className="flex items-center gap-1">
+          <div className="min-w-0 flex-1 truncate text-xs font-semibold text-stone-900">
+            {column.name}
+          </div>
+          {hasInfo && (
+            <button
+              type="button"
+              aria-label={`About ${column.name}`}
+              aria-expanded={open}
+              aria-describedby={open ? panelId : undefined}
+              className="-m-1 shrink-0 rounded-full p-1 text-stone-600 hover:text-stone-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-stone-500"
+              onMouseEnter={() => setOpen(true)}
+              onMouseLeave={() => setOpen(false)}
+              onFocus={() => setOpen(true)}
+              onBlur={() => setOpen(false)}
+              onClick={() => setOpen((v) => !v)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setOpen(false);
+              }}
+            >
+              <InfoIcon className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
         {column.detail}
       </div>
       {hasInfo && open && (

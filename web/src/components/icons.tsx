@@ -116,3 +116,14 @@ export function ArrowRightIcon({ className }: { className?: string }) {
     </Icon>
   );
 }
+
+/** A circled "i" — there is more about this than the card has room for. */
+export function InfoIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <circle cx="8" cy="8" r="6.25" />
+      <path d="M8 7.25v3.75" />
+      <path d="M8 5.1v.05" />
+    </Icon>
+  );
+}

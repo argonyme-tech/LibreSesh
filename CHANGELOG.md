@@ -18,8 +18,10 @@ All notable changes to this project are documented here.
   narrowing a window moves nothing that is already scheduled and badges nothing
   — it is a rule about what may be booked next — and a session that predates
   the window stays editable by whoever owns it. The hours show under the track's
-  column on the schedule, in the session form's track picker for the day being
-  placed, and in the room-card-style panel the column reveals; they travel
+  column on the schedule and in the session form's track picker for the day
+  being placed, with an ⓘ beside the track's name for what the times cannot say
+  themselves — that they are a rule, who it binds, and which other days differ;
+  they travel
   through export and import (`"start": "09:00", "end": "13:00"`, plus
   `windows`). Every existing track keeps no hours and behaves exactly as before.
 
@@ -370,13 +372,14 @@ All notable changes to this project are documented here.
   room without a capacity announced "no capacity set" under its name on the
   schedule — a note about an empty column, told to attendees, on most rooms of
   most events, since capacity is optional by design. The card now shows what
-  the room actually has: the seat count when there is one, and the organiser's
-  description beside it, on a line that truncates. Hovering, focusing or
-  tapping the card opens a panel with all of it in full — seats, whether
-  attendees may book the room, and the directions the description carries
-  (which floor, which door, what to bring), which had until now been editable
-  in the room editor and visible nowhere else on the schedule. A room with
-  nothing set shows its name alone and opens nothing.
+  the room actually has: the seat count when there is one, and the booking
+  permission when it has one. The organiser's directions — which floor, which
+  door, what to bring, editable in the room editor and visible nowhere else on
+  the schedule until now — sit behind a small ⓘ beside the room's name, which
+  appears **only** when there are directions to read. The panel holds what the
+  card cannot, and nothing the card already says: a hover that repeats the line
+  above it is noise twice. A room with nothing set shows its name alone and
+  offers no button.
 
 - **The last hand-rolled modals moved onto the primitive.** Six callers still
   built their own intro paragraph and button row rather than passing

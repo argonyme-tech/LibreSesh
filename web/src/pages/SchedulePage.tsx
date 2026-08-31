@@ -3,13 +3,12 @@ import { Link, useMatch, useNavigate, useParams } from "react-router-dom";
 import type {
   ContributionDto,
   ContributionKind,
-  RoomDto,
   SessionDto,
   TrackDto,
 } from "@shared/types";
 import type { Repeat } from "@shared/repeat";
 import { dateRange, zonedTimeToUtc } from "@shared/time";
-import { windowLabel, windowOn, type DayWindow } from "@shared/trackHours";
+import { windowLabel, windowOn } from "@shared/trackHours";
 import { ApiError, api, type SessionWrite } from "../lib/api";
 import {
   dayLabel,
@@ -22,7 +21,7 @@ import {
 import { useEventData } from "../lib/useEventData";
 import { matchesQuery } from "../lib/search";
 import { useFilters } from "../lib/useFilters";
-import { hasRoomInfo, roomSummary, seatsLabel } from "../lib/rooms";
+import { roomNote, seatsLabel } from "../lib/rooms";
 import { useMe } from "../lib/useMe";
 import { Calendar, PX_PER_MIN, timeClashPairs } from "../components/Calendar";
 import { DetailSheet } from "../components/DetailSheet";
@@ -52,58 +51,23 @@ const NOW_TICK_MS = 30_000;
 const UNTRACKED = -1;
 
 /**
- * What a track card reveals: the hours it keeps on the day on screen, and
- * whether that is its usual window or this day's own. Only organisers place
- * sessions outside it, so the note names who the rule binds — an attendee
- * reading "09:00–13:00" should know it is a rule and not a description.
+ * What the hours on a track card do not say for themselves: that they are a
+ * rule rather than a description, who it binds, and whether this day keeps its
+ * own window. The times themselves stay on the card and are not repeated here.
  */
-function TrackInfo({
-  track,
-  day,
-  hours,
-}: {
-  track: TrackDto;
-  day: string;
-  hours: DayWindow;
-}) {
+function TrackInfo({ track, day }: { track: TrackDto; day: string }) {
   const ownDay = track.windows.some((w) => w.date === day);
   return (
     <div className="space-y-1.5">
-      <div className="font-semibold text-stone-900 dark:text-stone-100">{track.name}</div>
-      <div className="tabular-nums">Takes sessions {windowLabel(hours)}</div>
-      {ownDay && <div>These hours are this day's own.</div>}
+      <p>
+        The hours on the card are a rule: a session outside them is refused, unless an organiser
+        places it.
+      </p>
+      {ownDay && <p>Today keeps its own window — other days differ.</p>}
       {!ownDay && track.windows.length > 0 && (
-        <div>
-          Other days differ:{" "}
-          {track.windows.map((w) => `${w.date} ${windowLabel(w)}`).join(", ")}.
-        </div>
-      )}
-      <p>Anything outside is refused, unless an organiser places it.</p>
-    </div>
-  );
-}
-
-/**
- * What a room card reveals when you linger on it. The card can show one
- * truncated line; this is where the organiser's directions — which floor, which
- * door, what to bring — get read in full, alongside the seat count and whether
- * anyone may book the room.
- */
-function RoomInfo({ room }: { room: RoomDto }) {
-  const seats = seatsLabel(room.capacity);
-  return (
-    <div className="space-y-1.5">
-      <div className="font-semibold text-stone-900 dark:text-stone-100">
-        {room.name}
-      </div>
-      {seats && <div>{seats}</div>}
-      {room.openBooking && (
-        <div className="font-medium text-stone-700 dark:text-stone-200">
-          Attendees may book this room
-        </div>
-      )}
-      {room.description.trim() && (
-        <p className="whitespace-pre-line">{room.description.trim()}</p>
+        <p>
+          Other days differ: {track.windows.map((w) => `${w.date} ${windowLabel(w)}`).join(", ")}.
+        </p>
       )}
     </div>
   );
@@ -222,7 +186,10 @@ export function SchedulePage() {
   const columns = useMemo(() => {
     if (axis === "room") {
       return (bundle?.rooms ?? []).map((room) => {
-        const summary = roomSummary(room);
+        const seats = seatsLabel(room.capacity);
+        // Seats and the booking permission fit on the card; the organiser's
+        // directions do not, so they are the whole of what the button reveals.
+        const note = roomNote(room);
         return {
           id: room.id,
           name: room.name,
@@ -234,10 +201,10 @@ export function SchedulePage() {
                   attendees may book this room
                 </div>
               )}
-              {summary && <div className="truncate">{summary}</div>}
+              {seats && <div className="truncate">{seats}</div>}
             </div>
           ),
-          info: hasRoomInfo(room) ? <RoomInfo room={room} /> : undefined,
+          info: note ? <p className="whitespace-pre-line">{note}</p> : undefined,
         };
       });
     }
@@ -260,7 +227,7 @@ export function SchedulePage() {
             {hours && <div className="truncate tabular-nums">{windowLabel(hours)}</div>}
           </div>
         ),
-        info: hours ? <TrackInfo track={track} day={day} hours={hours} /> : undefined,
+        info: hours ? <TrackInfo track={track} day={day} /> : undefined,
       };
     });
     if (sessions.some((x) => x.trackId === null)) {
