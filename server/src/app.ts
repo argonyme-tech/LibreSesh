@@ -18,6 +18,7 @@ import { bundleRoutes } from './routes/bundle.js';
 import { contributionRoutes } from './routes/contributions.js';
 import { eventAuthRoutes } from './routes/eventAuth.js';
 import { eventRoutes } from './routes/events.js';
+import { importRoutes } from './routes/import.js';
 import { eventMeRoutes, meRoutes } from './routes/me.js';
 import { peopleRoutes } from './routes/people.js';
 import { roomRoutes } from './routes/rooms.js';
@@ -53,6 +54,7 @@ export function createApp(db: Db, config: Config): App {
   api.use(identityMiddleware(db, process.env.NODE_ENV === 'production'));
   api.use(meRoutes(ctx));
   api.use(eventRoutes(ctx));
+  api.use(importRoutes(ctx));
   api.use(backupRoutes(ctx));
 
   const event = Router({ mergeParams: true });

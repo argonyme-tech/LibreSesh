@@ -1,0 +1,457 @@
+/**
+ * Build a whole event — rooms, tracks, tags and a full grid of sessions —
+ * from one JSON document.
+ *
+ * The document is written for a *transcriber*, not for the database. A printed
+ * schedule, a photo of a wall, a conference website: whatever it is read from
+ * has room names and wall-clock times and no ids at all, so this format has
+ * none either. Rooms, tracks and tags are declared once by name and referred
+ * to by that name; times are the local times printed on the schedule, and the
+ * event's own timezone turns them into instants. That is also why it is not
+ * `export.json` read backwards — an export is a record of ids, this is a
+ * description of a schedule, and only the second one can be typed by hand or
+ * produced from a picture.
+ *
+ * Two rules make it safe to point at a production database:
+ *
+ * - **All or nothing.** Everything lands in one transaction. A document that
+ *   fails on its last session leaves no half-built event behind, so the fix is
+ *   always "correct the file and run it again".
+ * - **Dry run.** `dryRun` does the entire import, collects the same counts,
+ *   warnings and errors, and rolls back. Nothing else tells you a transcription
+ *   is right except doing it.
+ *
+ * Contradictions inside the document are errors; things that are merely
+ * suspicious are warnings, returned alongside the result rather than thrown.
+ */
+import { z } from 'zod';
+import { hashPassword, setRole } from './auth.js';
+import { audit } from './audit.js';
+import { type Config, isDemoEvent } from './config.js';
+import type { Db, EventRow } from './db.js';
+import { badRequest, conflict, HttpError } from './errors.js';
+import { resolveEventPasswords, type PasswordField } from './eventPasswords.js';
+import { assertValidTimes } from './sessionRules.js';
+import { nextRoomColor } from './shared/roomColors.js';
+import { localDate, localMinuteOfDay, zonedTimeToUtc } from './shared/time.js';
+import { resolveSpeaker } from './speakers.js';
+import {
+  colorSchema,
+  dateSchema,
+  distinctPasswordsRefinement,
+  isoInstantSchema,
+  minuteOfDaySchema,
+  optionalTrimmed,
+  passwordSchema,
+  roleLabelSchema,
+  slugSchema,
+  timezoneSchema,
+  trimmed,
+} from './validation.js';
+
+/** 24-hour wall clock. `24:00` is allowed as an end: it means midnight closing
+ *  the day, which is how a last session of the evening is usually printed. */
+const startTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Expected HH:MM (24-hour)');
+const endTimeSchema = z
+  .string()
+  .regex(/^(([01]\d|2[0-3]):[0-5]\d|24:00)$/, 'Expected HH:MM (24-hour), or 24:00 for midnight');
+
+const importRoomSchema = z.object({
+  name: trimmed(80),
+  description: optionalTrimmed(500).optional(),
+  capacity: z.number().int().min(0).max(100000).nullable().optional(),
+  color: colorSchema.optional(),
+  openBooking: z.boolean().optional(),
+});
+
+const importTrackSchema = z.object({ name: trimmed(60), color: colorSchema.optional() });
+
+const importTagSchema = z.object({ name: trimmed(40), color: colorSchema.optional() });
+
+/**
+ * A session names its room; a room is never invented from a session. A typo
+ * that quietly grew a fourth column would be far harder to spot in a grid than
+ * a rejection naming the row it came from.
+ */
+const importSessionSchema = z
+  .object({
+    room: trimmed(80),
+    track: trimmed(60).nullish(),
+    tags: z.array(trimmed(40)).max(20).optional(),
+    type: z.enum(['official', 'open']).optional(),
+    title: trimmed(120),
+    description: optionalTrimmed(5000).optional(),
+    /** Free text, matched to an existing profile or given a new unclaimed one. */
+    speaker: optionalTrimmed(120).optional(),
+    /** Local date and times, as printed on the schedule. */
+    date: dateSchema.optional(),
+    start: startTimeSchema.optional(),
+    end: endTimeSchema.optional(),
+    /** The alternative: instants, for a document a program wrote. */
+    startsAt: isoInstantSchema.optional(),
+    endsAt: isoInstantSchema.optional(),
+  })
+  .superRefine((v, ctx) => {
+    const local = v.date !== undefined || v.start !== undefined || v.end !== undefined;
+    const instants = v.startsAt !== undefined || v.endsAt !== undefined;
+    if (local && instants) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Give either date/start/end or startsAt/endsAt, not both',
+      });
+      return;
+    }
+    if (instants) {
+      if (v.startsAt === undefined || v.endsAt === undefined) {
+        ctx.addIssue({ code: 'custom', message: 'startsAt and endsAt go together' });
+      }
+      return;
+    }
+    if (v.date === undefined || v.start === undefined || v.end === undefined) {
+      ctx.addIssue({ code: 'custom', message: 'Needs date, start and end (or startsAt/endsAt)' });
+    }
+  });
+
+export const eventImportSchema = z
+  .object({
+    /** Present on a document this app produced; ignored, but not rejected. */
+    format: z.literal('libresesh.event').optional(),
+    version: z.literal(1).optional(),
+    event: z
+      .object({
+        name: trimmed(120),
+        slug: slugSchema,
+        timezone: timezoneSchema,
+        startDate: dateSchema,
+        endDate: dateSchema,
+        dayStartMin: minuteOfDaySchema.optional(),
+        dayEndMin: minuteOfDaySchema.optional(),
+        userRoleLabel: roleLabelSchema.optional(),
+        // Blank fields are filled in and handed back once, exactly as when an
+        // event is created by hand — nobody transcribing a schedule should
+        // have to invent three passwords to get it in.
+        viewerPassword: passwordSchema.optional(),
+        userPassword: passwordSchema.optional(),
+        adminPassword: passwordSchema.optional(),
+      })
+      .refine((v) => v.endDate >= v.startDate, {
+        message: 'End date must not be before the start date',
+        path: ['endDate'],
+      })
+      .refine((v) => (v.dayEndMin ?? 1320) > (v.dayStartMin ?? 480), {
+        message: 'Day end must be after day start',
+        path: ['dayEndMin'],
+      })
+      .superRefine(distinctPasswordsRefinement),
+    /** Array order is column order on the grid — the order they are printed in. */
+    rooms: z.array(importRoomSchema).max(100).optional(),
+    tracks: z.array(importTrackSchema).max(60).optional(),
+    tags: z.array(importTagSchema).max(200).optional(),
+    sessions: z.array(importSessionSchema).max(1000).optional(),
+  })
+  .strict();
+
+export type EventImport = z.infer<typeof eventImportSchema>;
+
+export interface ImportCounts {
+  rooms: number;
+  tracks: number;
+  tags: number;
+  sessions: number;
+  /** Profiles created for speaker names nobody in this event answered to. */
+  people: number;
+}
+
+export interface ImportResult {
+  slug: string;
+  /** Absent on a dry run: nothing was written, so there is no id to give. */
+  eventId: number | null;
+  dryRun: boolean;
+  counts: ImportCounts;
+  /** Things worth a second look that are not reasons to refuse the import. */
+  warnings: string[];
+  /** Only the passwords this instance invented, shown once. */
+  generatedPasswords: Partial<Record<PasswordField, string>>;
+}
+
+/** Thrown to roll a dry run back once it has produced its answer. */
+class DryRunFinished extends Error {
+  constructor(readonly result: ImportResult) {
+    super('dry run');
+  }
+}
+
+const minuteOfDay = (hhmm: string): number => {
+  const [h, m] = hhmm.split(':').map(Number) as [number, number];
+  return h * 60 + m;
+};
+
+/** `sessions[3] "Opening keynote"` — every message says which row it came from. */
+const rowLabel = (index: number, title: string): string => `sessions[${index}] "${title}"`;
+
+/** Case- and whitespace-insensitive, because a transcription is not consistent. */
+const key = (name: string): string => name.trim().replace(/\s+/g, ' ').toLowerCase();
+
+/** Names are the only handle the document has, so two of them must not collide. */
+function assertNamesDistinct(items: { name: string }[], kind: string): void {
+  const seen = new Set<string>();
+  for (const item of items) {
+    if (seen.has(key(item.name))) throw badRequest(`Two ${kind} are both called "${item.name}"`);
+    seen.add(key(item.name));
+  }
+}
+
+export interface ImportOptions {
+  /** Whose import this is: creator of every row, and admin of the new event. */
+  actorIdentityId: number;
+  dryRun?: boolean;
+}
+
+export function importEvent(
+  db: Db,
+  config: Config,
+  doc: EventImport,
+  { actorIdentityId, dryRun = false }: ImportOptions,
+): ImportResult {
+  const rooms = doc.rooms ?? [];
+  const tracks = doc.tracks ?? [];
+  const tags = doc.tags ?? [];
+  const sessions = doc.sessions ?? [];
+
+  if (rooms.length === 0 && sessions.length > 0) {
+    throw badRequest('Sessions need rooms — none are declared');
+  }
+
+  const existing = db
+    .prepare<[string], { id: number }>('SELECT id FROM events WHERE slug = ?')
+    .get(doc.event.slug);
+  if (existing) throw conflict('That slug is already taken', 'slug_taken');
+
+  const { passwords, generated } = resolveEventPasswords(
+    doc.event,
+    isDemoEvent(config, doc.event.slug),
+  );
+
+  const warnings: string[] = [];
+  const now = new Date().toISOString();
+
+  const run = (): ImportResult => {
+    const eventId = Number(
+      db
+        .prepare(
+          `INSERT INTO events
+            (slug, name, timezone, start_date, end_date, day_start_min, day_end_min,
+             viewer_pw_hash, user_pw_hash, admin_pw_hash, archived, user_role_label, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+        )
+        .run(
+          doc.event.slug,
+          doc.event.name,
+          doc.event.timezone,
+          doc.event.startDate,
+          doc.event.endDate,
+          doc.event.dayStartMin ?? 480,
+          doc.event.dayEndMin ?? 1320,
+          hashPassword(passwords.viewerPassword),
+          hashPassword(passwords.userPassword),
+          hashPassword(passwords.adminPassword),
+          doc.event.userRoleLabel ?? 'attendee',
+          now,
+        ).lastInsertRowid,
+    );
+    const event = db
+      .prepare<[number], EventRow>('SELECT * FROM events WHERE id = ?')
+      .get(eventId) as EventRow;
+
+    assertNamesDistinct(rooms, 'rooms');
+    const roomIds = new Map<string, number>();
+    const insertRoom = db.prepare(
+      `INSERT INTO rooms (event_id, name, description, capacity, color, open_booking, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    );
+    const roomColors: string[] = [];
+    for (const [order, room] of rooms.entries()) {
+      const color = room.color ?? nextRoomColor(roomColors);
+      roomColors.push(color);
+      const id = insertRoom.run(
+        eventId,
+        room.name,
+        room.description ?? '',
+        room.capacity ?? null,
+        color,
+        room.openBooking ? 1 : 0,
+        order,
+      ).lastInsertRowid;
+      roomIds.set(key(room.name), Number(id));
+    }
+
+    assertNamesDistinct(tracks, 'tracks');
+    const trackIds = new Map<string, number>();
+    const insertTrack = db.prepare(
+      'INSERT INTO tracks (event_id, name, color, sort_order) VALUES (?, ?, ?, ?)',
+    );
+    const trackColors: string[] = [];
+    for (const [order, track] of tracks.entries()) {
+      const color = track.color ?? nextRoomColor(trackColors);
+      trackColors.push(color);
+      const id = insertTrack.run(eventId, track.name, color, order).lastInsertRowid;
+      trackIds.set(key(track.name), Number(id));
+    }
+
+    assertNamesDistinct(tags, 'tags');
+    const tagIds = new Map<string, number>();
+    const insertTag = db.prepare('INSERT INTO tags (event_id, name, color) VALUES (?, ?, ?)');
+    for (const tag of tags) {
+      const id = insertTag.run(eventId, tag.name, tag.color ?? '#6B7280').lastInsertRowid;
+      tagIds.set(key(tag.name), Number(id));
+    }
+
+    const insertSession = db.prepare(
+      `INSERT INTO sessions
+        (event_id, room_id, track_id, type, title, description, speaker, speaker_id,
+         livestream_url, starts_at, ends_at, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, '', ?, '', ?, ?, ?, ?, ?)`,
+    );
+    const linkTag = db.prepare(
+      'INSERT OR IGNORE INTO session_tags (session_id, tag_id) VALUES (?, ?)',
+    );
+    /** Placed sessions per room, to notice a double booking after the fact. */
+    const placed = new Map<number, { startsAt: number; endsAt: number; label: string }[]>();
+
+    for (const [index, session] of sessions.entries()) {
+      const label = rowLabel(index, session.title);
+      const roomId = roomIds.get(key(session.room));
+      if (roomId === undefined) {
+        throw badRequest(`${label}: no room called "${session.room}" is declared`);
+      }
+
+      let trackId: number | null = null;
+      if (session.track) {
+        const found = trackIds.get(key(session.track));
+        if (found === undefined) {
+          throw badRequest(`${label}: no track called "${session.track}" is declared`);
+        }
+        trackId = found;
+      }
+
+      const startsAt =
+        session.startsAt !== undefined
+          ? new Date(session.startsAt)
+          : zonedTimeToUtc(session.date as string, minuteOfDay(session.start as string), event.timezone);
+      const endsAt =
+        session.endsAt !== undefined
+          ? new Date(session.endsAt)
+          : zonedTimeToUtc(session.date as string, minuteOfDay(session.end as string), event.timezone);
+
+      if (endsAt <= startsAt) throw badRequest(`${label}: ends before it starts`);
+      try {
+        assertValidTimes(event, { startsAt, endsAt });
+      } catch (err) {
+        throw badRequest(`${label}: ${(err as HttpError).message}`);
+      }
+
+      // The dates are declared in this same document, so a session outside them
+      // means one of the two is a transcription error. Refusing says which.
+      const localStart = localDate(startsAt, event.timezone);
+      if (localStart < event.start_date || localStart > event.end_date) {
+        throw badRequest(
+          `${label}: ${localStart} is outside the event dates ${event.start_date}…${event.end_date}`,
+        );
+      }
+
+      const resolvedTags: number[] = [];
+      for (const name of session.tags ?? []) {
+        const tagId = tagIds.get(key(name));
+        if (tagId === undefined) throw badRequest(`${label}: no tag called "${name}" is declared`);
+        resolvedTags.push(tagId);
+      }
+
+      const speakerId = resolveSpeaker(
+        db,
+        eventId,
+        session.speaker ? { speakerName: session.speaker } : {},
+        null,
+      );
+      const sessionId = Number(
+        insertSession.run(
+          eventId,
+          roomId,
+          trackId,
+          session.type ?? 'official',
+          session.title,
+          session.description ?? '',
+          speakerId,
+          startsAt.toISOString(),
+          endsAt.toISOString(),
+          actorIdentityId,
+          now,
+          now,
+        ).lastInsertRowid,
+      );
+      for (const tagId of new Set(resolvedTags)) linkTag.run(sessionId, tagId);
+
+      // Outside the day viewport a session is in the database and off the top
+      // or bottom of the grid — invisible, which reads as a failed import.
+      const startMin = localMinuteOfDay(startsAt, event.timezone);
+      let endMin = localMinuteOfDay(endsAt, event.timezone);
+      if (endMin === 0 && localDate(endsAt, event.timezone) > localStart) endMin = 1440;
+      if (startMin < event.day_start_min || endMin > event.day_end_min) {
+        warnings.push(
+          `${label} runs outside the hours the schedule shows (${event.day_start_min / 60}:00–${
+            event.day_end_min / 60
+          }:00) and will not be visible until you widen them in Settings`,
+        );
+      }
+
+      const inRoom = placed.get(roomId) ?? [];
+      const clash = inRoom.find(
+        (other) => other.startsAt < endsAt.getTime() && other.endsAt > startsAt.getTime(),
+      );
+      if (clash) {
+        warnings.push(`${label} overlaps ${clash.label} in "${session.room}"`);
+      }
+      inRoom.push({ startsAt: startsAt.getTime(), endsAt: endsAt.getTime(), label });
+      placed.set(roomId, inRoom);
+    }
+
+    // Every profile in a brand-new event was made by this import, from a
+    // speaker name that matched nobody already in it.
+    const people = db
+      .prepare<[number], { n: number }>('SELECT COUNT(*) AS n FROM people WHERE event_id = ?')
+      .get(eventId) as { n: number };
+
+    const result: ImportResult = {
+      slug: doc.event.slug,
+      eventId,
+      dryRun,
+      counts: {
+        rooms: rooms.length,
+        tracks: tracks.length,
+        tags: tags.length,
+        sessions: sessions.length,
+        people: people.n,
+      },
+      warnings,
+      generatedPasswords: generated,
+    };
+
+    if (dryRun) throw new DryRunFinished({ ...result, eventId: null });
+
+    setRole(db, actorIdentityId, eventId, 'admin');
+    audit(db, {
+      identityId: actorIdentityId,
+      eventId,
+      action: 'import',
+      entity: 'event',
+      entityId: eventId,
+    });
+    return result;
+  };
+
+  try {
+    return db.transaction(run)();
+  } catch (err) {
+    if (err instanceof DryRunFinished) return err.result;
+    throw err;
+  }
+}

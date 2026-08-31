@@ -57,12 +57,15 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   Noticed 2026-08-31: `pruneAudit` deletes by `event_id`, so these rows also
   grow without limit — slowly (they are all rare actions), but forever.
 
-- **Nothing imports an event export.** `GET /export.json` writes a complete
-  archive of an event and there is no route that reads one back, so the JSON is
-  a hand-off and a record, not a restore path — the encrypted whole-DB backup
-  is the only way back. An importer would want a new slug, fresh ids, and a
-  decision about what to do with authorship names that belong to identities the
-  target instance has never seen.
+- **Nothing imports an event *export*.** `POST /events/import` now builds an
+  event from a JSON schedule — rooms, tracks, tags and sessions, named rather
+  than numbered, so a transcribed programme can be imported (2026-08-31). What
+  it does not do is read `GET /export.json` back: an export is a record of ids,
+  instants and authorship belonging to identities the target instance has never
+  seen, and reading one back wants a new slug, fresh ids and a decision about
+  those names. So the encrypted whole-DB backup is still the only restore path.
+  Also still missing: importing into an *existing* event (this only creates
+  one), and any UI at all — the route is curl-only.
 
 - **Compact button overrides do nothing.** `SecondaryButton className="py-1"`
   and the `py-1.5` variants in DetailSheet, ProfilePage, ProposalBoard and
