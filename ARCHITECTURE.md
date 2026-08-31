@@ -314,6 +314,31 @@ An admin merging the wrong two people is therefore a real mistake with no undo
 truthful record either way: rows written before the merge keep the actor who
 actually wrote them.
 
+**What becomes of the losing device (the identity #9 scenario).** Merge
+unifies the event's *records*; it cannot unify the human's *devices*, because
+it cannot reach into another browser's cookie jar. So after Ada's laptop
+(identity #7) survives a merge, her phone still holds identity #9 — signed out
+of this event, but the same #9 everywhere, since an identity belongs to the
+device, not to an event (§What a cookie is, exactly). Entering an event never
+mints an identity; only a first-ever visit from a cookie-less browser does.
+From here the phone can go two ways:
+
+- **The right way: device linking.** Ada opens "Link another device" on the
+  laptop and types the phrase on the phone. The phone's cookie is repointed to
+  #7; both devices are now one identity, and #9 goes quiet forever — its row
+  stays, because the audit log points at it and its UID must keep resolving.
+- **The wrong way, which nothing currently prevents: re-entering.** If the
+  phone just passes the gate again, it comes back as #9 — same UID as before,
+  fresh role, none of its old work — and the human is split across two
+  identities again, undoing the organiser's cleanup. The gate does not yet
+  hint "if this is you, link this device instead"; that gap is queued in
+  STATUS.md.
+
+The same fork applies to anyone signed out by a merge who was *not* a
+duplicate — a genuinely different person mistakenly merged simply re-enters
+and is themselves again, minus the work that moved. That, too, is why merge is
+admin-only and confirmed.
+
 ### The audit log, and what "append-only" means here
 
 Every write appends a row: identity, event, action, entity, entity id, time.

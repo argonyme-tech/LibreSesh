@@ -73,6 +73,14 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   either a real `size` prop on the button primitives or `tailwind-merge`; a
   call site cannot win this with a class name.
 
+- **The gate doesn't suggest device linking to a merged-out device.** After a
+  both-claimed merge the losing device is signed out; when it next hits the
+  gate, nothing says "if this is you, link this device instead of re-entering".
+  A person who re-enters recreates the two-identity split the organiser just
+  merged away. Wants one line on the gate (likely only when the arriving
+  identity holds no role but does hold an event name here — exactly the
+  signed-out shape). Scenario documented in ARCHITECTURE §Merging two people.
+
 - **Number fields accept nonsense.** Room capacity is `type="number" min={0}`,
   which the browser enforces on the spinner but not on typing or paste; the
   client strips a minus sign and `parseCapacity` floors it, and the server
