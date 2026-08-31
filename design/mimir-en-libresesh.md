@@ -181,9 +181,31 @@ organización":
 - Mímir propone **flujos de reunión** y puntos organizativos según el modelo elegido.
 - Calendario/eventos usando LibreSesh como modelo/base.
 
+**Arquitectura (ampliación del facilitador, 2026-09-01): dos apps hermanas
+entrelazadas, un solo Mímir.**
+
+- **Mímir Orgs** (nueva): red social propia de organizaciones y modelos
+  organizativos — "LinkedIn de organizaciones". Chat paralelo con **prompt propio**
+  (acompañamiento de organizaciones), perfiles de organización públicos y
+  **perfiles individuales privados y opcionales**. Es la capa de acompañamiento.
+- **LibreSesh+Mímir** (esta): la capa **ejecutiva** — eventos, agenda, decisiones.
+  Mímir Orgs se nutre de ella como brazo de ejecución.
+- **El entrelazado** (contrato de conexión entre ambas):
+  1. Al crear un evento en el hub, **conectas tu organización** (perfil de Orgs).
+  2. El sistema pregunta: *¿tu modelo organizativo se refleja en este proceso?*
+     (toma de decisiones, roles, ritmos) — y Mímir diseña considerándolo.
+  3. **Evento multi-organización**: se detecta que participan varias orgs con
+     modelos distintos → se plantea explícitamente la **conducción única y el
+     sistema unificado del evento** (un acuerdo de trabajo entre organizaciones —
+     el mismo contrato de colaboración del §3b, a escala org). Nadie impone su
+     modelo; el del evento se acuerda.
+- Motor compartido: mismo Mímir, prompts distintos por app; los aprendizajes
+  (anonimizados, al nivel de principio) pueden fluir entre ambas según la ética
+  del corpus.
+
 ⚠️ Es un PROYECTO NUEVO del ecosistema, no una feature de este fork: debe pasar por su
 alta formal (clasificación Tronco/Ramas, hogar en el vault, plan propio). Esta sección
-es solo la semilla para no perder la idea.
+es la semilla + arquitectura para no perder la idea.
 
 ## 4 · Chat por proceso
 
