@@ -7,10 +7,19 @@ Last updated: 2026-08-31
 
 ## In Progress
 
-Working directly on `main`. 0.2.0 was tagged 2026-08-30; what shipped is in
-CHANGELOG.md under `[0.2.0]`, and what has landed since is under
-`[Unreleased]`. What is left of the UI-overhaul plan lives in
-`_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
+Working directly on `main`, except the breaks rework below, which sits on
+`feat/event-level-breaks` (`5e53811`) and is not merged yet. 0.2.0 was tagged
+2026-08-30; what shipped is in CHANGELOG.md under `[0.2.0]`, and what has
+landed since is under `[Unreleased]`. What is left of the UI-overhaul plan
+lives in `_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
+
+- **Breaks rework — code done, unverified in a browser.** Breaks are their own
+  event-level table now instead of `sessions.background`; the whole change is
+  on `feat/event-level-breaks` and written up in CHANGELOG `[Unreleased]` and
+  ARCHITECTURE §Breaks. 490 tests, lint and both typechecks pass, and the
+  server side is verified end to end against the dev database — but **nobody
+  has yet seen a break band in a real browser**, which is the one thing left.
+  See Blockers.
 
 - **Whole-app UI sweep.** The primitives landed, the admin page is done, and
   as of 2026-08-31 every modal is on the `Modal` primitive — the last six
@@ -30,8 +39,39 @@ CHANGELOG.md under `[0.2.0]`, and what has landed since is under
 
 ## Blockers
 
-_None._ The identity design question that sat here is decided and shipped —
-see `_planning/specs/identity-and-people.md` §Decisions for the reasoning and
+- **The breaks UI cannot be confirmed: the browser shows an older app.**
+  Reported 2026-08-31. Everything server-side checks out and was verified
+  rather than assumed:
+  - `data/app.db` holds three breaks (democonf: Lunch 12:00–14:00, Coffee
+    15:30–16:00; longconf: Lunch), all `date: null`, and the bundle returns
+    them.
+  - The running vite serves the new modules — `AdminPage.tsx` imports
+    `AdminBreaks`, `SchedulePage.tsx` passes `breaks: bundle.breaks` to both
+    `Calendar` and `ListView`.
+  - `Calendar` rendered server-side with one break emits the band with the
+    right geometry (`top:384px;height:192px` for 12:00–14:00 on an 08:00 grid),
+    `aria-hidden` and `pointer-events-none` as designed.
+  - There is no service worker and no client-side bundle cache, so nothing
+    should be able to serve stale UI.
+  - An identity that is not ours (`6f257`, admin on both events) was hitting
+    this API live, and nothing listened on 3000 before the dev server started,
+    so the tab did load from this vite.
+
+  A stale build server on port 3221 (`node server/dist/index.js` from
+  2026-08-30, pointed at a scratchpad `bug.db`) was found and killed — that one
+  explains the earlier "state seems old", but not why the reloaded app still
+  shows no breaks.
+
+  Unblocks on two checks from the browser that reports the problem: open
+  `/src/pages/AdminBreaks.tsx` on the dev server (JS source = right server, so
+  hard-reload the tab; app HTML or 404 = the forwarded port goes somewhere
+  else), and hover the build pill bottom-right, which should read
+  `v0.2.0 · 5e53811-dirty`. If it is the port, the next move is a second dev
+  server on a fresh port so VS Code auto-forwards it, side-stepping the fixed
+  `appPort` mapping in `.devcontainer/devcontainer.json`.
+
+The identity design question that sat here is decided and shipped — see
+`_planning/specs/identity-and-people.md` §Decisions for the reasoning and
 CHANGELOG `[Unreleased]` for what landed.
 
 ---
