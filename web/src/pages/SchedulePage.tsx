@@ -3,6 +3,7 @@ import { Link, useMatch, useNavigate, useParams } from "react-router-dom";
 import type {
   ContributionDto,
   ContributionKind,
+  RoomDto,
   SessionDto,
 } from "@shared/types";
 import type { Repeat } from "@shared/repeat";
@@ -19,6 +20,7 @@ import {
 import { useEventData } from "../lib/useEventData";
 import { matchesQuery } from "../lib/search";
 import { useFilters } from "../lib/useFilters";
+import { hasRoomInfo, roomSummary, seatsLabel } from "../lib/rooms";
 import { useMe } from "../lib/useMe";
 import { Calendar, PX_PER_MIN, timeClashPairs } from "../components/Calendar";
 import { DetailSheet } from "../components/DetailSheet";
@@ -46,6 +48,32 @@ const NOW_TICK_MS = 30_000;
 /** Column id for sessions with no track. Negative so it cannot collide with a
  *  real track id, and appended last so the programme proper reads first. */
 const UNTRACKED = -1;
+
+/**
+ * What a room card reveals when you linger on it. The card can show one
+ * truncated line; this is where the organiser's directions — which floor, which
+ * door, what to bring — get read in full, alongside the seat count and whether
+ * anyone may book the room.
+ */
+function RoomInfo({ room }: { room: RoomDto }) {
+  const seats = seatsLabel(room.capacity);
+  return (
+    <div className="space-y-1.5">
+      <div className="font-semibold text-stone-900 dark:text-stone-100">
+        {room.name}
+      </div>
+      {seats && <div>{seats}</div>}
+      {room.openBooking && (
+        <div className="font-medium text-stone-700 dark:text-stone-200">
+          Attendees may book this room
+        </div>
+      )}
+      {room.description.trim() && (
+        <p className="whitespace-pre-line">{room.description.trim()}</p>
+      )}
+    </div>
+  );
+}
 
 export function SchedulePage() {
   const { slug = "", sessionId } = useParams();
@@ -159,20 +187,25 @@ export function SchedulePage() {
    */
   const columns = useMemo(() => {
     if (axis === "room") {
-      return (bundle?.rooms ?? []).map((room) => ({
-        id: room.id,
-        name: room.name,
-        color: room.color,
-        detail: (
-          <div className="truncate text-xs text-stone-600">
-            {room.openBooking && (
-              <span className="font-medium text-stone-800">attendees may book this room</span>
-            )}
-            {room.openBooking && <br />}
-            {room.capacity ? `${room.capacity} seats` : "no capacity set"}
-          </div>
-        ),
-      }));
+      return (bundle?.rooms ?? []).map((room) => {
+        const summary = roomSummary(room);
+        return {
+          id: room.id,
+          name: room.name,
+          color: room.color,
+          detail: (
+            <div className="text-xs text-stone-600">
+              {room.openBooking && (
+                <div className="truncate font-medium text-stone-800">
+                  attendees may book this room
+                </div>
+              )}
+              {summary && <div className="truncate">{summary}</div>}
+            </div>
+          ),
+          info: hasRoomInfo(room) ? <RoomInfo room={room} /> : undefined,
+        };
+      });
     }
     const tracks = bundle?.tracks ?? [];
     const sessions = bundle?.sessions ?? [];

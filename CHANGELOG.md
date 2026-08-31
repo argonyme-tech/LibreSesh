@@ -349,6 +349,18 @@ All notable changes to this project are documented here.
 
 ### Changed
 
+- **A room card says what the room is, not what the database lacks.** Every
+  room without a capacity announced "no capacity set" under its name on the
+  schedule — a note about an empty column, told to attendees, on most rooms of
+  most events, since capacity is optional by design. The card now shows what
+  the room actually has: the seat count when there is one, and the organiser's
+  description beside it, on a line that truncates. Hovering, focusing or
+  tapping the card opens a panel with all of it in full — seats, whether
+  attendees may book the room, and the directions the description carries
+  (which floor, which door, what to bring), which had until now been editable
+  in the room editor and visible nowhere else on the schedule. A room with
+  nothing set shows its name alone and opens nothing.
+
 - **The last hand-rolled modals moved onto the primitive.** Six callers still
   built their own intro paragraph and button row rather than passing
   `description` and `footer`; they now match every other modal, and the ones

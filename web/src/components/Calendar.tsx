@@ -199,6 +199,64 @@ export interface CalendarColumn {
   color: string;
   /** Second line on the column card: seats, booking permission, session count. */
   detail?: ReactNode;
+  /** The fuller story — shown on hover, focus or tap, where the card itself has
+   *  room for one truncated line. Omit it and the card is inert. */
+  info?: ReactNode;
+}
+
+/**
+ * A column's header card, and the panel it reveals. The card is 176px wide and
+ * the line under the name truncates, so anything longer than a few words —
+ * where the room is, how to get in — needs somewhere else to live. Hover and
+ * focus open it for mouse and keyboard; a tap opens it on touch, where there
+ * is no hover at all.
+ */
+function ColumnCard({ column, alignEnd }: { column: CalendarColumn; alignEnd: boolean }) {
+  const [open, setOpen] = useState(false);
+  const hasInfo = column.info != null;
+  const panelId = `column-info-${column.id}`;
+
+  return (
+    <div
+      className="relative shrink-0 px-1"
+      style={{ width: COL_W }}
+      onMouseEnter={() => hasInfo && setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <div
+        className={`rounded-lg border border-stone-200/80 px-3 py-2 dark:border-stone-700 ${
+          hasInfo ? 'cursor-help' : ''
+        }`}
+        // The palette is already washed out; 'cc'/'22' keep it that way
+        // in light and dark without maintaining two palettes.
+        style={{ background: `${column.color}cc`, borderColor: column.color }}
+        tabIndex={hasInfo ? 0 : undefined}
+        aria-describedby={hasInfo && open ? panelId : undefined}
+        onFocus={() => hasInfo && setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onClick={() => hasInfo && setOpen((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setOpen(false);
+        }}
+      >
+        <div className="truncate text-xs font-semibold text-stone-900">{column.name}</div>
+        {column.detail}
+      </div>
+      {hasInfo && open && (
+        <div
+          id={panelId}
+          role="tooltip"
+          // Anchored to the last column, a left-aligned panel would hang off
+          // the end of the grid and be clipped by the scroller.
+          className={`absolute top-full z-30 mt-1 w-60 rounded-lg border border-stone-200 bg-white p-3 text-xs leading-relaxed text-stone-600 shadow-lg dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300 ${
+            alignEnd ? 'right-1' : 'left-1'
+          }`}
+        >
+          {column.info}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export interface CalendarProps {
@@ -488,18 +546,12 @@ export function Calendar({
               </span>
             </div>
           </div>
-          {columns.map((column) => (
-            <div key={column.id} className="shrink-0 px-1" style={{ width: COL_W }}>
-              <div
-                className="rounded-lg border border-stone-200/80 px-3 py-2 dark:border-stone-700"
-                // The palette is already washed out; 'cc'/'22' keep it that way
-                // in light and dark without maintaining two palettes.
-                style={{ background: `${column.color}cc`, borderColor: column.color }}
-              >
-                <div className="truncate text-xs font-semibold text-stone-900">{column.name}</div>
-                {column.detail}
-              </div>
-            </div>
+          {columns.map((column, i) => (
+            <ColumnCard
+              key={column.id}
+              column={column}
+              alignEnd={i > 0 && i === columns.length - 1}
+            />
           ))}
         </div>
 
