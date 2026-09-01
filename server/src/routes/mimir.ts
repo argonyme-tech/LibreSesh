@@ -45,6 +45,14 @@ export function mimirRoutes(ctx: Ctx): Router {
     model?: string;
   }
   const enginePath = dataDir ? join(dataDir, 'mimir-engine.json') : null;
+  const PROVIDERS: Record<string, { url?: string; model?: string }> = {
+    anthropic: {},
+    nvidia: {
+      url: 'https://integrate.api.nvidia.com/v1',
+      model: 'nvidia/llama-3.1-nemotron-70b-instruct',
+    },
+    groq: { url: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile' },
+  };
   /**
    * A key carries its provider in its prefix. Deducing the endpoint from it
    * removes the commonest configuration failure: an NVIDIA key sent to the
@@ -231,6 +239,7 @@ export function mimirRoutes(ctx: Ctx): Router {
       prompt: loadPrompt() !== null,
       model: cfg?.model ?? (cfg?.url ? '(unset)' : 'claude-opus-5'),
       provider: cfg?.url ? 'openai-compatible' : 'anthropic',
+      endpoint: cfg?.url ?? 'https://api.anthropic.com',
     });
   });
 
@@ -243,15 +252,17 @@ export function mimirRoutes(ctx: Ctx): Router {
     limit(ctx.limiter, 'write'),
     (req, res) => {
       const body = parse(mimirKeySchema, req.body);
+      const preset = body.provider ? PROVIDERS[body.provider] : undefined;
+      const url = body.url ?? preset?.url;
+      const model = body.model ?? preset?.model;
       if (!enginePath) {
         res.status(503).json({ error: { message: 'No data directory on this deployment' } });
         return;
       }
-      writeFileSync(
-        enginePath,
-        JSON.stringify({ key: body.key.trim(), url: body.url, model: body.model }),
-        { encoding: 'utf8', mode: 0o600 },
-      );
+      writeFileSync(enginePath, JSON.stringify({ key: body.key.trim(), url, model }), {
+        encoding: 'utf8',
+        mode: 0o600,
+      });
       audit(ctx.db, {
         identityId: req.identity.id,
         eventId: req.event.id,

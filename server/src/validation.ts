@@ -269,6 +269,8 @@ export const mimirPromptSchema = z.object({
 
 export const mimirKeySchema = z.object({
   key: z.string().min(4).max(300),
+  /** Explicit provider beats any guessing from the key prefix. */
+  provider: z.enum(['anthropic', 'nvidia', 'groq', 'custom']).optional(),
   /** OpenAI-compatible base URL (…/v1). Absent = Anthropic API. */
   url: z.string().url().max(300).optional(),
   model: z.string().min(1).max(120).optional(),

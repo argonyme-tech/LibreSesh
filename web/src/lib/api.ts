@@ -211,7 +211,7 @@ export const api = {
       `/e/${encode(slug)}/mimir/catalog`,
     ),
   mimirStatus: (slug: string) =>
-    request<{ engine: boolean; prompt: boolean; model: string }>(
+    request<{ engine: boolean; prompt: boolean; model: string; endpoint?: string }>(
       'GET',
       `/e/${encode(slug)}/mimir/status`,
     ),
@@ -219,7 +219,10 @@ export const api = {
     request<{ reply: string; model: string }>('POST', `/e/${encode(slug)}/mimir/chat`, {
       messages,
     }),
-  mimirSetKey: (slug: string, body: { key: string; url?: string; model?: string }) =>
+  mimirSetKey: (
+    slug: string,
+    body: { key: string; provider?: string; url?: string; model?: string },
+  ) =>
     request<{ ok: boolean; engine: boolean }>('PUT', `/e/${encode(slug)}/mimir/key`, body),
   createProposal: (slug: string, body: ProposalWrite) =>
     request<ProposalDto>('POST', `/e/${encode(slug)}/proposals`, body),

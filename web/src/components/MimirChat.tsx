@@ -26,6 +26,7 @@ export function MimirChat({
 }) {
   const [engine, setEngine] = useState<boolean | null>(null);
   const [model, setModel] = useState('');
+  const [provider, setProvider] = useState<'anthropic' | 'nvidia' | 'groq' | 'custom'>('anthropic');
   const [keyDraft, setKeyDraft] = useState('');
   const [urlDraft, setUrlDraft] = useState('');
   const [modelDraft, setModelDraft] = useState('');
@@ -58,8 +59,9 @@ export function MimirChat({
     try {
       await api.mimirSetKey(slug, {
         key: keyDraft.trim(),
-        ...(urlDraft.trim() ? { url: urlDraft.trim() } : {}),
-        ...(modelDraft.trim() ? { model: modelDraft.trim() } : {}),
+        provider,
+        ...(provider === 'custom' && urlDraft.trim() ? { url: urlDraft.trim() } : {}),
+        ...(provider === 'custom' && modelDraft.trim() ? { model: modelDraft.trim() } : {}),
       });
       setKeyDraft('');
       setShowConfig(false);
@@ -71,7 +73,7 @@ export function MimirChat({
     } finally {
       setSavingKey(false);
     }
-  }, [keyDraft, refresh, slug, toast]);
+  }, [keyDraft, provider, urlDraft, modelDraft, refresh, slug, toast]);
 
   const sendText = useCallback(
     async (content: string) => {
@@ -114,43 +116,80 @@ export function MimirChat({
       <div className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-white dark:bg-stone-900 p-5 text-sm">
         <span className={mimirChip}>◆ engine off</span>
         <p className="mt-3">
-          Paste an API key — stored on the server only, never shown again. Default provider is
-          the Claude API (<code>console.anthropic.com</code>); fill the optional fields for any
-          OpenAI-compatible engine:
+          Pick the provider, paste its API key. Stored on the server only, never shown again.
         </p>
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {(
+            [
+              ['anthropic', 'Anthropic', 'sk-ant-…'],
+              ['nvidia', 'NVIDIA', 'nvapi-…'],
+              ['groq', 'Groq', 'gsk_…'],
+              ['custom', 'Other', 'any URL'],
+            ] as const
+          ).map(([id, label, hint]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setProvider(id)}
+              aria-pressed={provider === id}
+              className={`rounded-xl border p-2.5 text-left ${
+                provider === id
+                  ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40'
+                  : 'border-stone-300 dark:border-stone-700'
+              }`}
+            >
+              <span className="block text-sm font-semibold">{label}</span>
+              <span className="block text-[11px] text-stone-500 dark:text-stone-400">{hint}</span>
+            </button>
+          ))}
+        </div>
         <div className="mt-3 space-y-2">
           <input
             type="password"
             className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-950 p-2.5 text-sm"
             value={keyDraft}
             onChange={(e) => setKeyDraft(e.target.value)}
-            placeholder="API key (sk-ant-…, nvapi-…, gsk_…)"
+            placeholder={
+              provider === 'anthropic'
+                ? 'sk-ant-…'
+                : provider === 'nvidia'
+                  ? 'nvapi-…'
+                  : provider === 'groq'
+                    ? 'gsk_…'
+                    : 'API key'
+            }
             aria-label="Engine API key"
             autoComplete="off"
           />
-          <input
-            className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-950 p-2.5 text-sm"
-            value={urlDraft}
-            onChange={(e) => setUrlDraft(e.target.value)}
-            placeholder="Base URL (optional) — e.g. https://integrate.api.nvidia.com/v1"
-            aria-label="Engine base URL"
-          />
-          <input
-            className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-950 p-2.5 text-sm"
-            value={modelDraft}
-            onChange={(e) => setModelDraft(e.target.value)}
-            placeholder="Model (optional) — e.g. nvidia/llama-3.1-nemotron-70b-instruct"
-            aria-label="Engine model"
-          />
+          {provider === 'custom' && (
+            <>
+              <input
+                className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-950 p-2.5 text-sm"
+                value={urlDraft}
+                onChange={(e) => setUrlDraft(e.target.value)}
+                placeholder="Base URL — e.g. http://your-dgx:11434/v1"
+                aria-label="Engine base URL"
+              />
+              <input
+                className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-950 p-2.5 text-sm"
+                value={modelDraft}
+                onChange={(e) => setModelDraft(e.target.value)}
+                placeholder="Model name"
+                aria-label="Engine model"
+              />
+            </>
+          )}
           <PrimaryButton onClick={() => void saveKey()} disabled={savingKey || !keyDraft.trim()}>
             {savingKey ? 'Arming…' : 'Arm engine'}
           </PrimaryButton>
         </div>
         <p className="mt-3 text-xs text-stone-500 dark:text-stone-400">
-          Anthropic = best fidelity to the doctrine prompt (key only, leave URL and model empty).
-          NVIDIA free tier logs what you send — demo use only, never real group material — and
-          NEEDS all three fields. Ollama/DGX works once the server can reach it (base URL{' '}
-          <code>http://…:11434/v1</code>, any key).
+          {provider === 'anthropic' &&
+            'Best fidelity to the doctrine prompt. Key from console.anthropic.com/settings/keys.'}
+          {provider === 'nvidia' &&
+            'Free tier — it logs what you send, so demo material only. Key from build.nvidia.com/settings/api-keys; endpoint and model are filled in for you.'}
+          {provider === 'groq' && 'Fast and free-tier friendly; endpoint and model filled in for you.'}
+          {provider === 'custom' && 'Any OpenAI-compatible endpoint — Ollama, a DGX, vLLM…'}
         </p>
         {showConfig && (
           <button
