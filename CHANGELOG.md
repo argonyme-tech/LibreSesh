@@ -482,6 +482,14 @@ All notable changes to this project are documented here.
 
 ### Fixed
 
+- **The session sheet fits the phone it opens on.** The sheet is bottom-anchored
+  inside a `fixed inset-0` parent, but capped its height with `max-h-[85vh]` —
+  and `vh` measures the viewport with the mobile address bar *hidden*. With the
+  bar showing, the sheet was taller than the box holding it, so its top was
+  clipped away: the session's own title sat above the screen with no scrolling
+  that could reach it. It is `dvh` now, the unit that tracks what you can
+  actually see, matching what `Modal` already does.
+
 - **A dropped block no longer leaps past where you put it.** The server writes
   the SSE `change` frame *before* it answers the PATCH, and the broker echoes to
   every subscriber including the one that made the write — so your own move
