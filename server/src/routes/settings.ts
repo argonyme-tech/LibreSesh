@@ -35,6 +35,42 @@ export function settingsRoutes(ctx: Ctx): Router {
     },
   );
 
+  /**
+   * Say which role a password grants, without granting it.
+   *
+   * This exists for the invite QR. The event stores bcrypt hashes and nothing
+   * else, so the server cannot hand the organiser a plaintext to encode — they
+   * have to type it. A QR is then printed, taped to a wall and scanned by two
+   * hundred people, and a typo in it is not discovered until they are all
+   * standing at the door. So the panel asks here first and refuses to draw a
+   * code for a password no role answers to.
+   *
+   * Admin-only, and rate-limited on the same bucket as the gate: it is an
+   * oracle over the event's passwords, and an attendee holding the attendee
+   * password must not be able to use it to hunt for the organiser one.
+   */
+  router.post(
+    '/password-role',
+    requireRole(ctx.db, 'admin'),
+    limit(ctx.limiter, 'auth'),
+    (req, res) => {
+      const { password } = parse(authSchema, req.body);
+      const role = roleForPassword(req.event, password);
+      if (!role) throw forbidden('That password does not match any role on this event');
+      // Worth a row: "who printed the organiser QR, and when" is exactly the
+      // question the log is for, and a printed code outlives the session that
+      // made it.
+      audit(ctx.db, {
+        identityId: req.identity.id,
+        eventId: req.event.id,
+        action: 'invite_qr',
+        entity: 'event',
+        entityId: req.event.id,
+      });
+      res.json({ role });
+    },
+  );
+
   // Deliberately not behind `requireWritable`: un-archiving is how an admin
   // makes an archived event editable again.
   router.patch(

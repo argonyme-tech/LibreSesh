@@ -3,23 +3,30 @@
 The shared queue: what is in flight, what is blocked, and what is planned.
 Shipped work moves to [CHANGELOG.md](CHANGELOG.md) and is not repeated here.
 
-Last updated: 2026-08-31
+Last updated: 2026-09-01
 
 ## In Progress
 
-Working directly on `main`, except the breaks rework below, which sits on
-`feat/event-level-breaks` (`5e53811`) and is not merged yet. 0.2.0 was tagged
-2026-08-30; what shipped is in CHANGELOG.md under `[0.2.0]`, and what has
-landed since is under `[Unreleased]`. What is left of the UI-overhaul plan
-lives in `_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
+Working on `dev`; `main` is the released line and only takes merges. The
+breaks rework has landed — `feat/event-level-breaks` (`5e53811`) is an
+ancestor of `dev` — so its code half is done and written up in CHANGELOG
+`[Unreleased]` and ARCHITECTURE §Breaks; what is left of it is the browser
+confirmation under Blockers. 0.2.0 was tagged 2026-08-30; what shipped is in
+CHANGELOG.md under `[0.2.0]`, and what has landed since is under
+`[Unreleased]`. What is left of the UI-overhaul plan lives in
+`_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
 
-- **Breaks rework — code done, unverified in a browser.** Breaks are their own
-  event-level table now instead of `sessions.background`; the whole change is
-  on `feat/event-level-breaks` and written up in CHANGELOG `[Unreleased]` and
-  ARCHITECTURE §Breaks. 490 tests, lint and both typechecks pass, and the
-  server side is verified end to end against the dev database — but **nobody
-  has yet seen a break band in a real browser**, which is the one thing left.
-  See Blockers.
+- **Tag colours — asked for 2026-09-01, nothing written yet.** Two parts: the
+  colour control on the add-tag row and in the tag editor should be a circle
+  rather than the browser's rectangular `<input type="color">` chrome, and a
+  new tag should take a colour by itself instead of every tag starting at
+  `DEFAULT_TAG_COLOR` grey (`AdminPage.tsx:42`). The auto-assignment wants its
+  own palette: `ROOM_COLORS` is deliberately washed out because a room colour
+  is a column that text sits on, while a tag is a small chip that has to read
+  at a glance — so a second, brighter list beside it, with the `nextRoomColor`
+  shape, taking the first colour no live tag is using. The server already
+  defaults a colourless tag to `#6B7280`; that default should become the
+  assignment, so an API caller gets what the form gets.
 
 - **Whole-app UI sweep.** The primitives landed, the admin page is done, and
   as of 2026-08-31 every modal is on the `Modal` primitive — the last six
@@ -39,8 +46,12 @@ lives in `_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
 
 ## Blockers
 
-- **The breaks UI cannot be confirmed: the browser shows an older app.**
-  Reported 2026-08-31. Everything server-side checks out and was verified
+- **UI changes cannot be confirmed: the browser shows an older app.**
+  Reported 2026-08-31 against the breaks band, and still what stands between
+  "written and green" and "seen working". Everything since has shipped on a
+  read-through: the breaks band, and on 2026-08-31/09-01 the room card's info
+  panel (`63d3f4d`, `48e9c12`, `c7ae002`) and the track-hours editor with its
+  per-day rows (`e4eb832`). Server side everything checks out, and was verified
   rather than assumed:
   - `data/app.db` holds three breaks (democonf: Lunch 12:00–14:00, Coffee
     15:30–16:00; longconf: Lunch), all `date: null`, and the bundle returns
@@ -81,6 +92,18 @@ CHANGELOG `[Unreleased]` for what landed.
 _The only queue of future work, priority-ordered. Top High-Priority item = next up._
 
 ## High Priority
+
+- **A track has no description, so its info panel has little to say.** Filed
+  2026-09-01. A room carries `description` — which floor, which door, what to
+  bring — and the schedule now reads it through the ⓘ on the column card. A
+  track carries only a name, a colour and, since `e4eb832`, its hours, so the
+  same button can explain what the hours mean but not what the strand *is*.
+  Wanted: `tracks.description`, a field in the track editor beside the hours,
+  and the text shown through the panel that already exists — the presentation
+  is built, so this is a column, a validation line, an editor field, a mapper
+  and the export/import pair. Worth doing in the same pass: `ColumnCard` takes
+  whatever node the page hands it and two callers now build that node by hand;
+  a third is the point to give it a shape.
 
 - **The drop still flickers, and the fix so far only made it smaller.**
   Reported 2026-08-31, after the two fixes in CHANGELOG `[Unreleased]` landed
@@ -261,6 +284,31 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
     profile**, **Merge a duplicate**, the two proposal modals — submitting on
     Enter and not double-submitting.
 
+  From 2026-09-01, none of it seen in a browser:
+  - the **info button on a column card**: that the ⓘ appears only on rooms with
+    a description and tracks with hours, that hover, focus and tap all open the
+    panel, and — the bug fixed in `c7ae002` — that the panel opens flush under
+    *its own* card in a row where the cards are different heights, including
+    the right-aligned one on the last column;
+  - the **track editor**: the hours toggle, the per-day rows and their day
+    picker offering only dates without a window, and that the list row reads
+    `09:00–13:00 +1 day`;
+  - the **session form's track picker**, which labels each option with the
+    hours for the day being placed, and the refusal that arrives from the
+    server when an attendee books outside them;
+  - the **invite QR**, which has had no camera anywhere near it. The encoder is
+    verified — the symbol renders with correct finder patterns and the URL
+    round-trips through the fragment, both under test — but *scanning* is the
+    part no test in this repo can reach. Wanted: a real phone camera on the
+    rendered code; that the gate then shows **Invited as …** with no password
+    box; that the address bar reads a bare `/e/:slug` immediately after, and
+    that Back does not restore the fragment; that copying the URL at that point
+    yields a link which asks a second device for the password. Also worth a
+    look on paper — print it and scan the print, which is the only test of the
+    module size at the default 176px. The sharing warning beside it is
+    role-dependent — amber for the attendee and organiser codes, a plain line
+    for the viewer one — so all three want a look.
+
   From 2026-08-30:
   - the `Modal` rewrite — overlay scrolls, `dvh` cap — against the tallest
     modal there is, and the one it was reported on ("Link another device");
@@ -296,6 +344,15 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   would have contained it; there is still none.
 
 ## Medium Priority
+
+- **A track window cannot close a day.** Noted 2026-09-01 when track hours
+  landed. An override row is a window and a window must end after it starts, so
+  "the workshops track does not run on the last day" cannot be said — the
+  nearest thing is a one-minute window nobody can book, which is a trick rather
+  than a statement. The fix is a `closed` flag on `track_windows` that the
+  resolver reads before the times, plus a checkbox on the per-day row. Wait for
+  someone to actually want it: a track that skips a day is often better said by
+  not scheduling anything on it.
 
 - **Strip the `Claude-Session:` links out of the git history.** Every commit
   Claude Code made carries a `Claude-Session: https://claude.ai/code/session_…`
@@ -412,9 +469,12 @@ against the code on 2026-08-30:
   The identity model has grown a lot since — profiles, device linking, speaker
   codes — but every bit of it is deliberately account-free: a speaker code
   binds a phrase to a person, and never asks for an email or a password.
-- **Email of any kind**, **image uploads**, **multi-language**, and **per-room
-  QR codes**. Still true to the letter — there is no mail, upload, i18n or QR
-  code anywhere in the tree.
+- **Email of any kind**, **image uploads**, and **multi-language**. Still true
+  to the letter — there is no mail, upload or i18n anywhere in the tree.
+- **Per-room QR codes** — a code on a door that opens that room's schedule.
+  Still out. Note that the tree now *has* a QR encoder, added 2026-09-01 for
+  invite codes (CHANGELOG `[Unreleased]`, ARCHITECTURE §Invite QR codes), so
+  what keeps this out is the decision and no longer the absence of the means.
 
 ## Voting: pitches yes, programme no
 

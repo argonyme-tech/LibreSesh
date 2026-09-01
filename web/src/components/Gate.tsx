@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import type { Me, Role } from '@shared/types';
 import { ApiError, api } from '../lib/api';
+import { takeInvite } from '../lib/inviteLink';
 import { useMe } from '../lib/useMe';
-import { Field, PrimaryButton, SecondaryButton, inputClass, linkClass } from './ui';
+import { Field, PrimaryButton, RoleBadge, SecondaryButton, inputClass, linkClass } from './ui';
 
 export interface GateProps {
   slug: string;
@@ -14,7 +15,14 @@ export interface GateProps {
 /** Full-screen password gate — an event's schedule is never public (SPEC §3.2). */
 export function Gate({ slug, eventName, me, onEntered }: GateProps) {
   const { refresh } = useMe();
-  const [password, setPassword] = useState('');
+  /**
+   * An invite QR puts the event password in the URL fragment. `takeInvite` has
+   * already lifted it out of the address bar at startup (`main.tsx`) and holds
+   * the one copy; this reads that copy rather than the URL, which by now is a
+   * bare `/e/:slug`.
+   */
+  const [invite, setInvite] = useState(takeInvite);
+  const [password, setPassword] = useState(invite?.password ?? '');
   const [name, setName] = useState(me?.displayName ?? '');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -147,6 +155,23 @@ export function Gate({ slug, eventName, me, onEntered }: GateProps) {
 
   const initial = (eventName ?? slug).trim().charAt(0).toUpperCase() || '?';
 
+  /**
+   * Placed by each branch rather than once at the bottom. Under an invite the
+   * only thing left to decide is the name, so it has to sit above the button
+   * that submits it — a one-tap Enter with the name field below it is a
+   * roster full of auto-generated names.
+   */
+  const nameField = (
+    <Field label="You'll appear as" hint="Remembered on this device. No account needed.">
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        maxLength={40}
+        className={inputClass}
+      />
+    </Field>
+  );
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-stone-100 dark:bg-stone-950 px-4 py-10">
       <div className="w-full max-w-sm rounded-2xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-6 shadow-sm">
@@ -191,6 +216,50 @@ export function Gate({ slug, eventName, me, onEntered }: GateProps) {
               </button>
             )}
           </>
+        ) : invite ? (
+          <>
+            <div className="mb-1 mt-3 flex items-center gap-2 text-sm text-stone-500 dark:text-stone-400">
+              <span>Invited as</span>
+              <RoleBadge role={invite.role ?? 'user'} />
+            </div>
+            <p className="mb-4 text-sm text-stone-500 dark:text-stone-400">
+              The code you scanned carries this event's password. Pick the name you'll appear
+              under and you're in.
+            </p>
+            {nameField}
+            {error && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{error}</p>}
+            {suggestion !== null && (
+              <button
+                type="button"
+                onClick={() => void enterWithSuffix(suggestion)}
+                disabled={busy}
+                className={`mt-1.5 text-xs font-semibold ${linkClass}`}
+              >
+                Enter as “{suggestion.replace(/\s+\d+$/, '')} 2” instead
+              </button>
+            )}
+            <PrimaryButton
+              className="mt-4 w-full py-2 text-sm"
+              onClick={() => void submit()}
+              disabled={busy}
+            >
+              {busy ? 'Entering…' : 'Enter'}
+            </PrimaryButton>
+            {/* The password can have been changed since the code was printed,
+                and then the QR is simply wrong. Leaving no way past it would
+                strand whoever scanned it on a screen with one dead button. */}
+            <button
+              type="button"
+              onClick={() => {
+                setInvite(undefined);
+                setPassword('');
+                setError(null);
+              }}
+              className={`mt-3 text-xs font-semibold ${linkClass}`}
+            >
+              Type a password instead
+            </button>
+          </>
         ) : (
           <>
         <p className="mb-5 text-sm text-stone-500 dark:text-stone-400">This schedule needs the event password.</p>
@@ -226,16 +295,9 @@ export function Gate({ slug, eventName, me, onEntered }: GateProps) {
           </>
         )}
 
-        <div className="mt-5 border-t border-stone-100 dark:border-stone-800 pt-4">
-          <Field label="You'll appear as" hint="Remembered on this device. No account needed.">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={40}
-              className={inputClass}
-            />
-          </Field>
-        </div>
+        {!invite && (
+          <div className="mt-5 border-t border-stone-100 dark:border-stone-800 pt-4">{nameField}</div>
+        )}
 
         <div className="mt-4 border-t border-stone-100 dark:border-stone-800 pt-4">
           {linkMode ? (

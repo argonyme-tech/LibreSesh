@@ -139,6 +139,11 @@ export const api = {
   /** Demo instances only: the gate picks a role instead of checking a password. */
   authenticateAsRole: (slug: string, role: Role, displayName?: string) =>
     request<{ role: Role }>('POST', `/e/${encode(slug)}/auth`, { role, displayName }),
+  /** Which role a password grants, without granting it — admin only. The
+   *  invite-QR panel asks before drawing a code, because the server holds only
+   *  bcrypt hashes and cannot check the organiser's typing any other way. */
+  passwordRole: (slug: string, password: string) =>
+    request<{ role: Role }>('POST', `/e/${encode(slug)}/password-role`, { password }),
   /** Rename yourself inside one event. 409 if the name is taken there. */
   renameInEvent: (slug: string, displayName: string) =>
     request<{ displayName: string }>('PATCH', `/e/${encode(slug)}/me`, { displayName }),

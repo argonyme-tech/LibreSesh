@@ -18,6 +18,7 @@ import { AdminPermissions } from './AdminPermissions';
 import { AdminBackup } from './AdminBackup';
 import { AdminAudit } from './AdminAudit';
 import { AdminAttendees } from './AdminAttendees';
+import { AdminInvite } from './AdminInvite';
 import {
   DangerButton,
   Modal,
@@ -975,6 +976,8 @@ export function AdminPage() {
             </div>
             </FormStack>
           </Section>
+
+          <AdminInvite slug={slug} userRoleLabel={userRoleLabel.trim() || undefined} />
 
           <Section
             title="Duplicate Event/Conf"
