@@ -3,6 +3,7 @@ import { Link, useMatch, useNavigate, useParams } from "react-router-dom";
 import type {
   ContributionDto,
   ContributionKind,
+  RoomDto,
   SessionDto,
   TrackDto,
 } from "@shared/types";
@@ -21,7 +22,8 @@ import {
 import { useEventData } from "../lib/useEventData";
 import { matchesQuery } from "../lib/search";
 import { useFilters } from "../lib/useFilters";
-import { roomNote, seatsLabel } from "../lib/rooms";
+import { roomHasInfo, roomNote, seatsLabel } from "../lib/rooms";
+import { UNTRACKED, matchesTracks, trackNote } from "../lib/tracks";
 import { useMe } from "../lib/useMe";
 import { Calendar, PX_PER_MIN, timeClashPairs } from "../components/Calendar";
 import { DetailSheet } from "../components/DetailSheet";
@@ -46,28 +48,69 @@ import {
 
 const NOW_TICK_MS = 30_000;
 
-/** Column id for sessions with no track. Negative so it cannot collide with a
- *  real track id, and appended last so the programme proper reads first. */
-const UNTRACKED = -1;
 
 /**
- * What the hours on a track card do not say for themselves: that they are a
- * rule rather than a description, who it binds, and whether this day keeps its
- * own window. The times themselves stay on the card and are not repeated here.
+ * Everything about a room, in one place: the organiser's directions first,
+ * then the facts.
+ *
+ * The card used to carry the seats and the booking permission on a second
+ * line, and this panel deliberately held only what the card had no room for.
+ * That split asked a reader to look in two places for one room, and put a
+ * standing claim — "attendees may book this room" — in the busiest 176px on
+ * the schedule. The card is a name now, and everything about the room is
+ * behind the ⓘ.
  */
-function TrackInfo({ track, day }: { track: TrackDto; day: string }) {
+function RoomInfo({ room }: { room: RoomDto }) {
+  const note = roomNote(room);
+  const seats = seatsLabel(room.capacity);
+  return (
+    <div className="space-y-1.5">
+      {note && <p className="whitespace-pre-line">{note}</p>}
+      {seats && <p>{seats}</p>}
+      {room.openBooking && <p>Attendees may schedule their own sessions here.</p>}
+    </div>
+  );
+}
+
+/**
+ * What a track is for, and what the hours on its card do not say for
+ * themselves: that they are a rule rather than a description, who it binds,
+ * and whether this day keeps its own window. The times themselves stay on the
+ * card, so they are not repeated here.
+ */
+function TrackInfo({
+  track,
+  day,
+  note,
+  hours,
+}: {
+  track: TrackDto;
+  day: string;
+  /** The organiser's context for the strand, or '' if they gave none. */
+  note: string;
+  /** Whether the card is showing hours that need explaining. */
+  hours: boolean;
+}) {
   const ownDay = track.windows.some((w) => w.date === day);
   return (
     <div className="space-y-1.5">
-      <p>
-        The hours on the card are a rule: a session outside them is refused, unless an organiser
-        places it.
-      </p>
-      {ownDay && <p>Today keeps its own window — other days differ.</p>}
-      {!ownDay && track.windows.length > 0 && (
-        <p>
-          Other days differ: {track.windows.map((w) => `${w.date} ${windowLabel(w)}`).join(", ")}.
-        </p>
+      {/* The organiser's words first: a reader who tapped the button wants to
+          know what the strand is, and the hours are a footnote to that. */}
+      {note && <p className="whitespace-pre-line">{note}</p>}
+      {hours && (
+        <>
+          <p>
+            The hours on the card are a rule: a session outside them is refused, unless an organiser
+            places it.
+          </p>
+          {ownDay && <p>Today keeps its own window — other days differ.</p>}
+          {!ownDay && track.windows.length > 0 && (
+            <p>
+              Other days differ:{" "}
+              {track.windows.map((w) => `${w.date} ${windowLabel(w)}`).join(", ")}.
+            </p>
+          )}
+        </>
       )}
     </div>
   );
@@ -144,6 +187,9 @@ export function SchedulePage() {
   // Only offered when the event actually has tracks; otherwise there is one
   // sensible axis and no switch to show.
   const hasTracks = (bundle?.tracks.length ?? 0) > 0;
+  /** Whether the programme still holds sessions with no track — what makes the
+   *  "Unassigned" filter chip, and the column of the same name, worth showing. */
+  const hasUntracked = (bundle?.sessions ?? []).some((s) => s.trackId === null);
   const axis: "room" | "track" =
     hasTracks && filters.axis === "track" ? "track" : "room";
 
@@ -186,25 +232,15 @@ export function SchedulePage() {
   const columns = useMemo(() => {
     if (axis === "room") {
       return (bundle?.rooms ?? []).map((room) => {
-        const seats = seatsLabel(room.capacity);
-        // Seats and the booking permission fit on the card; the organiser's
-        // directions do not, so they are the whole of what the button reveals.
-        const note = roomNote(room);
+        // The card is the room's name and nothing else. Seats, the booking
+        // permission and the directions are all the same kind of thing — facts
+        // about a room — so they live together behind the ⓘ rather than being
+        // split across a truncating second line and a panel.
         return {
           id: room.id,
           name: room.name,
           color: room.color,
-          detail: (
-            <div className="text-xs text-stone-600">
-              {room.openBooking && (
-                <div className="truncate font-medium text-stone-800">
-                  attendees may book this room
-                </div>
-              )}
-              {seats && <div className="truncate">{seats}</div>}
-            </div>
-          ),
-          info: note ? <p className="whitespace-pre-line">{note}</p> : undefined,
+          info: roomHasInfo(room) ? <RoomInfo room={room} /> : undefined,
         };
       });
     }
@@ -215,6 +251,10 @@ export function SchedulePage() {
       // on a day with its own window the default is not the rule, and printing
       // it under the column would be a lie about what will be accepted.
       const hours = windowOn(track, day);
+      // The strand's own context, exactly as a room's directions are handled:
+      // the session count and the hours are on the card, so the panel carries
+      // what the card has no room for.
+      const note = trackNote(track);
       return {
         id: track.id,
         name: track.name,
@@ -227,7 +267,10 @@ export function SchedulePage() {
             {hours && <div className="truncate tabular-nums">{windowLabel(hours)}</div>}
           </div>
         ),
-        info: hours ? <TrackInfo track={track} day={day} /> : undefined,
+        info:
+          note || hours ? (
+            <TrackInfo track={track} day={day} note={note} hours={Boolean(hours)} />
+          ) : undefined,
       };
     });
     if (sessions.some((x) => x.trackId === null)) {
@@ -299,6 +342,7 @@ export function SchedulePage() {
             !s.tagIds.some((t) => filters.tags.includes(t))
           )
             return false;
+          if (!matchesTracks(filters.tracks, s)) return false;
           if (filters.mine && !starredIds.has(s.id)) return false;
           // Same matcher the search box uses: every word has to appear
           // somewhere in the session, in any order.
@@ -316,6 +360,7 @@ export function SchedulePage() {
     bundle,
     filters.rooms,
     filters.tags,
+    filters.tracks,
     filters.q,
     filters.soon,
     filters.mine,
@@ -992,12 +1037,15 @@ export function SchedulePage() {
                 filters={filters}
                 rooms={bundle.rooms}
                 tags={bundle.tags}
+                tracks={bundle.tracks}
+                hasUntracked={hasUntracked}
                 starredCount={starredIds.size}
               />
               <ActiveFilters
                 filters={filters}
                 rooms={bundle.rooms}
                 tags={bundle.tags}
+                tracks={bundle.tracks}
               />
             </div>
           </div>

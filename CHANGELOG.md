@@ -6,6 +6,40 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **Filter the schedule by track — including the sessions on no track.** The
+  Filter panel gained a **Tracks** section beside Rooms and Tags, with a chip
+  per track and an **Unassigned** chip for sessions nobody has put on a strand
+  yet. It is the same shape as the other chips: several tracks can be on at
+  once, an empty selection narrows nothing, and each one comes off from the
+  active-filter row beside the button.
+
+  The **Unassigned** chip is the point of the change. Untracked sessions are
+  real programme — they already get their own column on the track axis — but
+  until now they were the one thing the filters could not ask for, and "what
+  still needs a strand?" is the question an organiser asks most while a
+  programme is being built. It appears only when some session actually has no
+  track, so an event that tracks everything never sees it.
+
+  Like every other filter, it lives in the URL (`?track=3,-1`, where `-1` is
+  the unassigned bucket), so a filtered view is a link somebody else can open.
+
+- **A track can say what it is for.** Tracks now carry a description, the way
+  rooms always have. Manage Event → Tracks → **Edit** takes up to 500
+  characters — "hands-on, bring a laptop", who the strand is aimed at, what to
+  expect — and the schedule shows it behind the info button on the track's
+  column header.
+
+  That is deliberately the same place a room's directions appear, because a
+  track column and a room column are the same furniture: the card carries what
+  fits on a card (the session count, the hours the track keeps) and the button
+  carries the one thing that does not. A track with nothing to say and no hours
+  still has no info button, so nothing changes for an event that does not use
+  the field.
+
+  It travels with the event too — it is written by the JSON import (`tracks[].
+  description`) and comes back in the export, so a transcribed schedule keeps
+  the context it was transcribed with.
+
 - **Enter an event by scanning a QR code.** Manage Event → Settings → **Invite
   by QR** turns one of the three event passwords into a code for a badge, a
   poster or a sheet of paper at the door. Scanning it opens the gate with the
@@ -398,6 +432,22 @@ All notable changes to this project are documented here.
   is soft-deleted. Audited; not undoable via /trash, hence admin-only.
 
 ### Changed
+
+- **A room's column header is its name, and nothing else.** The header used to
+  carry a second line — the seats, and "attendees may book this room" — in the
+  176 pixels of a column card, where it truncated, while the organiser's
+  directions sat behind the ⓘ. That asked a reader to look in two places for
+  one room, and spent the busiest space on the schedule on a standing claim
+  that never changes.
+
+  The card is now just the room. The seats, the booking permission and the
+  directions are together behind the info button, which appears whenever there
+  is any of the three and stays away when there is none — so its presence still
+  means there is something to read.
+
+  Track columns keep their second line: what it says there — how many sessions
+  are on the track, the hours it is keeping today — changes with the day on
+  screen, and that is worth seeing without a hover.
 
 - **A room card says what the room is, not what the database lacks.** Every
   room without a capacity announced "no capacity set" under its name on the
