@@ -47,6 +47,53 @@ interface Verified {
 }
 
 /**
+ * What a leaked code actually costs, said in front of the code rather than in
+ * a doc nobody opens.
+ *
+ * Deliberately loudest for the two roles that can *write*. A viewer code
+ * getting out means a stranger reads the schedule, which is a smaller thing
+ * than the panel shouting at every organiser who prints one and teaching them
+ * to ignore the box. An attendee code gets someone into the programme; an
+ * organiser code hands over the whole event, including the other passwords —
+ * so that one is a different sentence, not a louder version of the same one.
+ */
+function ShareWarning({ role, userLabel }: { role: Role; userLabel?: string }) {
+  const attendee = userLabel ?? 'attendee';
+  if (role === 'viewer') {
+    return (
+      <p className="text-xs text-stone-500 dark:text-stone-400">
+        This one is the read-only password, so a code that travels further than you meant costs
+        least — but it is still the schedule, and the schedule is not public.
+      </p>
+    );
+  }
+  return (
+    <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+      <p className="font-semibold">Don’t share this code outside the event.</p>
+      {role === 'admin' ? (
+        <p className="mt-1">
+          It carries the <strong>organiser</strong> password. Anyone who scans it — from a photo, a
+          screenshot, a slide left on a projector — gets full control of the event: they can edit
+          and delete anything, see the audit log, change the roster, and change these passwords.
+          Hand it to the people running the event and nobody else.
+        </p>
+      ) : (
+        <p className="mt-1">
+          It carries the <strong>{attendee}</strong> password, which is permission to write: to
+          book sessions, post notes and change the programme. Put it where the people at the event
+          are — a badge, a lanyard, the door — and not anywhere it outlives the room. Posting it
+          publicly hands the programme to people who were never here.
+        </p>
+      )}
+      <p className="mt-1">
+        If it does get out, the fix is <strong>Change passwords</strong> above; everyone already
+        inside keeps their role, and a fresh code has to reach whoever hasn’t scanned yet.
+      </p>
+    </div>
+  );
+}
+
+/**
  * Turn an event password into a QR an attendee can scan at the door.
  *
  * The organiser has to type the password, and there is no way around that:
@@ -165,6 +212,7 @@ export function AdminInvite({ slug, userRoleLabel }: { slug: string; userRoleLab
                   The code itself does, though. Anyone who photographs it holds that password until
                   you change it — treat it exactly like printing the password on the poster.
                 </p>
+                <ShareWarning role={verified.role} userLabel={userRoleLabel} />
               </div>
             </div>
 

@@ -373,6 +373,15 @@ if it were printed underneath — an event password is a shared secret read off 
 wall, and this only saves the typing. A revocable per-invite token would be a
 different feature with its own table; the QR is the password, made scannable.
 
+So the panel says so, in front of the code rather than in a document nobody
+opens, and it says a different thing per role. The warning is loud for the two
+passwords that grant *writing* — an attendee code lets a stranger into the
+programme, an organiser code hands over the entire event including the other
+passwords — and quiet for the viewer one, whose leak costs a stranger reading a
+schedule. That asymmetry is the point: a box that shouted at every organiser
+who printed any code would teach them to stop reading it, and then it would not
+be there for the organiser code, which is the one that matters.
+
 The panel that draws it lives in `web/src/pages/AdminInvite.tsx`, and two
 things about it follow from the storage model rather than from taste:
 

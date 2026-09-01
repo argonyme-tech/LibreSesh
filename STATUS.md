@@ -305,7 +305,9 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
     that Back does not restore the fragment; that copying the URL at that point
     yields a link which asks a second device for the password. Also worth a
     look on paper — print it and scan the print, which is the only test of the
-    module size at the default 176px.
+    module size at the default 176px. The sharing warning beside it is
+    role-dependent — amber for the attendee and organiser codes, a plain line
+    for the viewer one — so all three want a look.
 
   From 2026-08-30:
   - the `Modal` rewrite — overlay scrolls, `dvh` cap — against the tallest

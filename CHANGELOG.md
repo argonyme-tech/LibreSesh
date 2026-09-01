@@ -23,6 +23,12 @@ All notable changes to this project are documented here.
   exactly as if the password were printed on the poster; that is what it is
   for.
 
+  Beside the code is a warning about where it may travel, pitched at what the
+  password actually grants: an attendee code is permission to write, an
+  organiser code is the whole event including the other passwords, and a viewer
+  code is a schedule that is nonetheless not public. Each says what to do if
+  one gets out.
+
   The organiser types the password to encode it, because the event stores
   bcrypt hashes and the server has no plaintext to give. It confirms the typing
   instead — a new admin-only `POST /e/:slug/password-role` names the role a
