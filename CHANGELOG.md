@@ -993,6 +993,23 @@ All notable changes to this project are documented here.
   the stored hashes too, so a new password cannot quietly land on a role that
   is staying put. Swapping two passwords in a single request still works.
 
+### Changed
+
+- **The organiser's three buttons moved down beside the filters.** Manage
+  Event, Arrange Sessions and Add session had a row of the schedule header to
+  themselves, held there by the day strip and the Grid/List and Rooms/Tracks
+  toggles beside them — which on a desktop left a wide empty gap to the right
+  of those toggles and a whole row of header height paying for three buttons.
+  They now end the row that carries search, Filter and Now, which had the same
+  gap on its right, and the header is one row shorter.
+
+  Below `sm` they still take a line of their own: on a phone they do not fit
+  beside the search box, and cramming them there is what the icon-only
+  treatment was already avoiding. The move also puts them outside the part of
+  the header that folds away as you scroll into a day — Arrange in particular
+  is a thing you reach for mid-scroll, and it used to fold out from under you.
+
+
 ## [0.2.0] — 2026-08-30
 
 ### Added

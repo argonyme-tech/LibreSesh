@@ -41,7 +41,7 @@ lives in `_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
 ## Blockers
 
 - **The breaks band still has not been seen in a browser.** What is left of
-  this: nobody has yet said whether the band is on the grid.
+  this: nobody has yet said whether the band is on the grid. DONE, works.
 
   **The "older app" half is solved, 2026-09-01, and the answer was a process.**
   A whole dev stack from 2026-08-31 was still running — `npm run dev` (pid
@@ -179,7 +179,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
   For the permissions matrix there is no remaining suspect on file. The
   optimistic overlay does move the switch on click, so if it still flicks, the
-  next thing to establish is *which* of the three states is wrong and when —
+  next thing to establish is _which_ of the three states is wrong and when —
   note that `busy !== null` disables every switch in the table during a save,
   and a disabled `Toggle` restyles, which is a visible change that is not a
   revert and could easily read as one.
@@ -206,7 +206,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   row, and the **Repeat** control in the session form — so a long programme's
   daily officials and fixed track hours are a few rows or a few clicks rather
   than sixty of either. What is left of that job:
-  - **Importing into an *existing* event.** The route only creates, so a whole
+  - **Importing into an _existing_ event.** The route only creates, so a whole
     transcribed programme still cannot be dropped into the event you are
     already running; the session form is the only way in, one session (or one
     run) at a time. Wants `POST /events/:slug/import`, gated on event admin
@@ -215,7 +215,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
     `dryRun` as now.
   - **A UI for the importer itself.** `POST /events/import` is curl plus a JSON
     file, which is right for a transcription and wrong for everything else.
-  - **Duplicate a day.** The repeat control repeats *one* session; copying a
+  - **Duplicate a day.** The repeat control repeats _one_ session; copying a
     whole day's programme onto other days is still hand work. Same expansion,
     a different front door — an action on the day rail rather than in the
     session form.
@@ -226,9 +226,9 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   a repeating session rather than by the track. Track defaults in the import
   document would be cheap; `start_min`/`end_min` on the `tracks` table is the
   bigger version and changes what a track means in the session form, the grid
-  and the filters — worth doing only to make the app *enforce* track hours.
+  and the filters — worth doing only to make the app _enforce_ track hours.
 
-- **Nothing imports an event *export*.** `POST /events/import` builds an event
+- **Nothing imports an event _export_.** `POST /events/import` builds an event
   from a JSON schedule, but does not read `GET /export.json` back: an export is
   a record of ids, instants and authorship belonging to identities the target
   instance has never seen, and reading one back wants a new slug, fresh ids and
@@ -237,7 +237,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
 - **Compact button overrides do nothing.** `SecondaryButton className="py-1"`
   and the `py-1.5` variants in DetailSheet, ProfilePage, ProposalBoard and
-  AdminPermissions are dead: Tailwind emits `.py-1` and `.py-1.5` *before* the
+  AdminPermissions are dead: Tailwind emits `.py-1` and `.py-1.5` _before_ the
   primitives' `.py-2.5`, so the base always wins and those buttons are full
   height. Verified in the built CSS on 2026-08-31. Predates the button-height
   fix — that change kept the situation identical rather than creating it. Wants
@@ -250,7 +250,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   A person who re-enters recreates the two-identity split the organiser just
   merged away. Wants one line on the gate (likely only when the arriving
   identity holds no role but does hold an event name here — exactly the
-  signed-out shape). Scenario documented in ARCHITECTURE §Merging two people.
+  signed-out shape). Scenario documented in ARCHITECTURE §Merging two people. @claude: this should go into a separate to-do file for profile/user related data modelling issues and improvements.
 
 - **Number fields accept nonsense.** Room capacity is `type="number" min={0}`,
   which the browser enforces on the spinner but not on typing or paste; the
@@ -296,9 +296,9 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   - the **Repeat** control in the session form — the only part of it with no
     automated coverage, since the server route is tested and the modal is not.
     Worth watching: the weekday chips wrapping under `sm` inside a `FormGrid`
-    that is already two columns; that the start day's chip reads as *fixed*
+    that is already two columns; that the start day's chip reads as _fixed_
     rather than broken when clicking it does nothing; and that the live count
-    and the **Create N sessions** button track the *Until* select as it moves.
+    and the **Create N sessions** button track the _Until_ select as it moves.
     Then create a real run of ten and confirm the grid fills without a reload —
     the client applies each created session itself and the server also
     broadcasts them, so a double-apply would show up here first;
@@ -333,7 +333,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   - the **info button on a column card**: that the ⓘ appears only on rooms with
     a description and tracks with hours, that hover, focus and tap all open the
     panel, and — the bug fixed in `c7ae002` — that the panel opens flush under
-    *its own* card in a row where the cards are different heights, including
+    _its own_ card in a row where the cards are different heights, including
     the right-aligned one on the last column;
   - the **track editor**: the hours toggle, the per-day rows and their day
     picker offering only dates without a window, and that the list row reads
@@ -343,7 +343,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
     server when an attendee books outside them;
   - the **invite QR**, which has had no camera anywhere near it. The encoder is
     verified — the symbol renders with correct finder patterns and the URL
-    round-trips through the fragment, both under test — but *scanning* is the
+    round-trips through the fragment, both under test — but _scanning_ is the
     part no test in this repo can reach. Wanted: a real phone camera on the
     rendered code; that the gate then shows **Invited as …** with no password
     box; that the address bar reads a bare `/e/:slug` immediately after, and
@@ -358,11 +358,15 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   - the `Modal` rewrite — overlay scrolls, `dvh` cap — against the tallest
     modal there is, and the one it was reported on ("Link another device");
   - the schedule header on a narrow screen: theme now lives in the profile
-    menu, Manage/Arrange/Add sit together and go icon-only below `sm`. Watch
-    where the action row chooses to wrap;
+    menu, Manage/Arrange/Add sit together and go icon-only below `sm`. As of
+    2026-09-01 they end the search/Filter/Now row rather than the day-strip row
+    above it, and take a line of their own only below `sm` (`basis-full`) —
+    so what wants watching is where that row breaks between `sm` and a laptop,
+    and how it looks with several active-filter chips beside it;
   - the tour no longer auto-starting for an organiser, while "?" still opens
     it;
   - the drag, now-line and 360px checks that were already outstanding.
+
 - **Deploy paths, and what is actually proven.** Railway builds from
   `deploy/Dockerfile` (`railway.json` pins the builder — Railway's Node
   autodetection runs a plain `npm ci`, which honours our `ignore-scripts=true`
@@ -400,7 +404,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   for the whole venue at 5 wrong guesses; with it set, the app must not also be
   reachable off-proxy, or `X-Forwarded-For` is the attacker's to write.
 
-  What is missing is a counter the caller cannot reset: failures per *event*,
+  What is missing is a counter the caller cannot reset: failures per _event_,
   surviving a new cookie, growing the wait as they pile up. `auth_failed`
   already lands in the audit log on every miss (`eventAuth.ts:76`), so the
   count exists — nothing reads it, and no organiser is ever told that someone
@@ -452,7 +456,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 - **Put the last two popdowns on `usePopover`.** `ProfileMenu` and
   `SpeakerCombobox` still position themselves and still carry their own
   outside-click/Escape effects. Neither can overhang today — one is `right-0
-  w-48`, the other `w-full` — so they are exempted by name in
+w-48`, the other `w-full` — so they are exempted by name in
   `tests/popoverOverflow.test.ts`, which also asserts the reason still holds.
   Moving them over would delete the last two copies of the dismiss effect and
   let that allowlist go away.
@@ -464,11 +468,11 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   phone at a conference venue, which is the network this app is actually used
   on.
 
-  The argument *for* reducing: `@floating-ui/react-dom` is roughly a third of
+  The argument _for_ reducing: `@floating-ui/react-dom` is roughly a third of
   the weight and does the whole job the bug needed — `strategy: 'fixed'`,
   `shift`, `flip`, `size`. Everything above that line is convenience.
 
-  The argument *against*, which is why the fuller package was chosen: the extra
+  The argument _against_, which is why the fuller package was chosen: the extra
   weight buys `useDismiss`, `useRole` and `FloatingFocusManager`. Dropping to
   `react-dom` means hand-rolling the outside-click/Escape effect again in every
   popdown — the four near-identical copies this change set out to delete — and
@@ -497,7 +501,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   **158 commits across all refs** — 140 of 169 on `main`, 141 of 170 on `dev` —
   spanning 2026-08-28 (`7692079`) to today, naming four distinct sessions. The
   string is in commit messages only: it appears in no tracked file and `git log
-  -S` finds it in no historical blob, so there is nothing to clean in the tree.
+-S` finds it in no historical blob, so there is nothing to clean in the tree.
 
   Not urgent, and not a leak: fetching one of the URLs anonymously returns
   **403**, so the transcripts are not readable by anyone who is not signed in
@@ -544,7 +548,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
 - **Show an organiser the old addresses an event still answers to.** Renaming
   an event landed 2026-09-01 and every former slug goes on resolving, but
-  nothing in the UI lists them — the only trail is the *renamed* rows in the
+  nothing in the UI lists them — the only trail is the _renamed_ rows in the
   audit log. `formerSlugs` was written for this and then removed rather than
   left as dead code (`git show` the rename commit for the four lines). Worth it
   only if an organiser ever asks "which names are burned?"; the guarantee they
@@ -554,7 +558,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 - **A real series, and a root event other events inherit from.** Deferred
   2026-08-31, deliberately and not for want of time. `repeat` expands to
   ordinary rows precisely because the event it was built for is one whose
-  sessions *drift* — the planned 14:00 becomes 14:20 on the day, and a series
+  sessions _drift_ — the planned 14:00 becomes 14:20 on the day, and a series
   that asked "does moving Tuesday move all of them?" would be answering the
   wrong question every single time. So the shipped design is right for this
   event, and the two ideas below are right for a different one, where a
@@ -575,7 +579,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   authoring convenience and it stops at the door.
 
 - **Quadratic voting on pitches.** Floated 2026-08-31 for a future instance,
-  explicitly not for this one: it changes what a vote *is* (a budget spent
+  explicitly not for this one: it changes what a vote _is_ (a budget spent
   across pitches, not a click per pitch), so it wants its own schema and its
   own thinking rather than a column bolted onto `proposal_interest`.
 
@@ -586,7 +590,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   isn't: the runner tracks migrations by filename, so an edit never reaches a
   database that already recorded the file, and the symptom is not a migration
   error but a crash at runtime (`table identities has no column named
-  public_id` on the first request from a new browser). Nothing warns about it —
+public_id` on the first request from a new browser). Nothing warns about it —
   tests build fresh databases every time, and so does a reseed. Low priority
   because no instance holds data yet, and the remedy until then is to delete
   and recreate. What it wants is a line in the ARCHITECTURE §Migrations
@@ -595,7 +599,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
 - **A one-line reset for the local database.** Wiping a dev instance is
   currently three commands: stop the api, `rm -f data/app.db data/app.db-wal
-  data/app.db-shm`, restart and let boot reseed. Easy to get wrong in the
+data/app.db-shm`, restart and let boot reseed. Easy to get wrong in the
   direction that hurts — `rm data/app.db*` also takes the `app.db.backup-*`
   copies sitting in the same directory. Wants an `npm run db:reset` that names
   the three files explicitly and leaves `data/.cookie-secret` alone (deleting
@@ -640,7 +644,7 @@ against the code on 2026-08-30:
 - **Email of any kind**, **image uploads**, and **multi-language**. Still true
   to the letter — there is no mail, upload or i18n anywhere in the tree.
 - **Per-room QR codes** — a code on a door that opens that room's schedule.
-  Still out. Note that the tree now *has* a QR encoder, added 2026-09-01 for
+  Still out. Note that the tree now _has_ a QR encoder, added 2026-09-01 for
   invite codes (CHANGELOG `[Unreleased]`, ARCHITECTURE §Invite QR codes), so
   what keeps this out is the decision and no longer the absence of the means.
 
