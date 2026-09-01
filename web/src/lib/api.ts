@@ -237,6 +237,25 @@ export const api = {
     request<EventDto>('PATCH', `/e/${encode(slug)}/settings`, body),
 
   // Proposal pool — the unconference pitch board (SPEC §8).
+  /** Mimir add-on. Catalog content lives server-side in the data dir. */
+  mimirCatalog: (slug: string) =>
+    request<{ version: number; dynamics: Record<string, unknown>[] }>(
+      'GET',
+      `/e/${encode(slug)}/mimir/catalog`,
+    ),
+  mimirStatus: (slug: string) =>
+    request<{ engine: boolean; prompt: boolean; model: string; endpoint?: string }>(
+      'GET',
+      `/e/${encode(slug)}/mimir/status`,
+    ),
+  mimirChat: (slug: string, messages: { role: 'user' | 'assistant'; content: string }[]) =>
+    request<{ reply: string; model: string }>('POST', `/e/${encode(slug)}/mimir/chat`, {
+      messages,
+    }),
+  mimirSetKey: (
+    slug: string,
+    body: { key: string; provider?: string; url?: string; model?: string },
+  ) => request<{ ok: boolean; engine: boolean }>('PUT', `/e/${encode(slug)}/mimir/key`, body),
   createProposal: (slug: string, body: ProposalWrite) =>
     request<ProposalDto>('POST', `/e/${encode(slug)}/proposals`, body),
   updateProposal: (slug: string, id: number, body: ProposalWrite) =>
@@ -376,6 +395,8 @@ export interface ProposalWrite {
   /** A name that matches nobody creates a person. Used instead of `speakerId`. */
   speakerName?: string;
   tagIds?: number[];
+  /** Mimir add-on: decision phase. Omitted = keep current / start at 'concern'. */
+  phase?: import('@shared/types').ProposalPhase;
 }
 
 export interface PlaceWrite {

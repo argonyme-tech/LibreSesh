@@ -359,6 +359,41 @@ export const permissionsSchema = z.record(
   z.array(z.enum(['viewer', 'user', 'speaker', 'admin'])).max(4),
 );
 
+/** Mimir add-on: the decision phases a pitch can sit in. */
+export const proposalPhases = ['concern', 'inquiry', 'proposal', 'decision'] as const;
+
+/** Mimir add-on: catalog upload. Content is validated loosely - the schema of
+ *  record is design/catalog.schema.json; here we guard shape and size only. */
+export const mimirCatalogSchema = z.object({
+  version: z.number().int().min(1),
+  dynamics: z.array(z.record(z.unknown())).max(2000),
+});
+
+export const mimirPromptSchema = z.object({
+  prompt: z.string().min(1).max(200_000),
+});
+
+export const mimirKeySchema = z.object({
+  key: z.string().min(4).max(300),
+  /** Explicit provider beats any guessing from the key prefix. */
+  provider: z.enum(['anthropic', 'nvidia', 'groq', 'custom']).optional(),
+  /** OpenAI-compatible base URL (.../v1). Absent = Anthropic API. */
+  url: z.string().url().max(300).optional(),
+  model: z.string().min(1).max(120).optional(),
+});
+
+export const mimirChatSchema = z.object({
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(['user', 'assistant']),
+        content: z.string().min(1).max(20_000),
+      }),
+    )
+    .min(1)
+    .max(80),
+});
+
 /** A pitch: everything a session has except a room and a time. */
 export const proposalSchema = z.object({
   title: trimmed(120),
@@ -366,6 +401,7 @@ export const proposalSchema = z.object({
   speakerId: z.number().int().positive().nullable().optional(),
   speakerName: optionalTrimmed(120).optional(),
   tagIds: z.array(z.number().int().positive()).max(20).optional(),
+  phase: z.enum(proposalPhases).optional(),
 });
 export const proposalPatchSchema = proposalSchema.partial();
 

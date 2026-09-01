@@ -6,6 +6,7 @@ import { AgendaPage } from './pages/AgendaPage';
 import { EventListPage } from './pages/EventListPage';
 import { NewEventPage } from './pages/NewEventPage';
 import { ImportPage } from './pages/ImportPage';
+import { MimirPage } from './pages/MimirPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { SchedulePage } from './pages/SchedulePage';
 import { SearchPage } from './pages/SearchPage';
@@ -35,6 +36,7 @@ export function App() {
           <Route path="/e/:slug/agenda" element={<AgendaPage />} />
           <Route path="/e/:slug/proposals" element={<ProposalBoard />} />
           <Route path="/e/:slug/p/:personId" element={<ProfilePage />} />
+          <Route path="/e/:slug/mimir" element={<MimirPage />} />
           <Route path="/e/:slug/admin" element={<AdminPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

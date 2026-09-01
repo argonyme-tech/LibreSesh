@@ -243,9 +243,14 @@ export interface ProposalDto {
   interestCount: number;
   /** Whether the requesting identity is one of them. */
   interested: boolean;
+  /** Mimir add-on: decision phase of the pitch. Everything starts as 'concern'. */
+  phase: ProposalPhase;
   createdAt: string;
   updatedAt: string;
 }
+
+/** Mimir add-on: the decision phases a pitch moves through. */
+export type ProposalPhase = 'concern' | 'inquiry' | 'proposal' | 'decision';
 
 /** A thematic strand across rooms and days. One per session at most, because
  *  the schedule can lay tracks out as its columns. */
