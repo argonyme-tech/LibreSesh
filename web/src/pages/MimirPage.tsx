@@ -4,6 +4,7 @@ import type { BundleDto, ContributionDto, ProposalDto, SessionDto } from '@share
 import { ApiError, api } from '../lib/api';
 import { useMe } from '../lib/useMe';
 import { eventShape } from '../lib/eventShape';
+import { readiness } from '../lib/readiness';
 import { Gate } from '../components/Gate';
 import { MimirChat, mimirChip } from '../components/MimirChat';
 import { rhythmWarnings } from '../components/RhythmCheck';
@@ -22,6 +23,7 @@ type Tool =
   | 'eventInterview'
   | 'catalog'
   | 'rhythm'
+  | 'readiness'
   | 'chat'
   | 'infographic'
   | 'sessions'
@@ -160,6 +162,7 @@ export function MimirPage() {
           ))}
         {tool === 'catalog' && <Catalog slug={slug} engine={engine} onLive={goLive} />}
         {tool === 'rhythm' && <Rhythm bundle={bundle} />}
+        {tool === 'readiness' && isAdmin && <Readiness bundle={bundle} />}
         {tool === 'infographic' && <Infographic bundle={bundle} />}
         {tool === 'sessions' && (
           <MySessions slug={slug} bundle={bundle} isAdmin={isAdmin} engine={engine} onLive={goLive} />
@@ -261,6 +264,9 @@ function Hub({
     tracks: bundle.tracks,
     timezone: bundle.event.timezone,
   });
+  // Counted here so the tile can carry the number rather than making an
+  // organiser open it to find out there was nothing.
+  const todo = isAdmin ? readiness(bundle) : [];
   return (
     <div className="space-y-8">
       <div className="rounded-2xl border border-indigo-200 dark:border-indigo-900 bg-gradient-to-br from-indigo-50 to-stone-50 dark:from-indigo-950/40 dark:to-stone-950 p-5">
@@ -329,6 +335,18 @@ function Hub({
           sub={warnings.length === 0 ? 'Schedule looks healthy' : `${warnings.length} advisory note(s)`}
           onClick={() => onOpen('rhythm')}
         />
+        {isAdmin && (
+          <Tile
+            glyph="✓"
+            title="Before the doors open"
+            sub={
+              todo.length === 0
+                ? 'Nothing outstanding'
+                : `${todo.length} thing(s) worth a look`
+            }
+            onClick={() => onOpen('readiness')}
+          />
+        )}
       </HubSection>
 
       <HubSection label="Explore">
@@ -1467,6 +1485,50 @@ function MySessions({
 }
 
 /* ---------------- rhythm ---------------- */
+
+/**
+ * Before the doors open: what is still missing, in one list.
+ *
+ * Every line is already visible somewhere in the app, one session at a time —
+ * "no speaker yet" on a detail, a backing count on a pitch, an over-capacity
+ * badge in the list. None of it was ever added up, so the organiser's real
+ * question could only be answered by walking the programme and remembering.
+ *
+ * Organisers only. Not because the facts are secret, but because every line
+ * ends in something only an organiser can do, and a list of jobs you cannot
+ * take is worse than no list.
+ */
+function Readiness({ bundle }: { bundle: BundleDto }) {
+  const found = useMemo(() => readiness(bundle), [bundle]);
+  if (found.length === 0) {
+    return (
+      <EmptyState>
+        ✓ Nothing outstanding: everyone credited can edit their own session, no backed pitch is
+        waiting, and the days are covered.
+      </EmptyState>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-stone-600 dark:text-stone-300">
+        {found.length} thing{found.length === 1 ? '' : 's'} worth a look before the doors open. Each
+        one says what was counted, so you can check it against the grid rather than take my word —
+        and none of them blocks anything.
+      </p>
+      {found.map((f) => (
+        <div
+          key={f.key}
+          className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-white dark:bg-stone-900 p-4 text-sm"
+        >
+          <b className="text-stone-800 dark:text-stone-100">{f.what}</b>
+          <p className="mt-1 text-stone-600 dark:text-stone-300">{f.because}</p>
+          <p className="mt-1 text-stone-700 dark:text-stone-200">{f.soWhat}</p>
+          <p className="mt-2 text-xs text-indigo-700 dark:text-indigo-400">{f.where}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function Rhythm({ bundle }: { bundle: BundleDto }) {
   // Breaks, track hours and the event's timezone turn most of these notes from
