@@ -3,13 +3,21 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
+  type KeyboardEventHandler,
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
 import type { Role } from '@shared/types';
+import {
+  maxDigits,
+  parseNumberField,
+  sanitizeNumberInput,
+  type NumberFieldSpec,
+} from '../lib/numberField';
 import { CloseIcon } from './icons';
 
 /**
@@ -87,6 +95,74 @@ export function FormGrid({
 }) {
   const at = cols === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2';
   return <div className={`grid items-start gap-3 ${at} ${className}`}>{children}</div>;
+}
+
+/**
+ * A field that holds a number. The only one — see `lib/numberField.ts` for why
+ * `type="number"` is not it.
+ *
+ * Digits are all that can be typed or pasted, and the range is checked here
+ * rather than by the server, so a value out of bounds says so under the field
+ * while you are still looking at it. The parsed value is the caller's to read
+ * back with `parseNumberField`; this renders the same verdict it would get.
+ */
+export function NumberField({
+  label,
+  hint,
+  spec,
+  value,
+  onChange,
+  onKeyDown,
+  suffix,
+  className = 'w-24',
+  autoFocus,
+}: {
+  label: string;
+  hint?: string;
+  spec: NumberFieldSpec;
+  value: string;
+  onChange: (next: string) => void;
+  onKeyDown?: KeyboardEventHandler<HTMLInputElement>;
+  /** Reads on from the field: "days · the rail is on for this event". */
+  suffix?: ReactNode;
+  className?: string;
+  autoFocus?: boolean;
+}) {
+  const id = useId();
+  const { error } = parseNumberField(value, spec);
+  // A field you have not filled in yet is not a field you got wrong, so the
+  // message waits until there is something in it to be wrong about.
+  const shown = value.trim() === '' ? null : error;
+
+  return (
+    <Field label={label} hint={hint} htmlFor={id}>
+      <div className="flex items-center gap-2">
+        <input
+          id={id}
+          inputMode="numeric"
+          autoComplete="off"
+          value={value}
+          onChange={(e) => onChange(sanitizeNumberInput(e.target.value, spec))}
+          onKeyDown={onKeyDown}
+          maxLength={maxDigits(spec)}
+          aria-invalid={shown ? true : undefined}
+          aria-describedby={shown ? `${id}-error` : undefined}
+          autoFocus={autoFocus}
+          className={`${inputClass} ${className} ${
+            shown ? 'border-red-400 focus:border-red-500 dark:border-red-700' : ''
+          }`}
+        />
+        {suffix && (
+          <span className="text-xs text-stone-500 dark:text-stone-400">{suffix}</span>
+        )}
+      </div>
+      {shown && (
+        <p id={`${id}-error`} role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">
+          {shown}
+        </p>
+      )}
+    </Field>
+  );
 }
 
 /** `userLabel` is the event's own word for the middle role, e.g. "attendee". */
