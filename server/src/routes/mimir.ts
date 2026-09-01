@@ -288,7 +288,7 @@ export function mimirRoutes(ctx: Ctx): Router {
           if (!r.ok) {
             const detail = (await r.text()).slice(0, 300);
             res
-              .status(r.status === 429 ? 429 : 502)
+              .status(r.status === 429 ? 429 : 424)
               .json({ error: { message: `Engine (${r.status}): ${detail}`, code: 'engine_error' } });
             return;
           }
@@ -320,12 +320,12 @@ export function mimirRoutes(ctx: Ctx): Router {
       } catch (err) {
         if (err instanceof Anthropic.APIError) {
           res
-            .status(err.status === 429 ? 429 : 502)
+            .status(err.status === 429 ? 429 : 424)
             .json({ error: { message: `Claude API: ${err.message}`, code: 'engine_error' } });
           return;
         }
         if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
-          res.status(504).json({
+          res.status(424).json({
             error: { message: 'Engine timed out — check the key/URL in Engine settings.', code: 'engine_timeout' },
           });
           return;
