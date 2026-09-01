@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
@@ -87,6 +87,35 @@ export function mimirRoutes(ctx: Ctx): Router {
   };
 
   const EMPTY = { version: 1, dynamics: [] as unknown[] };
+
+  // Flight recorder: when a container dies with no reachable logs, the crash
+  // writes itself to the data volume and survives the restart.
+  const crashPath = dataDir ? join(dataDir, 'crash.log') : null;
+  const record = (kind: string, err: unknown) => {
+    if (!crashPath) return;
+    try {
+      const detail =
+        err instanceof Error ? `${err.name}: ${err.message}\n${err.stack ?? ''}` : String(err);
+      appendFileSync(crashPath, `\n[${new Date().toISOString()}] ${kind}\n${detail}\n`);
+    } catch {
+      /* the recorder must never be the thing that crashes */
+    }
+  };
+  if (!process.listenerCount('uncaughtException')) {
+    process.on('uncaughtException', (err) => {
+      record('uncaughtException', err);
+      process.exit(1);
+    });
+    process.on('unhandledRejection', (err) => {
+      record('unhandledRejection', err);
+    });
+  }
+
+  router.get('/mimir/crashlog', requireRole(ctx.db, 'admin'), (_req, res) => {
+    const text =
+      crashPath && existsSync(crashPath) ? readFileSync(crashPath, 'utf8').slice(-8000) : '';
+    res.type('text/plain').send(text || '(empty)');
+  });
 
   router.get('/mimir/catalog', requireRole(ctx.db, 'user'), (_req, res) => {
     if (!catalogPath || !existsSync(catalogPath)) {
