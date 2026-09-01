@@ -31,7 +31,9 @@ export function MimirChat({
   const [urlDraft, setUrlDraft] = useState('');
   const [modelDraft, setModelDraft] = useState('');
   const [savingKey, setSavingKey] = useState(false);
-  const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
+  const [messages, setMessages] = useState<
+    { role: 'user' | 'assistant'; content: string; hidden?: boolean }[]
+  >([]);
   const [chatError, setChatError] = useState<string | null>(null);
   const [showConfig, setShowConfig] = useState(openConfig);
   const [draft, setDraft] = useState('');
@@ -76,13 +78,16 @@ export function MimirChat({
   }, [keyDraft, provider, urlDraft, modelDraft, refresh, slug, toast]);
 
   const sendText = useCallback(
-    async (content: string) => {
-      const next = [...messages, { role: 'user' as const, content }];
+    async (content: string, opts?: { hidden?: boolean }) => {
+      const next = [...messages, { role: 'user' as const, content, hidden: opts?.hidden }];
       setMessages(next);
       setChatError(null);
       setBusy(true);
       try {
-        const res = await api.mimirChat(slug, next);
+        const res = await api.mimirChat(
+          slug,
+          next.map(({ role, content: c }) => ({ role, content: c })),
+        );
         setMessages([...next, { role: 'assistant', content: res.reply }]);
       } catch (err) {
         // Keep the thread — an error is information, not an eraser.
@@ -98,7 +103,7 @@ export function MimirChat({
   useEffect(() => {
     if (engine && seed && messages.length === 0 && !seededRef.current) {
       seededRef.current = true;
-      void sendText(seed);
+      void sendText(seed, { hidden: true });
     }
   }, [engine, seed, messages.length, sendText]);
 
@@ -227,9 +232,25 @@ export function MimirChat({
             "give me a fan of formats to open the kitchen conflict".
           </p>
         )}
-        {messages.map((m, i) => (
+        {messages.filter((m) => !m.hidden).map((m, i) => (
           <div key={i} className={m.role === 'user' ? 'text-right' : ''}>
-            {m.role === 'assistant' && <span className={mimirChip}>◆ Mímir · proposal</span>}
+            {m.role === 'assistant' && (
+              <span className="flex items-center gap-2">
+                <span className={mimirChip}>◆ Mímir · proposal</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void navigator.clipboard
+                      .writeText(m.content)
+                      .then(() => toast.show('Copied'))
+                      .catch(() => toast.show('Could not copy — select the text instead'));
+                  }}
+                  className="text-[11px] text-stone-400 underline hover:text-indigo-500"
+                >
+                  copy
+                </button>
+              </span>
+            )}
             <div
               className={`mt-1 inline-block max-w-[85%] whitespace-pre-wrap rounded-xl p-3 text-left text-sm ${
                 m.role === 'user'
