@@ -50,6 +50,11 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/server/dist ./server/dist
 COPY --from=build /app/server/migrations ./server/migrations
+# Mimir add-on: the two prompt layers that ship with the code. The doctrine
+# default (a deployment's own /data/mimir-prompt.md overrides it) and the
+# programme manual, which describes this software and so belongs to it.
+COPY --from=build /app/server/mimir-prompt.default.md ./server/mimir-prompt.default.md
+COPY --from=build /app/server/mimir-program.md ./server/mimir-program.md
 COPY --from=build /app/web/dist ./web/dist
 
 # The DB lives on a volume mounted at /data so it survives image rebuilds —
