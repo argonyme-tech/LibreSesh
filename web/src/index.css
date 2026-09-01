@@ -14,6 +14,20 @@
 
   html {
     -webkit-text-size-adjust: 100%;
+
+    /* The backstop for the whole class of bug that anchored panels kept
+       causing: one element hanging off the right edge widens the document, and
+       a mobile browser answers that by shrinking the entire page to fit — the
+       layout looks broken and you have to pinch back in to read anything.
+       Clipping means the worst case is a panel you cannot fully see, not a
+       page you cannot read.
+
+       `clip`, not `hidden`: `hidden` makes html a scroll container and the
+       sticky schedule header stops sticking. Every grid that genuinely scrolls
+       sideways (the calendar, the day tabs) owns its own scroller and is
+       unaffected. This is a net, not a licence — see components/Popover.tsx
+       for where overflow is actually supposed to be prevented. */
+    overflow-x: clip;
   }
 
   body {

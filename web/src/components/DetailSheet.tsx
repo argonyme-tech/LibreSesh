@@ -69,11 +69,16 @@ export function DetailSheet({
         className="absolute inset-0 cursor-default bg-stone-900/30 dark:bg-black/60"
         onClick={onClose}
       />
-      {/* Width climbs with the viewport rather than sitting at one desktop
+      {/* `dvh`, not `vh`: `vh` measures the viewport with the mobile address
+          bar hidden, so `85vh` made the sheet taller than the `fixed inset-0`
+          parent it is bottom-anchored in, and the top of a long session — its
+          title — was clipped where no amount of scrolling reached it.
+
+          Width climbs with the viewport rather than sitting at one desktop
           size: the panel holds a description, three lists of contributions and
           a composer, and at `sm:w-96` on a wide screen every one of them
           wrapped early while the grid behind it had room to spare. */}
-      <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-5 shadow-xl sm:bottom-auto sm:left-auto sm:right-4 sm:top-4 sm:h-auto sm:max-h-[92vh] sm:w-[26rem] sm:rounded-2xl lg:w-[32rem] lg:p-6 xl:w-[36rem]">
+      <div className="absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-2xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-5 shadow-xl sm:bottom-auto sm:left-auto sm:right-4 sm:top-4 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:w-[26rem] sm:rounded-2xl lg:w-[32rem] lg:p-6 xl:w-[36rem]">
         <SessionDetail
           {...rest}
           session={session}
