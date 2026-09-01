@@ -388,7 +388,66 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   whole suite stayed green — is what the gap costs. A React error boundary
   would have contained it; there is still none.
 
+- **Brute-forcing an event password costs an attacker one cookie.** The gate
+  spends a token from `LIMITS.auth` (5 attempts / 15 min) on two buckets, the
+  identity and the IP, refunding both when a password is right
+  (`eventAuth.ts:62-86`). The identity half is keyed on `req.identity.id`,
+  which is whatever the caller's cookie says: dropping the cookie mints a new
+  identity and a full bucket, so that half stops an honest typo and nothing
+  else. The IP half is the only real limit, and it is `req.ip` — the socket
+  address unless `TRUST_PROXY=1` (`config.ts:128`, `app.ts:48`). Behind a proxy
+  with that unset, every attendee shares the proxy's bucket, which is a lockout
+  for the whole venue at 5 wrong guesses; with it set, the app must not also be
+  reachable off-proxy, or `X-Forwarded-For` is the attacker's to write.
+
+  What is missing is a counter the caller cannot reset: failures per *event*,
+  surviving a new cookie, growing the wait as they pile up. `auth_failed`
+  already lands in the audit log on every miss (`eventAuth.ts:76`), so the
+  count exists — nothing reads it, and no organiser is ever told that someone
+  has been guessing at their event all afternoon. Raising the capacity is not
+  the fix and would only hurt the typo case; bcrypt already makes each guess
+  cost something, which is why this is a real backlog item and not a fire.
+
+- **A person who never opened their profile cannot be merged.** Reported
+  2026-09-01: the merge dialog does not offer the people you most want to fold
+  together. Mechanism — a `people` row only exists once somebody edits their
+  profile, is typed as a speaker on a session, or is added by an organiser.
+  Someone who walked in, took a display name at the gate and never touched
+  their profile has no row at all: they live in `event_identities`/`roles`
+  only. The merge dialog lists `bundle.people` and `/people/:id/merge` loads
+  both sides out of the `people` table (`ProfilePage.tsx` MergeModal,
+  `people.ts:231`), so such a person cannot be either side of a merge.
+
+  The duplicate this actually produces: an organiser bills a session to "Ada
+  Lovelace" (auto-creating an unclaimed profile), Ada then joins the gate as
+  "Ada" and gets an identity with no profile. Two records, one human, and
+  merging is not the tool for it — they are not two profiles. The claim path
+  that would fix it fires only on an exact name match and only when she edits
+  her own profile (`people.ts:105-113`). The roster query already carries
+  `person_id` per attendee (`attendees.ts:47`), so Manage Event → People
+  already knows who has a profile and who does not; what is missing is the
+  organiser move "this attendee **is** that profile", which is a claim on
+  someone's behalf rather than a second kind of merge. Worth deciding whether
+  the merge dialog should also list profile-less attendees and quietly do the
+  claim, or whether that belongs on the People tab where the two lists meet.
+
 ## Medium Priority
+
+- **There is no landing page — `/` is the list of every event.** A visitor to
+  the root gets the logo, an Import and a New event button, and the instance's
+  events (`App.tsx:20`, `EventListPage.tsx`). Nothing says what LibreSesh is or
+  what it is for; the About dialog behind the "?" says it, but only to someone
+  already inside an event. On a public instance the list is also the front
+  door, so every event on the box is enumerable by anyone who loads the page,
+  which is a second reason not to lead with it.
+
+  Wants a simple page at `/` — what this is, one line on the licence, the way
+  in for someone holding an event link, and a way through to the list. The
+  list itself then wants its own address (`/events`), and the catch-all
+  redirect at `App.tsx:39` has to follow it rather than keep pointing at `/`.
+  The copy already exists in the About dialog and the README; this is mostly a
+  decision about what the list is for once it is not the first thing anyone
+  sees.
 
 - **Put the last two popdowns on `usePopover`.** `ProfileMenu` and
   `SpeakerCombobox` still position themselves and still carry their own
