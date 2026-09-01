@@ -122,7 +122,7 @@ export function MimirPage() {
             <EventInterview bundle={bundle} />
           </>
         )}
-        {tool === 'catalog' && <Catalog slug={slug} />}
+        {tool === 'catalog' && <Catalog slug={slug} engine={engine} onLive={goLive} />}
         {tool === 'rhythm' && <Rhythm bundle={bundle} />}
         {tool === 'infographic' && <Infographic bundle={bundle} />}
         {tool === 'sessions' && (
@@ -661,6 +661,114 @@ function EventInterview({ bundle }: { bundle: BundleDto }) {
   );
 }
 
+/* ---------------- format sketch: a diagram of the SHAPE, not of the content ---------------- */
+
+type Shape = 'circle' | 'pairs' | 'fishbowl' | 'clusters' | 'plenary' | 'board' | 'body';
+
+const SHAPE_LABEL: Record<Shape, string> = {
+  circle: 'Whole group in a circle',
+  pairs: 'In pairs',
+  fishbowl: 'Fishbowl — inner and outer circle',
+  clusters: 'Small groups, then plenary',
+  plenary: 'Plenary, facing forward',
+  board: 'Written first, then onto a wall',
+  body: 'Moving in the space',
+};
+
+/** Derived from the card's own words — a sketch of the format, never a claim
+ *  about content. Shown labelled as derived. */
+function shapeOf(d: Record<string, unknown>): Shape {
+  const t = `${String(d.name ?? '')} ${String(d.purpose ?? '')} ${String(d.steps ?? '')}`.toLowerCase();
+  if (/pecera|fishbowl|c[ií]rculo interior|dos c[ií]rculos/.test(t)) return 'fishbowl';
+  if (/parejas|en pareja|pairs|di[aá]logo a dos|escucha activa/.test(t)) return 'pairs';
+  if (/grupos de \d|peque[ñn]os grupos|tr[ií]os|subgrupos|clusters/.test(t)) return 'clusters';
+  if (/post-?it|tarjetas|papel[óo]grafo|pared|mural|escrib/.test(t)) return 'board';
+  if (/baila|danza|cuerpo|movimiento|de pie|caminar|espacio/.test(t)) return 'body';
+  if (/plenari|ponente|presentaci[óo]n al grupo/.test(t)) return 'plenary';
+  return 'circle';
+}
+
+function FormatSketch({ shape }: { shape: Shape }) {
+  const dot = 'currentColor';
+  const ring = (n: number, r: number, cx = 60, cy = 40) =>
+    Array.from({ length: n }, (_, i) => {
+      const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+      return <circle key={`${r}-${i}`} cx={cx + r * Math.cos(a)} cy={cy + r * Math.sin(a) * 0.75} r="3.4" fill={dot} />;
+    });
+  return (
+    <svg
+      viewBox="0 0 120 80"
+      className="h-20 w-full text-indigo-500 dark:text-indigo-400"
+      role="img"
+      aria-label={SHAPE_LABEL[shape]}
+    >
+      {shape === 'circle' && ring(9, 30)}
+      {shape === 'fishbowl' && (
+        <>
+          {ring(5, 14)}
+          {ring(10, 31)}
+          <circle cx="60" cy="40" r="14" fill="none" stroke="currentColor" strokeOpacity=".35" strokeDasharray="3 3" />
+        </>
+      )}
+      {shape === 'pairs' && (
+        <>
+          {[25, 60, 95].map((x) => (
+            <g key={x}>
+              <circle cx={x - 9} cy="40" r="4" fill={dot} />
+              <circle cx={x + 9} cy="40" r="4" fill={dot} />
+              <path d={`M${x - 4} 40 H${x + 4}`} stroke="currentColor" strokeOpacity=".4" />
+            </g>
+          ))}
+        </>
+      )}
+      {shape === 'clusters' && (
+        <>
+          {[[25, 25], [60, 25], [95, 25], [42, 58], [78, 58]].map(([cx, cy], i) => (
+            <g key={i}>
+              <circle cx={cx} cy={cy - 5} r="3.2" fill={dot} />
+              <circle cx={cx - 6} cy={cy + 4} r="3.2" fill={dot} />
+              <circle cx={cx + 6} cy={cy + 4} r="3.2" fill={dot} />
+            </g>
+          ))}
+        </>
+      )}
+      {shape === 'plenary' && (
+        <>
+          <rect x="46" y="10" width="28" height="7" rx="2" fill="currentColor" fillOpacity=".5" />
+          {[30, 45, 60].map((y) =>
+            [25, 45, 60, 75, 95].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="3.2" fill={dot} />),
+          )}
+        </>
+      )}
+      {shape === 'board' && (
+        <>
+          <rect x="14" y="10" width="92" height="46" rx="3" fill="none" stroke="currentColor" strokeOpacity=".45" />
+          {[[24, 18], [44, 18], [64, 18], [84, 18], [24, 34], [44, 34], [64, 34]].map(([x, y], i) => (
+            <rect key={i} x={x} y={y} width="14" height="11" rx="1.5" fill="currentColor" fillOpacity=".55" />
+          ))}
+          {[40, 60, 80].map((x) => (
+            <circle key={x} cx={x} cy="70" r="3.2" fill={dot} />
+          ))}
+        </>
+      )}
+      {shape === 'body' && (
+        <>
+          {[[22, 30], [50, 52], [78, 26], [100, 48]].map(([x, y], i) => (
+            <circle key={i} cx={x} cy={y} r="4" fill={dot} />
+          ))}
+          <path
+            d="M22 30 Q36 12 50 52 Q64 78 78 26 Q90 8 100 48"
+            fill="none"
+            stroke="currentColor"
+            strokeOpacity=".45"
+            strokeDasharray="4 3"
+          />
+        </>
+      )}
+    </svg>
+  );
+}
+
 /* ---------------- catalog ---------------- */
 
 const TIERS = ['all', 'validada', 'destacada', 'cantera'] as const;
@@ -672,11 +780,26 @@ const TIER_LABEL: Record<string, string> = {
   cantera: 'Quarry',
 };
 const DOMINIO_LABEL: Record<string, string> = { usada: 'used', vista: 'seen', leida: 'read' };
+const GAP_LABEL: Record<string, string> = {
+  que_revela: 'what it reveals',
+  tamano_grupo: 'group size',
+  tiempo: 'timing',
+};
 
-function Catalog({ slug }: { slug: string }) {
+function Catalog({
+  slug,
+  engine,
+  onLive,
+}: {
+  slug: string;
+  engine: boolean;
+  onLive: (seed: string) => void;
+}) {
   const [dynamics, setDynamics] = useState<Record<string, unknown>[] | null>(null);
   const [filter, setFilter] = useState('All');
   const [tier, setTier] = useState<(typeof TIERS)[number]>('all');
+  const [q, setQ] = useState('');
+  const [open, setOpen] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     void api.mimirCatalog(slug).then((c) => setDynamics(c.dynamics)).catch(() => setDynamics([]));
@@ -704,10 +827,136 @@ function Catalog({ slug }: { slug: string }) {
     );
   }
 
+  /* ---- detail card ---- */
+  if (open) {
+    const d = open;
+    const [en, orig] = String(d.name).split('  ·  ');
+    const gaps = Array.isArray(d.gaps) ? (d.gaps as string[]) : [];
+    const shape = shapeOf(d);
+    return (
+      <article className="max-w-2xl space-y-5">
+        <button
+          type="button"
+          onClick={() => setOpen(null)}
+          className="text-xs text-stone-500 dark:text-stone-400 underline"
+        >
+          ← back to the catalog
+        </button>
+
+        <header>
+          <h2 className="text-2xl font-semibold tracking-tight">{en}</h2>
+          {orig && (
+            <p className="mt-0.5 text-sm text-stone-500 dark:text-stone-400">
+              original title: <i>{orig}</i>
+            </p>
+          )}
+          <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
+            <span className={mimirChip}>{TIER_LABEL[String(d.tier)] ?? 'Quarry'}</span>
+            {Boolean(d.category) && (
+              <span className="rounded-full border border-stone-300 dark:border-stone-700 px-2 py-0.5 text-stone-500 dark:text-stone-400">
+                {String(d.category)}
+              </span>
+            )}
+            {Boolean(d.dominio) && (
+              <span className={mimirChip}>{DOMINIO_LABEL[String(d.dominio)] ?? String(d.dominio)}</span>
+            )}
+            {Boolean(d.safety) && d.safety !== 'safe' && (
+              <span className="rounded-full border border-amber-400/40 px-2 py-0.5 text-amber-600 dark:text-amber-400">
+                {String(d.safety)}
+              </span>
+            )}
+          </div>
+        </header>
+
+        <div className="grid gap-4 sm:grid-cols-[9rem_1fr]">
+          <div className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-950/20 p-2">
+            <FormatSketch shape={shape} />
+            <p className="mt-1 text-center text-[10px] leading-tight text-stone-500 dark:text-stone-400">
+              {SHAPE_LABEL[shape]}
+              <br />
+              <i>sketch derived from the card</i>
+            </p>
+          </div>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 self-start text-xs">
+            {([
+              ['Purpose', d.purpose],
+              ['Group size', d.people],
+              ['Time', d.minutes],
+              ['Difficulty', d.difficulty],
+              ['Block', d.block],
+              ['Source', d.source],
+            ] as [string, unknown][])
+              .filter(([, v]) => Boolean(v))
+              .map(([k, v]) => (
+                <div key={k} className={k === 'Purpose' || k === 'Source' ? 'col-span-2' : ''}>
+                  <dt className="text-[10px] uppercase tracking-wider text-stone-400 dark:text-stone-500">
+                    {k}
+                  </dt>
+                  <dd className="text-stone-700 dark:text-stone-200">{String(v)}</dd>
+                </div>
+              ))}
+          </dl>
+        </div>
+
+        {Boolean(d.discardIf) && (
+          <p className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-white dark:bg-stone-900 p-3 text-sm text-indigo-700 dark:text-indigo-300">
+            <b>Discard if:</b> {String(d.discardIf)}
+          </p>
+        )}
+
+        {Boolean(d.steps) ? (
+          <section>
+            <div className="mb-1 flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-semibold">How it runs</h3>
+              <span className="text-[10px] uppercase tracking-wider text-stone-400 dark:text-stone-500">
+                source text · {String(d.stepsLang ?? 'es')}
+              </span>
+              {engine && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onLive(
+                      `Translate this facilitation card into English, keeping it faithful — do not add steps, do not invent what is not there. Then, separately, tell me in one line what it seems to reveal about a group, marked clearly as YOUR hypothesis, not corpus.\n\n===CARD===\nTitle: ${en}${orig ? ` (${orig})` : ''}\nSource: ${String(d.source ?? '')}\n\n${String(d.steps)}\n===END CARD===`,
+                    )
+                  }
+                  className="ml-auto rounded-lg border border-indigo-400 bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-indigo-500"
+                >
+                  ◆ Translate with Mímir
+                </button>
+              )}
+            </div>
+            <p className="whitespace-pre-wrap rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-4 text-sm leading-relaxed">
+              {String(d.steps)}
+            </p>
+          </section>
+        ) : (
+          <p className="rounded-xl border border-dashed border-stone-300 dark:border-stone-700 p-4 text-sm text-stone-500 dark:text-stone-400">
+            No steps stored here. {String(d.stepsRef ?? '')}
+            {String(d.tier) === 'validada' &&
+              ' — rights reserved: the card lives in the source, only its metadata travels.'}
+          </p>
+        )}
+
+        {gaps.length > 0 && (
+          <p className="rounded-xl border border-dashed border-amber-400/40 bg-amber-50/40 dark:bg-amber-950/20 p-3 text-xs text-amber-700 dark:text-amber-400">
+            <b>Declared gaps:</b> {gaps.map((g) => GAP_LABEL[g] ?? g).join(' · ')} — not filled in
+            by Mímir. The facilitator writes these, or they stay empty.
+          </p>
+        )}
+      </article>
+    );
+  }
+
+  /* ---- grid ---- */
+  const needle = q.trim().toLowerCase();
   const shown = dynamics.filter(
     (d) =>
       (filter === 'All' || String(d.category) === filter) &&
-      (tier === 'all' || String(d.tier) === tier),
+      (tier === 'all' || String(d.tier) === tier) &&
+      (needle === '' ||
+        `${String(d.name)} ${String(d.purpose ?? '')} ${String(d.category ?? '')}`
+          .toLowerCase()
+          .includes(needle)),
   );
   const chip = (on: boolean) =>
     `rounded-full border px-2.5 py-1 text-xs ${
@@ -718,6 +967,13 @@ function Catalog({ slug }: { slug: string }) {
 
   return (
     <div>
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Search a dynamic by name, purpose or category…"
+        aria-label="Search dynamics"
+        className="mb-3 w-full rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 p-3 text-sm"
+      />
       <div className="mb-2 flex flex-wrap gap-1.5">
         {TIERS.map((t) => (
           <button key={t} type="button" onClick={() => setTier(t)} className={chip(tier === t)}>
@@ -733,48 +989,48 @@ function Catalog({ slug }: { slug: string }) {
         ))}
       </div>
       <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
-        {shown.length} shown · <b>Confirmed</b> by the facilitator · <b>Curated</b> = card-filed
-        in the vault · <b>Quarry</b> = from the 700-compendium, metadata only, awaiting human
-        criterion.
+        {shown.length} shown · <b>Confirmed</b> by the facilitator · <b>Curated</b> = card-filed in
+        the vault, full steps included · <b>Quarry</b> = from the 700-compendium, titles only,
+        awaiting human criterion.
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
-        {shown.map((d, i) => (
-          <div
-            key={i}
-            className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-4"
-          >
-            <div className="flex flex-wrap items-baseline gap-2">
-              <b className="text-sm">{String(d.name)}</b>
-              {Boolean(d.safety) && d.safety !== 'segura' && (
-                <span className="rounded-full border border-amber-400/40 px-2 py-0.5 text-[11px] text-amber-600 dark:text-amber-400">
-                  {String(d.safety)}
-                </span>
+        {shown.map((d, i) => {
+          const [en, orig] = String(d.name).split('  ·  ');
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setOpen(d)}
+              className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-4 text-left hover:border-indigo-400 dark:hover:border-indigo-600"
+            >
+              <div className="flex flex-wrap items-baseline gap-2">
+                <b className="text-sm">{en}</b>
+                {Boolean(d.safety) && d.safety !== 'safe' && (
+                  <span className="rounded-full border border-amber-400/40 px-2 py-0.5 text-[11px] text-amber-600 dark:text-amber-400">
+                    {String(d.safety)}
+                  </span>
+                )}
+                <span className={mimirChip}>{TIER_LABEL[String(d.tier)] ?? 'Quarry'}</span>
+              </div>
+              {orig && (
+                <p className="mt-0.5 text-[11px] italic text-stone-400 dark:text-stone-500">
+                  {orig}
+                </p>
               )}
-              <span className={mimirChip}>{TIER_LABEL[String(d.tier)] ?? 'Quarry'}</span>
-              {Boolean(d.dominio) && (
-                <span className={mimirChip}>{DOMINIO_LABEL[String(d.dominio)] ?? String(d.dominio)}</span>
+              {Boolean(d.purpose) && (
+                <p className="mt-1 text-xs text-stone-600 dark:text-stone-300">
+                  {String(d.purpose)}
+                </p>
               )}
-            </div>
-            {Boolean(d.purpose) && (
-              <p className="mt-1 text-xs text-stone-600 dark:text-stone-300">{String(d.purpose)}</p>
-            )}
-            <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-stone-500 dark:text-stone-400">
-              {Boolean(d.category) && <span>{String(d.category)}</span>}
-              {Boolean(d.people) && <span>· 👥 {String(d.people)}</span>}
-              {Boolean(d.minutes) && <span>· ⏱ {String(d.minutes)}</span>}
-            </div>
-            {Boolean(d.discardIf) && (
-              <p className="mt-2 border-t border-dashed border-stone-300 dark:border-stone-700 pt-2 text-xs text-indigo-700 dark:text-indigo-400">
-                Discard if: {String(d.discardIf)}
-              </p>
-            )}
-            {Boolean(d.stepsRef) && !d.discardIf && (
-              <p className="mt-2 border-t border-dashed border-stone-300 dark:border-stone-700 pt-2 text-[11px] text-stone-400">
-                Steps: {String(d.stepsRef)}
-              </p>
-            )}
-          </div>
-        ))}
+              <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-stone-500 dark:text-stone-400">
+                {Boolean(d.category) && <span>{String(d.category)}</span>}
+                {Boolean(d.people) && <span>· 👥 {String(d.people)}</span>}
+                {Boolean(d.minutes) && <span>· ⏱ {String(d.minutes)}</span>}
+                {Boolean(d.steps) && <span>· 📄 full card</span>}
+              </div>
+            </button>
+          );
+        })}
       </div>
       <p className="mt-4 text-xs text-stone-500 dark:text-stone-400">
         Choosing a dynamic is always human — Mímir only makes sure the fan is on the table.
