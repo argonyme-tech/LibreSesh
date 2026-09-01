@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { PersonDetailDto, PersonDto, PersonLink } from '@shared/types';
-import { ApiError, api } from '../lib/api';
+import { ApiError, api, type PersonWrite } from '../lib/api';
 import { dayLabel, fmtMin, place, rowId, todayInZone } from '../lib/format';
 import { renderMarkdown } from '../lib/markdown';
 import { useEventData } from '../lib/useEventData';
+import { EditIcon } from '../components/icons';
 import {
   EmptyState,
   Field,
+  FormError,
   FormStack,
+  IconButton,
   Modal,
   PrimaryButton,
   SecondaryButton,
@@ -18,6 +21,11 @@ import {
 } from '../components/ui';
 
 type Status = 'loading' | 'ok' | 'notfound' | 'error';
+
+/** Which field is open. One at a time on purpose: each save is its own request,
+ *  and two fields in flight at once is how a profile ends up saving half of
+ *  what you wrote. */
+type FieldKey = 'displayName' | 'name' | 'bio' | 'links';
 
 // Same wrappers DetailSheet uses for session descriptions.
 const PROSE =
@@ -34,8 +42,14 @@ export function ProfilePage() {
   const [detail, setDetail] = useState<PersonDetailDto | null>(null);
   const [status, setStatus] = useState<Status>('loading');
   const [error, setError] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
+  const [open, setOpen] = useState<FieldKey | null>(null);
   const [merging, setMerging] = useState(false);
+  // Drafts live here rather than in each field so an open editor keeps what you
+  // typed while the bundle refreshes underneath it.
+  const [draftDisplayName, setDraftDisplayName] = useState('');
+  const [draftName, setDraftName] = useState('');
+  const [draftBio, setDraftBio] = useState('');
+  const [draftLinks, setDraftLinks] = useState<PersonLink[]>([]);
 
   useEffect(() => {
     let live = true;
@@ -113,6 +127,39 @@ export function ProfilePage() {
     );
   }
 
+  const displayName = bundle?.displayName ?? '';
+  // An organiser editing someone else's profile writes it through the admin
+  // route; your own goes through /me/profile, which may still have to create it.
+  const asAdmin = !!isAdmin && !person.isMine;
+  const close = () => setOpen(null);
+
+  /** Open one field, seeding its draft from what is on screen. Seeding here
+   *  rather than at mount is what lets a field you never touched pick up an
+   *  edit that arrived over SSE. */
+  const edit = (key: FieldKey) => {
+    if (key === 'displayName') setDraftDisplayName(displayName);
+    if (key === 'name') setDraftName(person.name);
+    if (key === 'bio') setDraftBio(person.bio);
+    if (key === 'links') {
+      setDraftLinks(person.links.length > 0 ? person.links : [{ label: '', url: '' }]);
+    }
+    setOpen(key);
+  };
+
+  /** One field, one PATCH carrying only that field. Both routes take a partial
+   *  body, so saving a bio cannot quietly rewrite a name someone else changed
+   *  while this page was open. */
+  const savePerson = async (body: Partial<PersonWrite>) => {
+    const updated = asAdmin
+      ? await api.updatePerson(slug, person.id, body)
+      : await api.updateMyProfile(slug, body);
+    setDetail((d) => (d ? { ...d, person: updated } : d));
+    data.apply({ type: 'person.updated', entity: updated });
+  };
+
+  const setLink = (i: number, patch: Partial<PersonLink>) =>
+    setDraftLinks((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+
   return (
     <div className="min-h-screen bg-stone-100 dark:bg-stone-950 text-stone-900 dark:text-stone-100">
       <div className="mx-auto max-w-2xl px-4 py-8">
@@ -123,7 +170,46 @@ export function ProfilePage() {
         <div className="mt-4 rounded-2xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-5 shadow-sm">
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
-              <h1 className="text-lg font-semibold tracking-tight">{person.name}</h1>
+              {open === 'name' ? (
+                <FieldForm
+                  onClose={close}
+                  onSave={async () => {
+                    const wanted = draftName.trim();
+                    if (!wanted) throw new Error('A profile needs a name.');
+                    await savePerson({ name: wanted });
+                  }}
+                  hint={
+                    person.isMine
+                      ? 'The name on this profile — what sessions you host are credited to.'
+                      : undefined
+                  }
+                >
+                  <input
+                    value={draftName}
+                    onChange={(e) => setDraftName(e.target.value)}
+                    aria-label="Name"
+                    maxLength={120}
+                    className={`${inputClass} text-lg font-semibold`}
+                    autoFocus
+                  />
+                </FieldForm>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <h1 className="min-w-0 truncate text-lg font-semibold tracking-tight">
+                    {person.name}
+                  </h1>
+                  {canEdit && (
+                    <IconButton
+                      aria-label="Edit name"
+                      title="Edit name"
+                      className="shrink-0"
+                      onClick={() => edit('name')}
+                    >
+                      <EditIcon className="h-3.5 w-3.5" />
+                    </IconButton>
+                  )}
+                </div>
+              )}
               {/* Profile names are checked for clashes but are not the thing
                   that identifies anyone — this id is, and it is the one in the
                   address bar. Per event on purpose: a number that followed a
@@ -138,37 +224,157 @@ export function ProfilePage() {
                 Merge…
               </SecondaryButton>
             )}
-            {canEdit && (
-              <SecondaryButton className="shrink-0 py-1.5" onClick={() => setEditing(true)}>
-                Edit profile
-              </SecondaryButton>
-            )}
           </div>
 
-          {bioHtml && (
-            <div
-              className={`mt-3 ${PROSE}`}
-              // Markdown is escaped before parsing, so no author markup survives.
-              dangerouslySetInnerHTML={{ __html: bioHtml }}
-            />
-          )}
+          <div className="mt-4 space-y-4 border-t border-stone-100 pt-4 dark:border-stone-800">
+            {person.isMine && (
+              /* Your display name is not part of this profile — it is your
+                 identity in the event — so it saves through its own call, and
+                 an organiser looking at your profile does not get to touch it. */
+              <ProfileField
+                label="Display name"
+                hint="How you appear in this event: the header chip, and anything you post. Must be unlike anyone else's here."
+                canEdit
+                filled={displayName !== ''}
+                emptyText="You have no name in this event yet."
+                addLabel="Set a display name"
+                editing={open === 'displayName'}
+                onEdit={() => edit('displayName')}
+                onClose={close}
+                onSave={async () => {
+                  const wanted = draftDisplayName.trim();
+                  if (!wanted) throw new Error('A display name cannot be empty.');
+                  if (wanted === displayName) return;
+                  await api.renameInEvent(slug, wanted);
+                  await data.reload();
+                }}
+                editor={
+                  <input
+                    value={draftDisplayName}
+                    onChange={(e) => setDraftDisplayName(e.target.value)}
+                    aria-label="Display name"
+                    maxLength={40}
+                    className={inputClass}
+                    autoFocus
+                  />
+                }
+              >
+                <p className="text-sm">{displayName}</p>
+              </ProfileField>
+            )}
 
-          {person.links.length > 0 && (
-            <ul className="mt-3 space-y-1">
-              {person.links.map((link, i) => (
-                <li key={i}>
-                  <a
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-blue-700 dark:text-blue-400 underline"
-                  >
-                    {link.label || link.url}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
+            <ProfileField
+              label="Bio"
+              canEdit={canEdit}
+              filled={person.bio.trim() !== ''}
+              emptyText={person.isMine ? 'Nothing about you yet.' : 'No bio yet.'}
+              addLabel="Add a bio"
+              editing={open === 'bio'}
+              onEdit={() => edit('bio')}
+              onClose={close}
+              onSave={() => savePerson({ bio: draftBio.trim() })}
+              editHint="Markdown is supported."
+              editor={
+                <textarea
+                  value={draftBio}
+                  onChange={(e) => setDraftBio(e.target.value)}
+                  aria-label="Bio"
+                  rows={5}
+                  maxLength={2000}
+                  className={`${inputClass} resize-none`}
+                  autoFocus
+                />
+              }
+            >
+              <div
+                className={PROSE}
+                // Markdown is escaped before parsing, so no author markup survives.
+                dangerouslySetInnerHTML={{ __html: bioHtml }}
+              />
+            </ProfileField>
+
+            <ProfileField
+              label="Links"
+              canEdit={canEdit}
+              filled={person.links.length > 0}
+              emptyText="No links yet."
+              addLabel="Add a link"
+              editing={open === 'links'}
+              onEdit={() => edit('links')}
+              onClose={close}
+              onSave={async () => {
+                // A row left blank is a row you added and changed your mind
+                // about; a half-filled one is a mistake worth saying out loud,
+                // because the server would only ever see it as missing.
+                const kept = draftLinks.filter(
+                  (l) => l.label.trim() !== '' || l.url.trim() !== '',
+                );
+                if (kept.some((l) => l.label.trim() === '' || l.url.trim() === '')) {
+                  throw new Error('Every link needs both a label and an address.');
+                }
+                await savePerson({
+                  links: kept.map((l) => ({ label: l.label.trim(), url: l.url.trim() })),
+                });
+              }}
+              editor={
+                <div className="space-y-2">
+                  {draftLinks.map((link, i) => (
+                    <div key={i} className="flex gap-2">
+                      <input
+                        value={link.label}
+                        onChange={(e) => setLink(i, { label: e.target.value })}
+                        placeholder="Label"
+                        aria-label={`Link ${i + 1} label`}
+                        maxLength={60}
+                        className={`${inputClass} w-1/3`}
+                        autoFocus={i === 0}
+                      />
+                      <input
+                        value={link.url}
+                        onChange={(e) => setLink(i, { url: e.target.value })}
+                        placeholder="https://…"
+                        aria-label={`Link ${i + 1} address`}
+                        inputMode="url"
+                        className={inputClass}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setDraftLinks((ls) => ls.filter((_, idx) => idx !== i))}
+                        aria-label={`Remove link ${i + 1}`}
+                        className="shrink-0 rounded-lg px-2 text-stone-400 dark:text-stone-500 hover:text-red-600 dark:hover:text-red-400"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  {draftLinks.length < 10 && (
+                    <button
+                      type="button"
+                      onClick={() => setDraftLinks((ls) => [...ls, { label: '', url: '' }])}
+                      className="text-xs font-medium text-stone-600 dark:text-stone-300 underline hover:text-stone-900 dark:hover:text-stone-100"
+                    >
+                      Add another link
+                    </button>
+                  )}
+                </div>
+              }
+            >
+              <ul className="space-y-1">
+                {person.links.map((link, i) => (
+                  <li key={i}>
+                    <a
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-700 dark:text-blue-400 underline"
+                    >
+                      {link.label || link.url}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </ProfileField>
+          </div>
 
           {isAdmin && (
             <SpeakerAccess
@@ -181,7 +387,11 @@ export function ProfilePage() {
 
         <h2 className="mb-2 mt-6 text-sm font-semibold">Sessions</h2>
         {sessions.length === 0 ? (
-          <p className="text-sm text-stone-400 dark:text-stone-500">No sessions yet.</p>
+          <p className="text-sm text-stone-400 dark:text-stone-500">
+            {person.isMine
+              ? 'You are not hosting anything yet.'
+              : `${person.name} is not hosting anything yet.`}
+          </p>
         ) : (
           <ul className="space-y-2">
             {sessions.map((session) => {
@@ -222,186 +432,158 @@ export function ProfilePage() {
           }}
         />
       )}
+    </div>
+  );
+}
 
-      {editing && (
-        <ProfileEditor
-          slug={slug}
-          person={person}
-          asAdmin={!!isAdmin && !person.isMine}
-          mine={person.isMine}
-          displayName={bundle?.displayName ?? ''}
-          onRenamed={() => void data.reload()}
-          onClose={() => setEditing(false)}
-          onSaved={(updated) => {
-            setDetail((d) => (d ? { ...d, person: updated } : d));
-            data.apply({ type: 'person.updated', entity: updated });
-          }}
-        />
+/**
+ * One line of a profile, read until you open that one line.
+ *
+ * There is no page-wide edit mode, and that is what makes an empty profile
+ * legible: the bio you have not written can say so *where the bio goes*, with
+ * the way to write it right there, instead of being an absence you would only
+ * find by opening a dialog that edits everything at once. Each field also
+ * saves alone, so a slow-typed bio is not holding a name hostage.
+ *
+ * Empty *and* not yours to fill is the one case that draws nothing — a
+ * stranger reading a sparse profile should see a name and what there is, not a
+ * column of blanks.
+ */
+function ProfileField({
+  label,
+  hint,
+  editHint,
+  canEdit,
+  filled,
+  emptyText,
+  addLabel,
+  editing,
+  onEdit,
+  onClose,
+  onSave,
+  editor,
+  children,
+}: {
+  label: string;
+  /** Shown at rest as well as in the editor — for a field whose meaning is not
+   *  in its name. */
+  hint?: string;
+  /** Shown only while editing, for what you need while typing and never after. */
+  editHint?: string;
+  canEdit: boolean;
+  /** Whether there is anything to read. Blank-but-present counts as empty. */
+  filled: boolean;
+  emptyText: string;
+  addLabel: string;
+  editing: boolean;
+  onEdit: () => void;
+  onClose: () => void;
+  /** Rejecting keeps the editor open, with the message under the control. */
+  onSave: () => Promise<void>;
+  editor: ReactNode;
+  /** The read view. Only rendered when `filled`. */
+  children: ReactNode;
+}) {
+  if (!editing && !filled && !canEdit) return null;
+
+  return (
+    <div className="min-w-0">
+      <div className="mb-1 flex items-center gap-1.5">
+        <span className="text-xs font-medium text-stone-600 dark:text-stone-300">{label}</span>
+        {!editing && filled && canEdit && (
+          <IconButton
+            aria-label={`Edit ${label.toLowerCase()}`}
+            title={`Edit ${label.toLowerCase()}`}
+            onClick={onEdit}
+          >
+            <EditIcon className="h-3.5 w-3.5" />
+          </IconButton>
+        )}
+      </div>
+      {editing ? (
+        <FieldForm onClose={onClose} onSave={onSave} hint={editHint ?? hint}>
+          {editor}
+        </FieldForm>
+      ) : filled ? (
+        <>
+          {children}
+          {hint && <p className="mt-1 text-xs text-stone-400 dark:text-stone-500">{hint}</p>}
+        </>
+      ) : (
+        /* The empty state is the field, not a gap where one would be: what is
+           missing, named, with the button that fills it on the same line. */
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm text-stone-400 dark:text-stone-500">{emptyText}</p>
+          {canEdit && (
+            <SecondaryButton className="py-1" onClick={onEdit}>
+              {addLabel}
+            </SecondaryButton>
+          )}
+        </div>
       )}
     </div>
   );
 }
 
-/** Name, bio and a capped label+URL link editor. Mounted fresh on each open, so
- *  its fields seed straight from the person. */
-function ProfileEditor({
-  slug,
-  person,
-  asAdmin,
-  mine,
-  displayName,
-  onRenamed,
+/**
+ * The editor half of a field: the control, its own Save and Cancel, and the
+ * error its own save came back with. Shared so every field fails the same way
+ * — inline, under the control, with what you typed still in it — rather than
+ * as a toast that takes the message somewhere else on the page.
+ */
+function FieldForm({
+  onSave,
   onClose,
-  onSaved,
+  hint,
+  children,
 }: {
-  slug: string;
-  person: PersonDto;
-  asAdmin: boolean;
-  /** Whether this profile belongs to the caller — only then is the display
-   *  name theirs to edit, since a rename always writes *your* identity. */
-  mine: boolean;
-  /** The caller's name in this event, seeding the field above. */
-  displayName: string;
-  onRenamed: () => void;
+  onSave: () => Promise<void>;
   onClose: () => void;
-  onSaved: (person: PersonDto) => void;
+  hint?: string;
+  children: ReactNode;
 }) {
-  const toast = useToast();
-  const [nextDisplayName, setNextDisplayName] = useState(displayName);
-  const [name, setName] = useState(person.name);
-  const [bio, setBio] = useState(person.bio);
-  const [links, setLinks] = useState<PersonLink[]>(person.links);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const setLink = (i: number, patch: Partial<PersonLink>) =>
-    setLinks((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
-  const addLink = () => setLinks((ls) => (ls.length >= 10 ? ls : [...ls, { label: '', url: '' }]));
-  const removeLink = (i: number) => setLinks((ls) => ls.filter((_, idx) => idx !== i));
-
-  const save = async () => {
-    if (!name.trim() || busy) return;
+  const submit = async () => {
+    if (busy) return;
     setBusy(true);
+    setError(null);
     try {
-      // Your display name and this profile are two separate records, so saving
-      // makes two calls. The rename goes first: it is the one that can be
-      // refused — names are unique inside an event — and a saved profile
-      // followed by a rejected rename would leave the form half-applied.
-      const wanted = nextDisplayName.trim();
-      const renamed = mine && wanted !== '' && wanted !== displayName;
-      if (renamed) await api.renameInEvent(slug, wanted);
-      const body = {
-        name: name.trim(),
-        bio: bio.trim(),
-        links: links
-          .filter((l) => l.label.trim() && l.url.trim())
-          .map((l) => ({ label: l.label.trim(), url: l.url.trim() })),
-      };
-      const updated = asAdmin
-        ? await api.updatePerson(slug, person.id, body)
-        : await api.updateMyProfile(slug, body);
-      onSaved(updated);
-      if (renamed) onRenamed();
+      await onSave();
       onClose();
-      toast.show('Profile saved');
     } catch (err) {
-      toast.show((err as Error).message);
-    } finally {
+      setError((err as Error).message);
       setBusy(false);
     }
   };
 
   return (
-    <Modal
-      title="Edit profile"
-      onClose={onClose}
-      onSubmit={() => void save()}
-      footer={
-        <>
-          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-          <PrimaryButton type="submit" disabled={busy || !name.trim()}>
-            {busy ? 'Saving…' : 'Save'}
-          </PrimaryButton>
-        </>
-      }
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void submit();
+      }}
+      // Escape leaves the field, not the page. It stops here so a field inside
+      // a dialog does not close the dialog along with itself.
+      onKeyDown={(e) => {
+        if (e.key !== 'Escape') return;
+        e.stopPropagation();
+        onClose();
+      }}
     >
-      <FormStack>
-      {mine && (
-        <Field
-          label="Display name"
-          hint="How you appear in this event, on the header chip and anything you post. Must be unlike anyone else's here."
-        >
-          <input
-            value={nextDisplayName}
-            onChange={(e) => setNextDisplayName(e.target.value)}
-            maxLength={40}
-            className={inputClass}
-            autoFocus
-          />
-        </Field>
-      )}
-      <Field
-        label="Name"
-        hint={mine ? 'The name on this profile — what sessions you host are credited to.' : undefined}
-      >
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          maxLength={120}
-          className={inputClass}
-          autoFocus={!mine}
-        />
-      </Field>
-      <Field label="Bio" hint="Markdown is supported.">
-        <textarea
-          value={bio}
-          onChange={(e) => setBio(e.target.value)}
-          rows={4}
-          maxLength={2000}
-          className={`${inputClass} resize-none`}
-        />
-      </Field>
-      <Field label="Links">
-        <div className="space-y-2">
-          {links.map((link, i) => (
-            <div key={i} className="flex gap-2">
-              <input
-                value={link.label}
-                onChange={(e) => setLink(i, { label: e.target.value })}
-                placeholder="Label"
-                maxLength={60}
-                className={`${inputClass} w-1/3`}
-              />
-              <input
-                value={link.url}
-                onChange={(e) => setLink(i, { url: e.target.value })}
-                placeholder="https://…"
-                inputMode="url"
-                className={inputClass}
-              />
-              <button
-                type="button"
-                onClick={() => removeLink(i)}
-                aria-label="Remove link"
-                className="shrink-0 rounded-lg px-2 text-stone-400 dark:text-stone-500 hover:text-red-600 dark:hover:text-red-400"
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-          {links.length === 0 && <p className="text-xs text-stone-400 dark:text-stone-500">No links yet.</p>}
-          {links.length < 10 && (
-            <button
-              type="button"
-              onClick={addLink}
-              className="text-xs font-medium text-stone-600 dark:text-stone-300 underline hover:text-stone-900 dark:hover:text-stone-100"
-            >
-              Add a link
-            </button>
-          )}
-        </div>
-      </Field>
-      </FormStack>
-    </Modal>
+      {children}
+      {hint && <p className="mt-1 text-xs text-stone-400 dark:text-stone-500">{hint}</p>}
+      {error && <FormError className="mt-2">{error}</FormError>}
+      <div className="mt-2 flex gap-2">
+        <PrimaryButton type="submit" className="py-1.5" disabled={busy}>
+          {busy ? 'Saving…' : 'Save'}
+        </PrimaryButton>
+        <SecondaryButton className="py-1.5" onClick={onClose} disabled={busy}>
+          Cancel
+        </SecondaryButton>
+      </div>
+    </form>
   );
 }
 
