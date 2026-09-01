@@ -993,6 +993,28 @@ All notable changes to this project are documented here.
   the stored hashes too, so a new password cannot quietly land on a role that
   is staying put. Swapping two passwords in a single request still works.
 
+### Fixed
+
+- **The ⓘ on a column card can be opened by a finger.** Tapping it flashed the
+  panel open and shut in the same gesture, so on a phone it could not be
+  pinned at all. A touch browser synthesises the mouse sequence on a tap —
+  `mouseenter`, `focus`, `click`, as separate events — and the card opened on
+  the enter and toggled shut on the click.
+
+  That is most of what the column card now says. The redesign cut a room card
+  down to its name and moved the seats, whether attendees may book it, and the
+  organiser's directions behind the ⓘ; the track work put the strand's
+  description and its hours there too. None of it was reachable on a phone,
+  which is where somebody standing in a corridor actually reads a schedule.
+
+  The card is on the same `usePopover` as search, Filter and the "?" menu now,
+  which tells a real mouse from a synthesised one (`mouseOnly` hover,
+  focus-visible only) and hands the tap to the button's own click. Two things
+  come with the move: the panel dismisses on an outside press like every other
+  popdown, and it positions itself rather than being placed — on the last
+  column it slides back inside the viewport instead of needing a
+  right-align prop to stop it hanging off the end of the grid.
+
 ### Changed
 
 - **The organiser's three buttons moved down beside the filters.** Manage

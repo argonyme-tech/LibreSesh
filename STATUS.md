@@ -102,42 +102,6 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
 ## High Priority
 
-- **The ⓘ on a column card cannot be opened by touch.** Found 2026-09-01 by the
-  cloud review of `dev` → `main`, and verified in the source: the button in
-  `ColumnCard` (`web/src/components/Calendar.tsx:254-270`) carries both
-  `onMouseEnter={() => setOpen(true)}` and `onClick={() => setOpen((v) => !v)}`.
-  A touch browser synthesises the mouse sequence on tap — `mouseenter`, then
-  `focus`, then `click` — as separate DOM events, so React commits `true` on the
-  enter and the click's toggle immediately flips it back to `false`. Every tap
-  flashes the panel open and closes it; the panel cannot be pinned.
-
-  This matters more than a stray handler because of what the redesign put behind
-  that button. `e265ec0` reduced a room column card to the room's name alone and
-  moved seats, `Attendees may schedule` and the organiser's directions into the
-  panel; the track-hours work (`e4eb832`, `5738ac6`) put the strand description
-  and the rule-vs-day-window explanation there too. On a phone — how an attendee
-  standing in a corridor actually reads the schedule — none of it is reachable.
-  The doc comment above the component (`Calendar.tsx:226`) states the opposite,
-  "a click opens it on touch, where there is no hover at all"; that sentence is
-  the assumption to fix, not just the code.
-
-  Three fixes, cheapest first:
-  1. `onClick={() => setOpen(true)}`. The card's `onMouseLeave`, `onBlur` and
-     Escape already close it, so the toggle earns nothing.
-  2. Gate the hover openers on a hover-capable pointer —
-     `window.matchMedia('(hover: hover)').matches` — and keep the toggle for
-     touch. Honest about the two input models, one more branch to hold.
-  3. Move it onto `usePopover`/`useDismiss` like `SearchBox`, `FilterMenu` and
-     `HelpMenu`, whose `useHover` is `mouseOnly` and gets this right by
-     construction. This is where the codebase is going anyway (see the
-     Medium-Priority popdown item), and it deletes a hand-rolled dismiss.
-
-  Note it is untestable the way the rest of the calendar is tested: there is no
-  DOM in the container, so the tap sequence cannot be asserted, and a unit test
-  over an `openOnTap`-style helper would only restate the fix. This one needs a
-  real phone, or at least a browser with touch emulation — same standing gap as
-  the drop-flicker item below.
-
 - **The commit in About LibreSesh comes out empty — cause found, one line
   left.** Reported 2026-09-01 against the About dialog (`52a11fc`). It was the
   stale dev server (see the entry under Blockers): the build stamp is computed
@@ -331,10 +295,14 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
   From 2026-09-01, none of it seen in a browser:
   - the **info button on a column card**: that the ⓘ appears only on rooms with
-    a description and tracks with hours, that hover, focus and tap all open the
-    panel, and — the bug fixed in `c7ae002` — that the panel opens flush under
-    _its own_ card in a row where the cards are different heights, including
-    the right-aligned one on the last column;
+    a description and tracks with hours, and that hover, focus and tap all open
+    the panel. The touch half is the point — it is the bug fixed on 2026-09-01
+    by moving the card onto `usePopover`, and a real finger is the only thing
+    that proves it, since the tap is a synthesised mouse sequence no test here
+    can produce. Watch too that the panel still opens flush under _its own_
+    card in a row of different-height cards (the `c7ae002` bug, now `shift`'s
+    job rather than an `alignEnd` prop's) and that on the last column it slides
+    back inside the viewport instead of hanging off the end;
   - the **track editor**: the hours toggle, the per-day rows and their day
     picker offering only dates without a window, and that the list row reads
     `09:00–13:00 +1 day`;
