@@ -1,11 +1,23 @@
 import { useMemo, useState } from 'react';
-import type { RoomDto, SessionDto } from '@shared/types';
+import type { BreakDto, RoomDto, SessionDto, TrackDto } from '@shared/types';
+import { fmtMin, place } from '../lib/format';
 
 /** Mímir add-on (SPEC: design/mimir-en-libresesh.md §7): advisory rhythm
  *  checks over the published schedule. Strictly additive — a chip that is off
  *  by default, a panel that only lists, and nothing that ever blocks a save.
  *  "Señalar, no decidir": every finding names what, why, and the rule, and the
- *  organiser is free to ignore all of it. */
+ *  organiser is free to ignore all of it.
+ *
+ *  Every note here is arithmetic on something the organiser declared, never an
+ *  impression. That is the whole difference between a note worth reading and a
+ *  co-pilot with opinions: "this session runs 13:20–14:40 and lunch is
+ *  13:00–14:00" can be checked; "the rhythm feels heavy" cannot, and invites
+ *  an argument the software has no standing in.
+ *
+ *  Until breaks existed, a pause had to be inferred from a gap in the grid —
+ *  which cannot tell a lunch from a room nobody booked. Track hours and the
+ *  floor-holding flag are the same story: they used to live in someone's head,
+ *  so a check could only guess at them. They are written down now. */
 
 interface Warning {
   key: string;
@@ -20,8 +32,39 @@ const MAX_BLOCK_MIN = 90;
 /** Gap below this doesn't count as a break between back-to-back sessions. */
 const MIN_BREAK_MIN = 10;
 
-export function rhythmWarnings(sessions: SessionDto[], rooms: RoomDto[]): Warning[] {
+/** How much of a declared break a session has to eat before it is worth
+ *  saying. A minute of overlap is a rounding error in somebody's end time; a
+ *  quarter of an hour is people choosing between the session and lunch. */
+const BREAK_BITE_MIN = 15;
+
+/** A break applies to a day if it is daily, or pinned to that date. */
+const breakOn = (b: BreakDto, date: string) => b.date === null || b.date === date;
+
+/** A track's hours for one day: a window pinned to that date replaces the
+ *  track's own, which is the rule the schedule itself follows. */
+function trackHours(track: TrackDto, date: string): { startMin: number; endMin: number } | null {
+  const pinned = track.windows.find((w) => w.date === date);
+  if (pinned) return { startMin: pinned.startMin, endMin: pinned.endMin };
+  if (track.startMin === null || track.endMin === null) return null;
+  return { startMin: track.startMin, endMin: track.endMin };
+}
+
+const overlap = (aStart: number, aEnd: number, bStart: number, bEnd: number) =>
+  Math.max(0, Math.min(aEnd, bEnd) - Math.max(aStart, bStart));
+
+export function rhythmWarnings(
+  sessions: SessionDto[],
+  rooms: RoomDto[],
+  // Optional so a caller with an older bundle still gets the length checks
+  // rather than nothing at all.
+  { breaks = [], tracks = [], timezone = 'UTC' }: {
+    breaks?: BreakDto[];
+    tracks?: TrackDto[];
+    timezone?: string;
+  } = {},
+): Warning[] {
   const roomName = (id: number) => rooms.find((r) => r.id === id)?.name ?? `room ${id}`;
+  const trackOf = (id: number | null) => (id === null ? undefined : tracks.find((t) => t.id === id));
   const warnings: Warning[] = [];
 
   for (const s of sessions) {
@@ -32,6 +75,46 @@ export function rhythmWarnings(sessions: SessionDto[], rooms: RoomDto[]): Warnin
         what: `“${s.title}” runs ${min} min in one piece`,
         why: `Attention holds roughly ${MAX_BLOCK_MIN} minutes; beyond that the room is still seated but no longer there.`,
         rule: 'Hard limit: ~90 min with a real cut.',
+      });
+    }
+
+    const at = place(s, timezone);
+
+    // Eating a declared meal. The organiser said when lunch is; this is the
+    // one check that could never be made by looking at the grid.
+    for (const b of breaks) {
+      if (!breakOn(b, at.date)) continue;
+      const bite = overlap(at.startMin, at.endMin, b.startMin, b.endMin);
+      if (bite >= BREAK_BITE_MIN) {
+        warnings.push({
+          key: `break-${s.id}-${b.id}`,
+          what: `“${s.title}” takes ${bite} min out of ${b.label} (${fmtMin(b.startMin)}–${fmtMin(b.endMin)})`,
+          why: 'Whoever comes has to skip the meal, and whoever eats misses the session — so the room is half there either way.',
+          rule: `${b.label} is declared for this day.`,
+        });
+      }
+    }
+
+    // Outside the hours its own strand declares.
+    const track = trackOf(s.trackId);
+    const hours = track ? trackHours(track, at.date) : null;
+    if (track && hours && (at.startMin < hours.startMin || at.endMin > hours.endMin)) {
+      warnings.push({
+        key: `hours-${s.id}`,
+        what: `“${s.title}” runs ${fmtMin(at.startMin)}–${fmtMin(at.endMin)}, outside ${track.name} (${fmtMin(hours.startMin)}–${fmtMin(hours.endMin)})`,
+        why: 'The strand has a shape for a reason — the hours are where its kind of work belongs in the day.',
+        rule: `${track.name} accepts sessions ${fmtMin(hours.startMin)}–${fmtMin(hours.endMin)} on this day.`,
+      });
+    }
+
+    // A session that holds the floor closes open booking for everybody, for
+    // its whole length. Worth saying out loud when it is long.
+    if (s.blocksOpenBooking && min > MAX_BLOCK_MIN) {
+      warnings.push({
+        key: `floor-${s.id}`,
+        what: `“${s.title}” holds the floor for ${min} min`,
+        why: 'While it runs nobody can place an open session anywhere in the event, so that is the whole unconference closed, not one room.',
+        rule: 'A held floor is the event choosing for everyone.',
       });
     }
   }
@@ -71,6 +154,36 @@ export function rhythmWarnings(sessions: SessionDto[], rooms: RoomDto[]): Warnin
     }
   }
 
+  // Load: the same person giving one session straight after another. A session
+  // has several speakers now, so this is answerable — it was not before.
+  //
+  // Named as a fact about the schedule, never about the person: "these two
+  // sessions are back to back" is structure, and "they are taking on too much"
+  // is a judgement Mímir has no standing to make.
+  const byPerson = new Map<number, { name: string; sessions: SessionDto[] }>();
+  for (const s of sessions) {
+    for (const sp of s.speakers) {
+      const entry = byPerson.get(sp.id) ?? { name: sp.name, sessions: [] };
+      entry.sessions.push(s);
+      byPerson.set(sp.id, entry);
+    }
+  }
+  for (const [personId, { name, sessions: theirs }] of byPerson) {
+    const ordered = theirs.slice().sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    for (let i = 1; i < ordered.length; i++) {
+      const gap = (Date.parse(ordered[i].startsAt) - Date.parse(ordered[i - 1].endsAt)) / MINUTE;
+      if (gap < MIN_BREAK_MIN) {
+        warnings.push({
+          key: `load-${personId}-${ordered[i].id}`,
+          what: `${name} gives “${ordered[i - 1].title}” and “${ordered[i].title}” back to back${gap > 0 ? ` (${Math.round(gap)} min between)` : ''}`,
+          why: 'Whoever holds a room needs longer than the room does — the second one starts with no time to put the first one down.',
+          rule: `At least ${MIN_BREAK_MIN} min between sessions the same person gives.`,
+        });
+        break; // one note per person is enough to look at the whole day
+      }
+    }
+  }
+
   return warnings;
 }
 
@@ -84,10 +197,25 @@ const loadDismissed = (): string[] => {
   }
 };
 
-export function RhythmCheck({ sessions, rooms }: { sessions: SessionDto[]; rooms: RoomDto[] }) {
+export function RhythmCheck({
+  sessions,
+  rooms,
+  breaks = [],
+  tracks = [],
+  timezone = 'UTC',
+}: {
+  sessions: SessionDto[];
+  rooms: RoomDto[];
+  breaks?: BreakDto[];
+  tracks?: TrackDto[];
+  timezone?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState<string[]>(loadDismissed);
-  const all = useMemo(() => rhythmWarnings(sessions, rooms), [sessions, rooms]);
+  const all = useMemo(
+    () => rhythmWarnings(sessions, rooms, { breaks, tracks, timezone }),
+    [sessions, rooms, breaks, tracks, timezone],
+  );
   const warnings = all.filter((w) => !dismissed.includes(w.key));
 
   const setAndStore = (keys: string[]) => {

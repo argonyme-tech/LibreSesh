@@ -253,7 +253,13 @@ function Hub({
   onOpen: (t: Tool) => void;
   slug: string;
 }) {
-  const warnings = rhythmWarnings(bundle.sessions, bundle.rooms);
+  // Breaks, track hours and the event's timezone turn most of these notes from
+  // an inference about the grid into arithmetic on what the organiser declared.
+  const warnings = rhythmWarnings(bundle.sessions, bundle.rooms, {
+    breaks: bundle.breaks,
+    tracks: bundle.tracks,
+    timezone: bundle.event.timezone,
+  });
   return (
     <div className="space-y-8">
       <div className="rounded-2xl border border-indigo-200 dark:border-indigo-900 bg-gradient-to-br from-indigo-50 to-stone-50 dark:from-indigo-950/40 dark:to-stone-950 p-5">
@@ -1414,7 +1420,13 @@ function MySessions({
 /* ---------------- rhythm ---------------- */
 
 function Rhythm({ bundle }: { bundle: BundleDto }) {
-  const warnings = rhythmWarnings(bundle.sessions, bundle.rooms);
+  // Breaks, track hours and the event's timezone turn most of these notes from
+  // an inference about the grid into arithmetic on what the organiser declared.
+  const warnings = rhythmWarnings(bundle.sessions, bundle.rooms, {
+    breaks: bundle.breaks,
+    tracks: bundle.tracks,
+    timezone: bundle.event.timezone,
+  });
   if (warnings.length === 0) {
     return <EmptyState>⏱ Nothing to flag: no block runs past ~90 min without a real pause.</EmptyState>;
   }
