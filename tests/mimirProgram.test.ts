@@ -108,6 +108,65 @@ describe('the programme manual', () => {
   });
 });
 
+/**
+ * LibreSesh is billed as an "(un)conference scheduler", and the first draft of
+ * this manual read like it: the only shape it described was an open floor, and
+ * the only sentence about event kinds was a binary — closed rooms are a
+ * programme, one open room is an unconference.
+ *
+ * That is a real failure mode rather than a stylistic one. The same objects
+ * hold a conference, a course, a residency, an assembly and a festival, one
+ * deployment holds several at once, and Mimir gets no signal telling her which
+ * she is in. A manual that knows one shape produces confident advice about the
+ * open floor at an event with no open rooms, and never notices.
+ */
+describe('the manual is not unconference-only', () => {
+  it('says outright that it covers every kind of event', () => {
+    expect(manual).toContain('nothing here is only for unconferences');
+  });
+
+  it('describes the shapes an organiser actually runs', () => {
+    for (const shape of [
+      'a fixed programme', // conference, seminar, symposium
+      'an open floor', // unconference, open space
+      'a hybrid', // a spine of held floors plus open rooms
+      'a residency, camp or gathering',
+      'an assembly or a decision meeting',
+      'a course or training',
+      'a festival or open programme',
+    ]) {
+      expect(manual, `no guidance for ${shape}`).toContain(shape);
+    }
+  });
+
+  it('reads the shape from the data instead of trusting a label', () => {
+    // The point of the section: she is handed rooms, tracks, breaks, sessions
+    // and pitches, and that is enough to tell what kind of event this is. A
+    // label somebody typed in a title is not.
+    expect(manual).toContain('read the shape from the data');
+    expect(manual).toContain('the label is never the point');
+  });
+
+  it('makes her say what she is reading, and ask when it is ambiguous', () => {
+    // Being wrong out loud costs one line. Guessing silently costs a whole
+    // conversation of advice aimed at the wrong event.
+    expect(manual).toContain('be wrong out loud');
+    expect(manual).toContain('do not default to the kind of event you saw last');
+  });
+
+  it('keeps open booking a property of rooms, not a kind of event', () => {
+    // The binary this replaced. An event is routinely closed in one room and
+    // open in the next, so the question has a per-room answer.
+    expect(manual).toContain('a property of rooms, not a setting of the event');
+    expect(manual).not.toContain('an event whose rooms are all closed is a programme');
+  });
+
+  it('asks the same four things whatever the shape', () => {
+    expect(manual).toContain('space that fits what happens in it');
+    expect(manual).toContain('a rhythm a human body can actually hold');
+  });
+});
+
 describe('the prompt layers reach a deployment', () => {
   it('ships both files that live beside the code', () => {
     // They are read from `server/` at runtime, and the runtime image copies

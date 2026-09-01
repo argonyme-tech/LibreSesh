@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import type { BundleDto, ContributionDto, ProposalDto, SessionDto } from '@shared/types';
 import { ApiError, api } from '../lib/api';
 import { useMe } from '../lib/useMe';
+import { eventShape } from '../lib/eventShape';
 import { Gate } from '../components/Gate';
 import { MimirChat, mimirChip } from '../components/MimirChat';
 import { rhythmWarnings } from '../components/RhythmCheck';
@@ -710,6 +711,52 @@ const EVENT_QUESTIONS = [
   },
 ] as const;
 
+/**
+ * What kind of event this is, read off the data rather than asked.
+ *
+ * It sits above the charter because everything after it is answered
+ * differently at a conference and at a camp, and because the app already knows
+ * — asking would spend a question on something the database answered, and get
+ * a worse answer, since people describe the event they meant to run.
+ *
+ * Always offered as a reading, never as a verdict. The correction link is the
+ * point of the component: being wrong out loud costs one line.
+ */
+function ShapeReading({ bundle }: { bundle: BundleDto }) {
+  const shape = useMemo(
+    () =>
+      eventShape({
+        rooms: bundle.rooms,
+        tracks: bundle.tracks,
+        breaks: bundle.breaks,
+        sessions: bundle.sessions,
+        proposals: bundle.proposals,
+        event: { startDate: bundle.event.startDate, endDate: bundle.event.endDate },
+      }),
+    [bundle],
+  );
+  return (
+    <div className="mb-4 rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/60 dark:bg-indigo-950/20 p-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={mimirChip}>I read this as</span>
+        <b className="text-stone-800 dark:text-stone-100">{shape.name}</b>
+        {!shape.certain && (
+          <span className="text-xs text-stone-500 dark:text-stone-400">
+            (thin signals — correct me)
+          </span>
+        )}
+      </div>
+      <p className="mt-1 text-stone-600 dark:text-stone-300">{shape.because}</p>
+      <p className="mt-1 text-stone-700 dark:text-stone-200">{shape.soWhat}</p>
+      <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">
+        This is a reading of the rooms, breaks and sessions as they stand — not a
+        label anyone typed. If it is wrong, say so in the chat and I will work from
+        what you tell me instead.
+      </p>
+    </div>
+  );
+}
+
 function EventInterview({ bundle }: { bundle: BundleDto }) {
   const toast = useToast();
   const [step, setStep] = useState(0);
@@ -732,6 +779,7 @@ function EventInterview({ bundle }: { bundle: BundleDto }) {
   if (done) {
     return (
       <div className="max-w-xl">
+        <ShapeReading bundle={bundle} />
         <Bubble
           text="Here is your process charter — copy it wherever your team works. What it deliberately does NOT contain: dynamics, agenda, timings. Those come after the charter holds."
           why="Loop B never starts before Loop A closes."
@@ -757,6 +805,7 @@ function EventInterview({ bundle }: { bundle: BundleDto }) {
   const q = EVENT_QUESTIONS[step];
   return (
     <div className="max-w-xl">
+      <ShapeReading bundle={bundle} />
       <Steps names={EVENT_QUESTIONS.map((x) => x.label)} at={step} />
       <Bubble text={q.q} why={q.why} />
       <textarea

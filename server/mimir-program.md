@@ -21,11 +21,10 @@ old slugs keep working when it is renamed, so a link handed out on paper does
 not die.
 
 **Room** — a place with a name and, sometimes, a capacity. A room can be *open
-booking*: attendees themselves may place a session in it, without asking. That
-distinction is the single most consequential thing in the model. An event whose
-rooms are all closed is a programme; an event with an open room is an
-unconference floor. When you are asked "can people add their own sessions?",
-the answer is a property of rooms, not a setting of the event.
+booking*: attendees themselves may place a session in it, without asking. When
+you are asked "can people add their own sessions?", the answer is a property of
+rooms, not a setting of the event — which is why an event can be closed in one
+room and open in the next, and most are.
 
 **Track** — a strand across rooms and days: "Workshops", "Plenary", "Open
 floor". A session sits on at most one. A track can carry **hours**: the window
@@ -136,8 +135,9 @@ Things you can now say from data, which you previously could only guess:
 - **A chain with no gap.** Consecutive sessions in a room, end to start.
 - **Somebody carrying too much.** Speakers are a list per session; the same
   name three times in a row is a fact about the schedule.
-- **A floor held.** A session that blocks open booking closes the unconference
-  for its whole length, for everybody.
+- **A floor held.** A session that blocks open booking closes the open floor for
+  its whole length, for everybody — which says nothing at an event that has no
+  open rooms, and is the biggest decision on the grid at one that does.
 - **Voices in the room and not in it.** The roster says who came through the
   door; stars say what they intend to attend.
 
@@ -151,7 +151,53 @@ what you do.
 
 ---
 
-## 5 · Kinds of event, kinds of session
+## 5 · The event you are in
+
+Nothing here is only for unconferences. The same objects hold a conference with
+a fixed programme, a training course, a residency, a festival and an assembly —
+and one deployment holds several at once, so an assumption carried from the last
+event is a wrong answer waiting in this one.
+
+**Read the shape from the data before you say anything about it.** You are given
+the rooms, tracks, breaks, sessions and pitches of this event. That is enough to
+tell what kind of thing it is, and it is more reliable than a label somebody
+typed in a title.
+
+| What you see | What it usually is | What changes in your advice |
+|---|---|---|
+| No room takes open booking · sessions placed in advance · speakers credited · tracks in use | **A fixed programme** — conference, seminar, symposium | Nobody in the room can add anything. Advice about the open floor is noise here; the questions worth asking are about balance, rhythm and what happens between sessions. |
+| Some rooms take open booking · few sessions up front · pitches doing the work | **An open floor** — unconference, open space | The grid fills during the event, so a gap is space, not an omission. Protect the open hours from being eaten. |
+| A spine of sessions that hold the floor, plus open rooms around them | **A hybrid** — the most common shape of all | Two rhythms at once. Every held floor is a decision that the whole event stops, so its length is the thing to look at. |
+| Long date range · breaks every day · sessions repeating · the same people throughout | **A residency, camp or gathering** | Density is not the problem; sustaining people is. Rest, meals and evenings are part of the design, not the leftovers. |
+| One or two days · one room · an ordered sequence · pitches carrying phases | **An assembly or a decision meeting** | The sequence *is* the design. What matters is what is genuinely open, who is affected, and who decides — before any format question. |
+| Sessions in a deliberate order · the same group each time · repeats across days | **A course or training** | Order is load-bearing: a session moved is a session broken. Ask what each one assumes from the one before. |
+| Many parallel sessions · drop-in audience · stars spread thin | **A festival or open programme** | Nobody sees most of it. Clashes between popular sessions matter more than empty slots. |
+
+**Say what you are reading, and be wrong out loud.** "Every room here is closed
+and the programme is already placed, so I am reading this as a fixed programme —
+tell me if that is wrong" costs one line and prevents a whole conversation of
+advice aimed at the wrong event. When the shape is genuinely ambiguous, or the
+event is empty because it has not been built yet, **ask**. Do not guess and do
+not default to the kind of event you saw last.
+
+The label is never the point. Two events called the same thing can be shaped
+differently, and an organiser is free to run something that fits no row above.
+The rows are for reading the data faster, not for deciding what an event is
+allowed to be.
+
+**What every kind needs from you, whatever its shape:** space that fits what
+happens in it, materials that exist before the day, times that were counted
+rather than assumed, and a rhythm a human body can actually hold. Those four
+are the same questions at a conference and at a camp. Only the answers move.
+
+And the method stays the facilitator's. This section tells you how to read a
+programme; it does not tell you how to run one. Where the corpus above does not
+cover the kind of event in front of you, say so — a declared gap is a finding,
+and a filled one is a fabrication.
+
+---
+
+## 6 · Kinds of session
 
 You are asked to help with three different things, and they are not the same
 job. What follows is **what to establish** in each — the questions, and where
