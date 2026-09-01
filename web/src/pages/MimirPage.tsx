@@ -100,7 +100,14 @@ export function MimirPage() {
 
       <main className="mx-auto max-w-3xl px-4 py-6">
         {tool === 'hub' && (
-          <Hub bundle={bundle} canUse={canUse} isAdmin={isAdmin} onOpen={setTool} slug={slug} />
+          <Hub
+            bundle={bundle}
+            canUse={canUse}
+            isAdmin={isAdmin}
+            engine={engine}
+            onOpen={setTool}
+            slug={slug}
+          />
         )}
         {tool === 'interview' && (
           <>
@@ -128,94 +135,183 @@ export function MimirPage() {
 
 /* ---------------- hub ---------------- */
 
+function Tile({
+  glyph,
+  title,
+  sub,
+  onClick,
+  to,
+  accent = false,
+}: {
+  glyph: string;
+  title: string;
+  sub: string;
+  onClick?: () => void;
+  to?: string;
+  accent?: boolean;
+}) {
+  const cls = `group flex items-center gap-4 rounded-2xl border p-4 text-left transition-colors ${
+    accent
+      ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50/60 dark:bg-indigo-950/30 hover:bg-indigo-100/60 dark:hover:bg-indigo-950/50'
+      : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 hover:border-indigo-400 dark:hover:border-indigo-600'
+  }`;
+  const inner = (
+    <>
+      <span
+        aria-hidden
+        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl ${
+          accent
+            ? 'bg-indigo-600 text-white'
+            : 'bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200'
+        }`}
+      >
+        {glyph}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">{title}</span>
+        <span className="block truncate text-xs text-stone-500 dark:text-stone-400">{sub}</span>
+      </span>
+      <span
+        aria-hidden
+        className="text-stone-300 dark:text-stone-600 transition-transform group-hover:translate-x-0.5 group-hover:text-indigo-500"
+      >
+        ›
+      </span>
+    </>
+  );
+  return to ? (
+    <Link to={to} className={cls}>
+      {inner}
+    </Link>
+  ) : (
+    <button type="button" onClick={onClick} className={cls}>
+      {inner}
+    </button>
+  );
+}
+
+function HubSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500">
+        {label}
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-2">{children}</div>
+    </section>
+  );
+}
+
 function Hub({
   bundle,
   canUse,
   isAdmin,
+  engine,
   onOpen,
   slug,
 }: {
   bundle: BundleDto;
   canUse: boolean;
   isAdmin: boolean;
+  engine: boolean;
   onOpen: (t: Tool) => void;
   slug: string;
 }) {
   const warnings = rhythmWarnings(bundle.sessions, bundle.rooms);
-  const tile =
-    'rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-4 text-left hover:border-indigo-400 dark:hover:border-indigo-600';
   return (
-    <div className="space-y-6">
-      <p className="text-sm text-stone-500 dark:text-stone-400">
-        Craft tools for designing sessions and processes. Mímir proposes and flags;{' '}
-        <b>deciding is always human.</b>
-      </p>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {canUse && (
-          <button type="button" className={tile} onClick={() => onOpen('interview')}>
-            <div className="text-2xl">🎤</div>
-            <div className="mt-1 text-sm font-semibold">Design your session</div>
-            <div className="text-xs text-stone-500 dark:text-stone-400">
-              Guided interview → draft in Pitches
-            </div>
-          </button>
-        )}
+    <div className="space-y-8">
+      <div className="rounded-2xl border border-indigo-200 dark:border-indigo-900 bg-gradient-to-br from-indigo-50 to-stone-50 dark:from-indigo-950/40 dark:to-stone-950 p-5">
+        <p className="max-w-xl text-sm text-stone-600 dark:text-stone-300">
+          The craft copilot for <b>{bundle.event.name}</b>. Mímir proposes formats, flags rhythm,
+          and helps you harvest — <b>deciding is always human.</b>
+        </p>
         {isAdmin && (
-          <button type="button" className={tile} onClick={() => onOpen('eventInterview')}>
-            <div className="text-2xl">🗺</div>
-            <div className="mt-1 text-sm font-semibold">Design the event process</div>
-            <div className="text-xs text-stone-500 dark:text-stone-400">
-              Commission, purpose, voices → process charter
-            </div>
-          </button>
-        )}
-        {canUse && (
-          <button type="button" className={tile} onClick={() => onOpen('catalog')}>
-            <div className="text-2xl">🎲</div>
-            <div className="mt-1 text-sm font-semibold">Dynamics catalog</div>
-            <div className="text-xs text-stone-500 dark:text-stone-400">
-              The facilitator's repertoire
-            </div>
-          </button>
-        )}
-        <Link to={`/e/${slug}/proposals`} className={tile}>
-          <div className="text-2xl">◇</div>
-          <div className="mt-1 text-sm font-semibold">Decisions</div>
-          <div className="text-xs text-stone-500 dark:text-stone-400">
-            Pitches by phase: concern → decision
-          </div>
-        </Link>
-        <button type="button" className={tile} onClick={() => onOpen('rhythm')}>
-          <div className="text-2xl">⏱</div>
-          <div className="mt-1 text-sm font-semibold">Rhythm</div>
-          <div className="text-xs text-stone-500 dark:text-stone-400">
-            {warnings.length === 0 ? 'Schedule looks healthy' : `${warnings.length} note(s)`}
-          </div>
-        </button>
-        {canUse && (
-          <button type="button" className={tile} onClick={() => onOpen('sessions')}>
-            <div className="text-2xl">🎬</div>
-            <div className="mt-1 text-sm font-semibold">My sessions</div>
-            <div className="text-xs text-stone-500 dark:text-stone-400">
-              Designs in progress · scripting · harvest & report
-            </div>
-          </button>
-        )}
-        <button type="button" className={tile} onClick={() => onOpen('infographic')}>
-          <div className="text-2xl">📊</div>
-          <div className="mt-1 text-sm font-semibold">Week at a glance</div>
-          <div className="text-xs text-stone-500 dark:text-stone-400">The process, visually</div>
-        </button>
-        {isAdmin && (
-          <button type="button" className={tile} onClick={() => onOpen('chat')}>
-            <div className="text-2xl text-indigo-600 dark:text-indigo-400">◆</div>
-            <div className="mt-1 text-sm font-semibold">Chat with Mímir</div>
-            <div className="text-xs text-stone-500 dark:text-stone-400">
-              Organisers only · the craft engine
-            </div>
+          <button
+            type="button"
+            onClick={() => onOpen('chat')}
+            className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
+              engine
+                ? 'bg-green-500/15 text-green-700 dark:text-green-400 border border-green-500/30'
+                : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'
+            }`}
+          >
+            <span
+              aria-hidden
+              className={`h-1.5 w-1.5 rounded-full ${engine ? 'bg-green-500' : 'bg-amber-500'}`}
+            />
+            {engine ? 'Engine armed — live interviews on' : 'Engine off — tap to arm the AI'}
           </button>
         )}
       </div>
+
+      {(canUse || isAdmin) && (
+        <HubSection label="Design">
+          {canUse && (
+            <Tile
+              glyph="🎤"
+              title="Design your session"
+              sub="Guided interview → draft in Pitches"
+              onClick={() => onOpen('interview')}
+            />
+          )}
+          {isAdmin && (
+            <Tile
+              glyph="🗺"
+              title="Design the event process"
+              sub="Commission, purpose, voices → process charter"
+              onClick={() => onOpen('eventInterview')}
+            />
+          )}
+        </HubSection>
+      )}
+
+      <HubSection label="Follow">
+        {canUse && (
+          <Tile
+            glyph="🎬"
+            title="My sessions"
+            sub="Design progress · scripting · harvest & report"
+            onClick={() => onOpen('sessions')}
+          />
+        )}
+        <Tile
+          glyph="◇"
+          title="Decisions"
+          sub="Pitches by phase: concern → decision"
+          to={`/e/${slug}/proposals`}
+        />
+        <Tile
+          glyph="⏱"
+          title="Rhythm"
+          sub={warnings.length === 0 ? 'Schedule looks healthy' : `${warnings.length} advisory note(s)`}
+          onClick={() => onOpen('rhythm')}
+        />
+      </HubSection>
+
+      <HubSection label="Explore">
+        {canUse && (
+          <Tile
+            glyph="🎲"
+            title="Dynamics catalog"
+            sub="The facilitator's repertoire, tiered"
+            onClick={() => onOpen('catalog')}
+          />
+        )}
+        <Tile
+          glyph="📊"
+          title="Week at a glance"
+          sub="Load per day · the decision pipeline"
+          onClick={() => onOpen('infographic')}
+        />
+        {isAdmin && (
+          <Tile
+            glyph="◆"
+            title="Chat with Mímir"
+            sub="Organisers only · the craft engine"
+            onClick={() => onOpen('chat')}
+            accent
+          />
+        )}
+      </HubSection>
     </div>
   );
 }
@@ -558,6 +654,14 @@ function EventInterview({ bundle }: { bundle: BundleDto }) {
 /* ---------------- catalog ---------------- */
 
 const TIERS = ['all', 'validada', 'destacada', 'cantera'] as const;
+/** Data values stay as the facilitator's corpus wrote them; the UI speaks English. */
+const TIER_LABEL: Record<string, string> = {
+  all: 'All tiers',
+  validada: 'Confirmed',
+  destacada: 'Curated',
+  cantera: 'Quarry',
+};
+const DOMINIO_LABEL: Record<string, string> = { usada: 'used', vista: 'seen', leida: 'read' };
 
 function Catalog({ slug }: { slug: string }) {
   const [dynamics, setDynamics] = useState<Record<string, unknown>[] | null>(null);
@@ -607,7 +711,7 @@ function Catalog({ slug }: { slug: string }) {
       <div className="mb-2 flex flex-wrap gap-1.5">
         {TIERS.map((t) => (
           <button key={t} type="button" onClick={() => setTier(t)} className={chip(tier === t)}>
-            {t === 'all' ? `All tiers (${dynamics.length})` : t}
+            {t === 'all' ? `All tiers (${dynamics.length})` : TIER_LABEL[t]}
           </button>
         ))}
       </div>
@@ -619,9 +723,9 @@ function Catalog({ slug }: { slug: string }) {
         ))}
       </div>
       <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
-        {shown.length} shown · <b>validada</b> = confirmed by the facilitator · <b>destacada</b> ={' '}
-        card-filed in the vault · <b>cantera</b> = quarry from the 700-compendium, metadata only,
-        awaiting human criterion.
+        {shown.length} shown · <b>Confirmed</b> by the facilitator · <b>Curated</b> = card-filed
+        in the vault · <b>Quarry</b> = from the 700-compendium, metadata only, awaiting human
+        criterion.
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         {shown.map((d, i) => (
@@ -636,8 +740,10 @@ function Catalog({ slug }: { slug: string }) {
                   {String(d.safety)}
                 </span>
               )}
-              <span className={mimirChip}>{String(d.tier ?? 'cantera')}</span>
-              {Boolean(d.dominio) && <span className={mimirChip}>{String(d.dominio)}</span>}
+              <span className={mimirChip}>{TIER_LABEL[String(d.tier)] ?? 'Quarry'}</span>
+              {Boolean(d.dominio) && (
+                <span className={mimirChip}>{DOMINIO_LABEL[String(d.dominio)] ?? String(d.dominio)}</span>
+              )}
             </div>
             {Boolean(d.purpose) && (
               <p className="mt-1 text-xs text-stone-600 dark:text-stone-300">{String(d.purpose)}</p>
