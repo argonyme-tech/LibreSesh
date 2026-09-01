@@ -1220,58 +1220,6 @@ export function SchedulePage() {
                     </span>
                   )}
                 </Link>
-
-                {/* Manage / Arrange / Add travel together at every width — an
-                    organiser's three actions belong in one place, not split between
-                    the header and here. Each keeps its glyph and drops its label
-                    below `sm`, which is what buys the room on a phone. */}
-                <div className="ml-auto flex items-center gap-2">
-                  {role === "admin" && (
-                    <Link
-                      data-tour="manage"
-                      to={`/e/${slug}/admin`}
-                      aria-label="Manage Event"
-                      title="Manage Event"
-                      className="flex items-center gap-1.5 rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 px-3 py-2 text-xs font-medium text-stone-600 dark:text-stone-300 hover:border-stone-400 dark:hover:border-stone-500"
-                    >
-                      <SettingsIcon className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Manage Event</span>
-                    </Link>
-                  )}
-                  {canArrange && (
-                    <button
-                      type="button"
-                      data-tour="arrange"
-                      onClick={() => setArrange((a) => !a)}
-                      aria-pressed={arrange}
-                      aria-label={arrange ? "Done arranging" : "Arrange sessions"}
-                      title={arrange ? "Done arranging" : "Arrange sessions"}
-                      className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium ${
-                        arrange
-                          ? "border-stone-900 bg-stone-900 dark:bg-stone-100 dark:text-stone-900 text-white"
-                          : "border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 text-stone-600 dark:text-stone-300 hover:border-stone-400 dark:hover:border-stone-500"
-                      }`}
-                    >
-                      <span aria-hidden="true">{arrange ? "✓" : "↕"}</span>
-                      <span className="hidden sm:inline">
-                        {arrange ? "Done arranging" : "Arrange Sessions"}
-                      </span>
-                    </button>
-                  )}
-                  {canWrite && (
-                    <button
-                      type="button"
-                      data-tour="add"
-                      onClick={() => setEditing({})}
-                      aria-label="Add session"
-                      title="Add session"
-                      className="flex items-center gap-1.5 rounded-lg bg-stone-900 dark:bg-stone-100 dark:text-stone-900 px-3 py-2 text-xs font-semibold text-white hover:bg-stone-700 dark:hover:bg-stone-300"
-                    >
-                      <span aria-hidden="true">+</span>
-                      <span className="hidden sm:inline">Add session</span>
-                    </button>
-                  )}
-                </div>
               </div>
             </div>
           </div>
@@ -1359,6 +1307,60 @@ export function SchedulePage() {
                 tags={bundle.tags}
                 tracks={bundle.tracks}
               />
+              {/* Manage / Arrange / Add end this row rather than the one above:
+                  the day strip and the view toggles left a wide gap on the right of
+                  it, and the organiser's three actions were taking a whole row of
+                  their own to sit in. `basis-full` below `sm` puts them back on a
+                  line of their own, because on a phone they do not fit beside the
+                  search box. Living here also means they survive the fold — Arrange
+                  is a thing you reach for mid-scroll, and it used to fold away. */}
+              <div className="flex basis-full items-center justify-end gap-2 sm:ml-auto sm:basis-auto">
+                {role === "admin" && (
+                  <Link
+                    data-tour="manage"
+                    to={`/e/${slug}/admin`}
+                    aria-label="Manage Event"
+                    title="Manage Event"
+                    className="flex items-center gap-1.5 rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 px-3 py-2 text-xs font-medium text-stone-600 dark:text-stone-300 hover:border-stone-400 dark:hover:border-stone-500"
+                  >
+                    <SettingsIcon className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Manage Event</span>
+                  </Link>
+                )}
+                {canArrange && (
+                  <button
+                    type="button"
+                    data-tour="arrange"
+                    onClick={() => setArrange((a) => !a)}
+                    aria-pressed={arrange}
+                    aria-label={arrange ? "Done arranging" : "Arrange sessions"}
+                    title={arrange ? "Done arranging" : "Arrange sessions"}
+                    className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium ${
+                      arrange
+                        ? "border-stone-900 bg-stone-900 dark:bg-stone-100 dark:text-stone-900 text-white"
+                        : "border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 text-stone-600 dark:text-stone-300 hover:border-stone-400 dark:hover:border-stone-500"
+                    }`}
+                  >
+                    <span aria-hidden="true">{arrange ? "✓" : "↕"}</span>
+                    <span className="hidden sm:inline">
+                      {arrange ? "Done arranging" : "Arrange Sessions"}
+                    </span>
+                  </button>
+                )}
+                {canWrite && (
+                  <button
+                    type="button"
+                    data-tour="add"
+                    onClick={() => setEditing({})}
+                    aria-label="Add session"
+                    title="Add session"
+                    className="flex items-center gap-1.5 rounded-lg bg-stone-900 dark:bg-stone-100 dark:text-stone-900 px-3 py-2 text-xs font-semibold text-white hover:bg-stone-700 dark:hover:bg-stone-300"
+                  >
+                    <span aria-hidden="true">+</span>
+                    <span className="hidden sm:inline">Add session</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
           </>

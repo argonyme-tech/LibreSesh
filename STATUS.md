@@ -13,20 +13,11 @@ ancestor of `dev` — so its code half is done and written up in CHANGELOG
 `[Unreleased]` and ARCHITECTURE §Breaks; what is left of it is the browser
 confirmation under Blockers. 0.2.0 was tagged 2026-08-30; what shipped is in
 CHANGELOG.md under `[0.2.0]`, and what has landed since is under
-`[Unreleased]`. What is left of the UI-overhaul plan lives in
-`_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
-
-- **Tag colours — asked for 2026-09-01, nothing written yet.** Two parts: the
-  colour control on the add-tag row and in the tag editor should be a circle
-  rather than the browser's rectangular `<input type="color">` chrome, and a
-  new tag should take a colour by itself instead of every tag starting at
-  `DEFAULT_TAG_COLOR` grey (`AdminPage.tsx:42`). The auto-assignment wants its
-  own palette: `ROOM_COLORS` is deliberately washed out because a room colour
-  is a column that text sits on, while a tag is a small chip that has to read
-  at a glance — so a second, brighter list beside it, with the `nextRoomColor`
-  shape, taking the first colour no live tag is using. The server already
-  defaults a colourless tag to `#6B7280`; that default should become the
-  assignment, so an API caller gets what the form gets.
+`[Unreleased]` — including tag colours (`3f723ac`, `0b08a00`),
+multi-speaker sessions (`f26bde3`), the single Calendar menu item
+(`5d020cb`) and per-field profile editing (`aa64417`), all four written up
+2026-09-01 after landing unlogged. What is left of the UI-overhaul plan
+lives in `_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
 
 - **Whole-app UI sweep.** The primitives landed, the admin page is done, and
   as of 2026-08-31 every modal is on the `Modal` primitive — the last six
@@ -39,7 +30,10 @@ CHANGELOG.md under `[0.2.0]`, and what has landed since is under
   five in `ui.tsx`, which are the primitives themselves. Re-counted 2026-08-31
   after the Backup and Audit tabs and the gate's name-collision link: still 21,
   because all three use the primitives (`secondaryButtonClass`, `linkClass`)
-  rather than a bare `underline`.
+  rather than a bare `underline`. Still 21 on 2026-09-01: the per-field
+  profile rework added no bare underline, because its "add a bio" affordance
+  is a `SecondaryButton` — it is an action, not navigation.
+
 - **ARCHITECTURE.md concurrency paragraph.** §Realtime documents broadcast and
   heartbeats but never states the model: last-write-wins, `assertNotStale`
   409 on an `updated_at` mismatch, no CRDT by design.
@@ -47,7 +41,7 @@ CHANGELOG.md under `[0.2.0]`, and what has landed since is under
 ## Blockers
 
 - **The breaks band still has not been seen in a browser.** What is left of
-  this: nobody has yet said whether the band is on the grid.
+  this: nobody has yet said whether the band is on the grid. DONE, works.
 
   **The "older app" half is solved, 2026-09-01, and the answer was a process.**
   A whole dev stack from 2026-08-31 was still running — `npm run dev` (pid
@@ -108,42 +102,6 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
 ## High Priority
 
-- **The ⓘ on a column card cannot be opened by touch.** Found 2026-09-01 by the
-  cloud review of `dev` → `main`, and verified in the source: the button in
-  `ColumnCard` (`web/src/components/Calendar.tsx:254-270`) carries both
-  `onMouseEnter={() => setOpen(true)}` and `onClick={() => setOpen((v) => !v)}`.
-  A touch browser synthesises the mouse sequence on tap — `mouseenter`, then
-  `focus`, then `click` — as separate DOM events, so React commits `true` on the
-  enter and the click's toggle immediately flips it back to `false`. Every tap
-  flashes the panel open and closes it; the panel cannot be pinned.
-
-  This matters more than a stray handler because of what the redesign put behind
-  that button. `e265ec0` reduced a room column card to the room's name alone and
-  moved seats, `Attendees may schedule` and the organiser's directions into the
-  panel; the track-hours work (`e4eb832`, `5738ac6`) put the strand description
-  and the rule-vs-day-window explanation there too. On a phone — how an attendee
-  standing in a corridor actually reads the schedule — none of it is reachable.
-  The doc comment above the component (`Calendar.tsx:226`) states the opposite,
-  "a click opens it on touch, where there is no hover at all"; that sentence is
-  the assumption to fix, not just the code.
-
-  Three fixes, cheapest first:
-  1. `onClick={() => setOpen(true)}`. The card's `onMouseLeave`, `onBlur` and
-     Escape already close it, so the toggle earns nothing.
-  2. Gate the hover openers on a hover-capable pointer —
-     `window.matchMedia('(hover: hover)').matches` — and keep the toggle for
-     touch. Honest about the two input models, one more branch to hold.
-  3. Move it onto `usePopover`/`useDismiss` like `SearchBox`, `FilterMenu` and
-     `HelpMenu`, whose `useHover` is `mouseOnly` and gets this right by
-     construction. This is where the codebase is going anyway (see the
-     Medium-Priority popdown item), and it deletes a hand-rolled dismiss.
-
-  Note it is untestable the way the rest of the calendar is tested: there is no
-  DOM in the container, so the tap sequence cannot be asserted, and a unit test
-  over an `openOnTap`-style helper would only restate the fix. This one needs a
-  real phone, or at least a browser with touch emulation — same standing gap as
-  the drop-flicker item below.
-
 - **The commit in About LibreSesh comes out empty — cause found, one line
   left.** Reported 2026-09-01 against the About dialog (`52a11fc`). It was the
   stale dev server (see the entry under Blockers): the build stamp is computed
@@ -185,7 +143,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
   For the permissions matrix there is no remaining suspect on file. The
   optimistic overlay does move the switch on click, so if it still flicks, the
-  next thing to establish is *which* of the three states is wrong and when —
+  next thing to establish is _which_ of the three states is wrong and when —
   note that `busy !== null` disables every switch in the table during a save,
   and a disabled `Toggle` restyles, which is a visible change that is not a
   revert and could easily read as one.
@@ -212,7 +170,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   row, and the **Repeat** control in the session form — so a long programme's
   daily officials and fixed track hours are a few rows or a few clicks rather
   than sixty of either. What is left of that job:
-  - **Importing into an *existing* event.** The route only creates, so a whole
+  - **Importing into an _existing_ event.** The route only creates, so a whole
     transcribed programme still cannot be dropped into the event you are
     already running; the session form is the only way in, one session (or one
     run) at a time. Wants `POST /events/:slug/import`, gated on event admin
@@ -221,7 +179,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
     `dryRun` as now.
   - **A UI for the importer itself.** `POST /events/import` is curl plus a JSON
     file, which is right for a transcription and wrong for everything else.
-  - **Duplicate a day.** The repeat control repeats *one* session; copying a
+  - **Duplicate a day.** The repeat control repeats _one_ session; copying a
     whole day's programme onto other days is still hand work. Same expansion,
     a different front door — an action on the day rail rather than in the
     session form.
@@ -232,9 +190,9 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   a repeating session rather than by the track. Track defaults in the import
   document would be cheap; `start_min`/`end_min` on the `tracks` table is the
   bigger version and changes what a track means in the session form, the grid
-  and the filters — worth doing only to make the app *enforce* track hours.
+  and the filters — worth doing only to make the app _enforce_ track hours.
 
-- **Nothing imports an event *export*.** `POST /events/import` builds an event
+- **Nothing imports an event _export_.** `POST /events/import` builds an event
   from a JSON schedule, but does not read `GET /export.json` back: an export is
   a record of ids, instants and authorship belonging to identities the target
   instance has never seen, and reading one back wants a new slug, fresh ids and
@@ -243,7 +201,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
 - **Compact button overrides do nothing.** `SecondaryButton className="py-1"`
   and the `py-1.5` variants in DetailSheet, ProfilePage, ProposalBoard and
-  AdminPermissions are dead: Tailwind emits `.py-1` and `.py-1.5` *before* the
+  AdminPermissions are dead: Tailwind emits `.py-1` and `.py-1.5` _before_ the
   primitives' `.py-2.5`, so the base always wins and those buttons are full
   height. Verified in the built CSS on 2026-08-31. Predates the button-height
   fix — that change kept the situation identical rather than creating it. Wants
@@ -256,7 +214,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   A person who re-enters recreates the two-identity split the organiser just
   merged away. Wants one line on the gate (likely only when the arriving
   identity holds no role but does hold an event name here — exactly the
-  signed-out shape). Scenario documented in ARCHITECTURE §Merging two people.
+  signed-out shape). Scenario documented in ARCHITECTURE §Merging two people. @claude: this should go into a separate to-do file for profile/user related data modelling issues and improvements.
 
 - **Number fields accept nonsense.** Room capacity is `type="number" min={0}`,
   which the browser enforces on the spinner but not on typing or paste; the
@@ -302,9 +260,9 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   - the **Repeat** control in the session form — the only part of it with no
     automated coverage, since the server route is tested and the modal is not.
     Worth watching: the weekday chips wrapping under `sm` inside a `FormGrid`
-    that is already two columns; that the start day's chip reads as *fixed*
+    that is already two columns; that the start day's chip reads as _fixed_
     rather than broken when clicking it does nothing; and that the live count
-    and the **Create N sessions** button track the *Until* select as it moves.
+    and the **Create N sessions** button track the _Until_ select as it moves.
     Then create a real run of ten and confirm the grid fills without a reload —
     the client applies each created session itself and the server also
     broadcasts them, so a double-apply would show up here first;
@@ -337,10 +295,14 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
   From 2026-09-01, none of it seen in a browser:
   - the **info button on a column card**: that the ⓘ appears only on rooms with
-    a description and tracks with hours, that hover, focus and tap all open the
-    panel, and — the bug fixed in `c7ae002` — that the panel opens flush under
-    *its own* card in a row where the cards are different heights, including
-    the right-aligned one on the last column;
+    a description and tracks with hours, and that hover, focus and tap all open
+    the panel. The touch half is the point — it is the bug fixed on 2026-09-01
+    by moving the card onto `usePopover`, and a real finger is the only thing
+    that proves it, since the tap is a synthesised mouse sequence no test here
+    can produce. Watch too that the panel still opens flush under _its own_
+    card in a row of different-height cards (the `c7ae002` bug, now `shift`'s
+    job rather than an `alignEnd` prop's) and that on the last column it slides
+    back inside the viewport instead of hanging off the end;
   - the **track editor**: the hours toggle, the per-day rows and their day
     picker offering only dates without a window, and that the list row reads
     `09:00–13:00 +1 day`;
@@ -349,7 +311,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
     server when an attendee books outside them;
   - the **invite QR**, which has had no camera anywhere near it. The encoder is
     verified — the symbol renders with correct finder patterns and the URL
-    round-trips through the fragment, both under test — but *scanning* is the
+    round-trips through the fragment, both under test — but _scanning_ is the
     part no test in this repo can reach. Wanted: a real phone camera on the
     rendered code; that the gate then shows **Invited as …** with no password
     box; that the address bar reads a bare `/e/:slug` immediately after, and
@@ -364,11 +326,15 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   - the `Modal` rewrite — overlay scrolls, `dvh` cap — against the tallest
     modal there is, and the one it was reported on ("Link another device");
   - the schedule header on a narrow screen: theme now lives in the profile
-    menu, Manage/Arrange/Add sit together and go icon-only below `sm`. Watch
-    where the action row chooses to wrap;
+    menu, Manage/Arrange/Add sit together and go icon-only below `sm`. As of
+    2026-09-01 they end the search/Filter/Now row rather than the day-strip row
+    above it, and take a line of their own only below `sm` (`basis-full`) —
+    so what wants watching is where that row breaks between `sm` and a laptop,
+    and how it looks with several active-filter chips beside it;
   - the tour no longer auto-starting for an organiser, while "?" still opens
     it;
   - the drag, now-line and 360px checks that were already outstanding.
+
 - **Deploy paths, and what is actually proven.** Railway builds from
   `deploy/Dockerfile` (`railway.json` pins the builder — Railway's Node
   autodetection runs a plain `npm ci`, which honours our `ignore-scripts=true`
@@ -394,12 +360,71 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   whole suite stayed green — is what the gap costs. A React error boundary
   would have contained it; there is still none.
 
+- **Brute-forcing an event password costs an attacker one cookie.** The gate
+  spends a token from `LIMITS.auth` (5 attempts / 15 min) on two buckets, the
+  identity and the IP, refunding both when a password is right
+  (`eventAuth.ts:62-86`). The identity half is keyed on `req.identity.id`,
+  which is whatever the caller's cookie says: dropping the cookie mints a new
+  identity and a full bucket, so that half stops an honest typo and nothing
+  else. The IP half is the only real limit, and it is `req.ip` — the socket
+  address unless `TRUST_PROXY=1` (`config.ts:128`, `app.ts:48`). Behind a proxy
+  with that unset, every attendee shares the proxy's bucket, which is a lockout
+  for the whole venue at 5 wrong guesses; with it set, the app must not also be
+  reachable off-proxy, or `X-Forwarded-For` is the attacker's to write.
+
+  What is missing is a counter the caller cannot reset: failures per _event_,
+  surviving a new cookie, growing the wait as they pile up. `auth_failed`
+  already lands in the audit log on every miss (`eventAuth.ts:76`), so the
+  count exists — nothing reads it, and no organiser is ever told that someone
+  has been guessing at their event all afternoon. Raising the capacity is not
+  the fix and would only hurt the typo case; bcrypt already makes each guess
+  cost something, which is why this is a real backlog item and not a fire.
+
+- **A person who never opened their profile cannot be merged.** Reported
+  2026-09-01: the merge dialog does not offer the people you most want to fold
+  together. Mechanism — a `people` row only exists once somebody edits their
+  profile, is typed as a speaker on a session, or is added by an organiser.
+  Someone who walked in, took a display name at the gate and never touched
+  their profile has no row at all: they live in `event_identities`/`roles`
+  only. The merge dialog lists `bundle.people` and `/people/:id/merge` loads
+  both sides out of the `people` table (`ProfilePage.tsx` MergeModal,
+  `people.ts:231`), so such a person cannot be either side of a merge.
+
+  The duplicate this actually produces: an organiser bills a session to "Ada
+  Lovelace" (auto-creating an unclaimed profile), Ada then joins the gate as
+  "Ada" and gets an identity with no profile. Two records, one human, and
+  merging is not the tool for it — they are not two profiles. The claim path
+  that would fix it fires only on an exact name match and only when she edits
+  her own profile (`people.ts:105-113`). The roster query already carries
+  `person_id` per attendee (`attendees.ts:47`), so Manage Event → People
+  already knows who has a profile and who does not; what is missing is the
+  organiser move "this attendee **is** that profile", which is a claim on
+  someone's behalf rather than a second kind of merge. Worth deciding whether
+  the merge dialog should also list profile-less attendees and quietly do the
+  claim, or whether that belongs on the People tab where the two lists meet.
+
 ## Medium Priority
+
+- **There is no landing page — `/` is the list of every event.** A visitor to
+  the root gets the logo, an Import and a New event button, and the instance's
+  events (`App.tsx:20`, `EventListPage.tsx`). Nothing says what LibreSesh is or
+  what it is for; the About dialog behind the "?" says it, but only to someone
+  already inside an event. On a public instance the list is also the front
+  door, so every event on the box is enumerable by anyone who loads the page,
+  which is a second reason not to lead with it.
+
+  Wants a simple page at `/` — what this is, one line on the licence, the way
+  in for someone holding an event link, and a way through to the list. The
+  list itself then wants its own address (`/events`), and the catch-all
+  redirect at `App.tsx:39` has to follow it rather than keep pointing at `/`.
+  The copy already exists in the About dialog and the README; this is mostly a
+  decision about what the list is for once it is not the first thing anyone
+  sees.
 
 - **Put the last two popdowns on `usePopover`.** `ProfileMenu` and
   `SpeakerCombobox` still position themselves and still carry their own
   outside-click/Escape effects. Neither can overhang today — one is `right-0
-  w-48`, the other `w-full` — so they are exempted by name in
+w-48`, the other `w-full` — so they are exempted by name in
   `tests/popoverOverflow.test.ts`, which also asserts the reason still holds.
   Moving them over would delete the last two copies of the dismiss effect and
   let that allowlist go away.
@@ -411,11 +436,11 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   phone at a conference venue, which is the network this app is actually used
   on.
 
-  The argument *for* reducing: `@floating-ui/react-dom` is roughly a third of
+  The argument _for_ reducing: `@floating-ui/react-dom` is roughly a third of
   the weight and does the whole job the bug needed — `strategy: 'fixed'`,
   `shift`, `flip`, `size`. Everything above that line is convenience.
 
-  The argument *against*, which is why the fuller package was chosen: the extra
+  The argument _against_, which is why the fuller package was chosen: the extra
   weight buys `useDismiss`, `useRole` and `FloatingFocusManager`. Dropping to
   `react-dom` means hand-rolling the outside-click/Escape effect again in every
   popdown — the four near-identical copies this change set out to delete — and
@@ -444,7 +469,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   **158 commits across all refs** — 140 of 169 on `main`, 141 of 170 on `dev` —
   spanning 2026-08-28 (`7692079`) to today, naming four distinct sessions. The
   string is in commit messages only: it appears in no tracked file and `git log
-  -S` finds it in no historical blob, so there is nothing to clean in the tree.
+-S` finds it in no historical blob, so there is nothing to clean in the tree.
 
   Not urgent, and not a leak: fetching one of the URLs anonymously returns
   **403**, so the transcripts are not readable by anyone who is not signed in
@@ -491,7 +516,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
 - **Show an organiser the old addresses an event still answers to.** Renaming
   an event landed 2026-09-01 and every former slug goes on resolving, but
-  nothing in the UI lists them — the only trail is the *renamed* rows in the
+  nothing in the UI lists them — the only trail is the _renamed_ rows in the
   audit log. `formerSlugs` was written for this and then removed rather than
   left as dead code (`git show` the rename commit for the four lines). Worth it
   only if an organiser ever asks "which names are burned?"; the guarantee they
@@ -501,7 +526,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 - **A real series, and a root event other events inherit from.** Deferred
   2026-08-31, deliberately and not for want of time. `repeat` expands to
   ordinary rows precisely because the event it was built for is one whose
-  sessions *drift* — the planned 14:00 becomes 14:20 on the day, and a series
+  sessions _drift_ — the planned 14:00 becomes 14:20 on the day, and a series
   that asked "does moving Tuesday move all of them?" would be answering the
   wrong question every single time. So the shipped design is right for this
   event, and the two ideas below are right for a different one, where a
@@ -522,7 +547,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   authoring convenience and it stops at the door.
 
 - **Quadratic voting on pitches.** Floated 2026-08-31 for a future instance,
-  explicitly not for this one: it changes what a vote *is* (a budget spent
+  explicitly not for this one: it changes what a vote _is_ (a budget spent
   across pitches, not a click per pitch), so it wants its own schema and its
   own thinking rather than a column bolted onto `proposal_interest`.
 
@@ -533,7 +558,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   isn't: the runner tracks migrations by filename, so an edit never reaches a
   database that already recorded the file, and the symptom is not a migration
   error but a crash at runtime (`table identities has no column named
-  public_id` on the first request from a new browser). Nothing warns about it —
+public_id` on the first request from a new browser). Nothing warns about it —
   tests build fresh databases every time, and so does a reseed. Low priority
   because no instance holds data yet, and the remedy until then is to delete
   and recreate. What it wants is a line in the ARCHITECTURE §Migrations
@@ -542,7 +567,7 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
 - **A one-line reset for the local database.** Wiping a dev instance is
   currently three commands: stop the api, `rm -f data/app.db data/app.db-wal
-  data/app.db-shm`, restart and let boot reseed. Easy to get wrong in the
+data/app.db-shm`, restart and let boot reseed. Easy to get wrong in the
   direction that hurts — `rm data/app.db*` also takes the `app.db.backup-*`
   copies sitting in the same directory. Wants an `npm run db:reset` that names
   the three files explicitly and leaves `data/.cookie-secret` alone (deleting
@@ -587,7 +612,7 @@ against the code on 2026-08-30:
 - **Email of any kind**, **image uploads**, and **multi-language**. Still true
   to the letter — there is no mail, upload or i18n anywhere in the tree.
 - **Per-room QR codes** — a code on a door that opens that room's schedule.
-  Still out. Note that the tree now *has* a QR encoder, added 2026-09-01 for
+  Still out. Note that the tree now _has_ a QR encoder, added 2026-09-01 for
   invite codes (CHANGELOG `[Unreleased]`, ARCHITECTURE §Invite QR codes), so
   what keeps this out is the decision and no longer the absence of the means.
 

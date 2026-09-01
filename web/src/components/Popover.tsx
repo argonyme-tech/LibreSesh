@@ -2,10 +2,13 @@ import {
   autoUpdate,
   flip,
   offset,
+  safePolygon,
   shift,
   size,
   useDismiss,
   useFloating,
+  useFocus,
+  useHover,
   useInteractions,
   useRole,
   type Placement,
@@ -43,16 +46,31 @@ export function usePopover({
   placement = 'bottom-start',
   role = 'dialog',
   escapeKey = true,
+  hover = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   placement?: Placement;
-  /** `listbox` for a combobox's results, `dialog` for a panel of controls. */
-  role?: 'dialog' | 'listbox' | 'menu';
+  /** `listbox` for a combobox's results, `dialog` for a panel of controls,
+   *  `tooltip` for one that only describes its anchor — which is what wires
+   *  `aria-describedby` up rather than announcing a dialog nobody opened. */
+  role?: 'dialog' | 'listbox' | 'menu' | 'tooltip';
   /** Off when the anchor already gives Escape a meaning of its own — a search
    *  box closes its results on the first press and clears itself on the
    *  second, and this listener would swallow the distinction. */
   escapeKey?: boolean;
+  /** Also open on hover and on keyboard focus, for a panel that explains its
+   *  anchor rather than acting on it — the ⓘ on a column card.
+   *
+   *  `mouseOnly` is the whole point of routing this through Floating UI. A
+   *  touch browser synthesises the mouse sequence on a tap — `mouseenter`,
+   *  `focus`, `click`, as separate DOM events — so a hand-rolled
+   *  `onMouseEnter={open}` beside an `onClick={toggle}` opens on the enter and
+   *  closes on the click, and the panel can never be pinned by a finger. This
+   *  listens to a real mouse only, and leaves the tap to the caller's click.
+   *  `visibleOnly` focus is the same rule for the keyboard: tab to it and it
+   *  opens, but the focus a tap or a click leaves behind does not. */
+  hover?: boolean;
 }) {
   const { refs, floatingStyles, context } = useFloating({
     open,
@@ -85,6 +103,11 @@ export function usePopover({
     // Outside pointerdown and Escape, which every one of these hand-rolled
     // separately and none of them quite identically.
     useDismiss(context, { outsidePressEvent: 'pointerdown', escapeKey }),
+    // `safePolygon` so the pointer can cross the 4px `offset` into the panel
+    // without the panel closing on the way. Enabled either way — the hook is
+    // inert when `hover` is off, and hooks cannot be called conditionally.
+    useHover(context, { enabled: hover, mouseOnly: true, handleClose: safePolygon() }),
+    useFocus(context, { enabled: hover, visibleOnly: true }),
     useRole(context, { role }),
   ]);
 
