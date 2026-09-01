@@ -248,13 +248,22 @@ export function MimirFab({ slug, role }: { slug: string; role: string }) {
               <MimirChat slug={slug} compact />
             </div>
           ) : (
-            <div className="space-y-2 text-sm">
-              <p className="text-stone-600 dark:text-stone-300">
-                Mímir helps design sessions and processes. The chat serves the organisers; these
-                are yours:
-              </p>
+            <div className="space-y-3 overflow-y-auto text-sm">
+              <div className="rounded-lg border border-stone-200 dark:border-stone-700 p-3 text-xs text-stone-600 dark:text-stone-300">
+                <b className="text-stone-800 dark:text-stone-100">How this page works</b>
+                <ul className="mt-1 list-disc space-y-1 pl-4">
+                  <li>The schedule is live — it updates for everyone as it changes.</li>
+                  <li>⭐ stars a session onto “My agenda”.</li>
+                  <li>Pitch a session in the Pitches board; popular ones get a room.</li>
+                  <li>Inside a session: leave notes, questions and links — that becomes the harvest.</li>
+                </ul>
+              </div>
+              <p className="text-stone-600 dark:text-stone-300">Mímir's tools for you:</p>
               <Link to={`/e/${slug}/mimir`} className="block underline">
                 🎤 Design your session (guided interview)
+              </Link>
+              <Link to={`/e/${slug}/mimir`} className="block underline">
+                🎬 My sessions — designs, scripting, harvest
               </Link>
               <Link to={`/e/${slug}/mimir`} className="block underline">
                 🎲 Dynamics catalog

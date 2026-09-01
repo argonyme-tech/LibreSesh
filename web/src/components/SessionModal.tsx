@@ -232,6 +232,14 @@ export function SessionModal({
         </Field>
       </FormGrid>
 
+      {/* Mímir add-on: advisory at edit time — flags, never blocks. */}
+      {durMin > 90 && (
+        <p className="mt-2 rounded-lg border border-indigo-200 dark:border-indigo-900 bg-indigo-50 dark:bg-indigo-950/30 px-3 py-2 text-xs text-indigo-700 dark:text-indigo-300">
+          ◆ Mímir: {durMin} min in one piece — attention holds ~90 with a real cut. Advisory
+          only; you decide.
+        </p>
+      )}
+
       <Field label="Tags">
         <div className="flex flex-wrap gap-1.5">
           {tags.length === 0 && <span className="text-xs text-stone-400 dark:text-stone-500">No tags yet.</span>}

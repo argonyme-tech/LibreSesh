@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import type { BundleDto } from '@shared/types';
+import type { BundleDto, ContributionDto, ProposalDto, SessionDto } from '@shared/types';
 import { ApiError, api } from '../lib/api';
+import { useMe } from '../lib/useMe';
 import { MimirChat, mimirChip } from '../components/MimirChat';
 import { rhythmWarnings } from '../components/RhythmCheck';
 import { EmptyState, PrimaryButton, SecondaryButton, Spinner, useToast } from '../components/ui';
@@ -13,7 +14,15 @@ import { EmptyState, PrimaryButton, SecondaryButton, Spinner, useToast } from '.
  */
 
 type Status = 'loading' | 'gate' | 'error' | 'ready';
-type Tool = 'hub' | 'interview' | 'eventInterview' | 'catalog' | 'rhythm' | 'chat' | 'infographic';
+type Tool =
+  | 'hub'
+  | 'interview'
+  | 'eventInterview'
+  | 'catalog'
+  | 'rhythm'
+  | 'chat'
+  | 'infographic'
+  | 'sessions';
 
 export function MimirPage() {
   const { slug = '' } = useParams();
@@ -108,6 +117,9 @@ export function MimirPage() {
         {tool === 'catalog' && <Catalog slug={slug} />}
         {tool === 'rhythm' && <Rhythm bundle={bundle} />}
         {tool === 'infographic' && <Infographic bundle={bundle} />}
+        {tool === 'sessions' && (
+          <MySessions slug={slug} bundle={bundle} isAdmin={isAdmin} engine={engine} onLive={goLive} />
+        )}
         {tool === 'chat' && isAdmin && <MimirChat slug={slug} seed={chatSeed} />}
       </main>
     </div>
@@ -180,6 +192,15 @@ function Hub({
             {warnings.length === 0 ? 'Schedule looks healthy' : `${warnings.length} note(s)`}
           </div>
         </button>
+        {canUse && (
+          <button type="button" className={tile} onClick={() => onOpen('sessions')}>
+            <div className="text-2xl">🎬</div>
+            <div className="mt-1 text-sm font-semibold">My sessions</div>
+            <div className="text-xs text-stone-500 dark:text-stone-400">
+              Designs in progress · scripting · harvest & report
+            </div>
+          </button>
+        )}
         <button type="button" className={tile} onClick={() => onOpen('infographic')}>
           <div className="text-2xl">📊</div>
           <div className="mt-1 text-sm font-semibold">Week at a glance</div>
@@ -646,6 +667,198 @@ function Catalog({ slug }: { slug: string }) {
   );
 }
 
+/* ---------------- my sessions: design status, scripting, harvest ---------------- */
+
+const PHASE_META: Record<string, { label: string; glyph: string; pct: number }> = {
+  concern: { label: 'Concern', glyph: '💭', pct: 25 },
+  inquiry: { label: 'Inquiry', glyph: '🔍', pct: 50 },
+  proposal: { label: 'Proposal', glyph: '📋', pct: 75 },
+  decision: { label: 'Decision', glyph: '◇', pct: 100 },
+};
+
+function scriptSeed(p: ProposalDto): string {
+  return `Help me script (run-sheet) my session "${p.title}". What I have so far:\n${p.description || '(no description yet)'}\n\nBuild the run-sheet with me: opening, development blocks, harvest, close — with timings that respect the ~90 min cut, formats that don't reward ease of speech (fan + discard conditions), aligned with the non-conference model in your corpus. One question at a time where something is missing. I decide everything.`;
+}
+
+function harvestSeed(s: SessionDto, contributions: { kind: string; body: string }[]): string {
+  const raw =
+    contributions.length === 0
+      ? '(no contributions were collected in the app)'
+      : contributions.map((c) => `- [${c.kind}] ${c.body}`).join('\n');
+  return `Run the harvest for the finished session "${s.title}" (${s.startsAt.slice(0, 10)}). The raw contributions below are primary sources: what is countable can be stated; judgments about people are data of the account, not fact; do not reconstruct what is not there.\n\nProduce:\n1. Despersonalised mirror — the 4-5 real points from among the repetition.\n2. Agreements & commitments (with names — commitments carry names).\n3. Open questions that remain.\n4. A short shareable report.\nThen return one clear decision to me.\n\nCONTRIBUTIONS:\n${raw}`;
+}
+
+function MySessions({
+  slug,
+  bundle,
+  isAdmin,
+  engine,
+  onLive,
+}: {
+  slug: string;
+  bundle: BundleDto;
+  isAdmin: boolean;
+  engine: boolean;
+  onLive: (seed: string) => void;
+}) {
+  const { me } = useMe();
+  const toast = useToast();
+  const [openReport, setOpenReport] = useState<number | null>(null);
+  const [contribs, setContribs] = useState<Record<number, ContributionDto[]>>({});
+  const now = Date.now();
+
+  const myDesigns = bundle.proposals.filter(
+    (p) => p.createdBy === me?.id && p.placedSessionId === null,
+  );
+  const ended = bundle.sessions
+    .filter((s) => Date.parse(s.endsAt) < now)
+    .sort((a, b) => b.endsAt.localeCompare(a.endsAt));
+
+  const loadContribs = async (sessionId: number): Promise<ContributionDto[]> => {
+    if (contribs[sessionId]) return contribs[sessionId];
+    try {
+      const detail = await api.session(slug, sessionId);
+      const list = detail.contributions.filter((c) => !c.hidden);
+      setContribs((prev) => ({ ...prev, [sessionId]: list }));
+      return list;
+    } catch (err) {
+      toast.show((err as Error).message);
+      return [];
+    }
+  };
+
+  const card =
+    'rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-4';
+
+  return (
+    <div className="space-y-8">
+      <section>
+        <h2 className="mb-1 text-sm font-semibold">Designs in progress</h2>
+        <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
+          Your pitches, by design phase. A design is “done” when it reaches ◇ Decision — or when
+          an organiser places it on the grid.
+        </p>
+        {myDesigns.length === 0 && (
+          <p className="text-sm text-stone-400">
+            Nothing in the workshop. Start one with the 🎤 interview.
+          </p>
+        )}
+        <div className="space-y-3">
+          {myDesigns.map((p) => {
+            const meta = PHASE_META[p.phase] ?? PHASE_META.concern;
+            return (
+              <div key={p.id} className={card}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <b className="text-sm">{p.title}</b>
+                  <span className={mimirChip}>
+                    {meta.glyph} {meta.label}
+                  </span>
+                  {meta.pct === 100 && (
+                    <span className="rounded-full border border-green-400/40 px-2 py-0.5 text-[11px] text-green-600 dark:text-green-400">
+                      design complete
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded bg-stone-200 dark:bg-stone-800">
+                  <div
+                    className="h-full rounded bg-indigo-400/80"
+                    style={{ width: `${meta.pct}%` }}
+                  />
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                  <Link
+                    to="../proposals"
+                    relative="path"
+                    className="rounded-lg border border-stone-300 dark:border-stone-600 px-2.5 py-1 hover:border-indigo-400"
+                  >
+                    Continue in Pitches
+                  </Link>
+                  {isAdmin && engine && (
+                    <button
+                      type="button"
+                      onClick={() => onLive(scriptSeed(p))}
+                      className="rounded-lg border border-indigo-400 bg-indigo-600 px-2.5 py-1 font-semibold text-white hover:bg-indigo-500"
+                    >
+                      ◆ Script it with Mímir
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-1 text-sm font-semibold">Finished sessions — harvest & report</h2>
+        <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
+          Collect what the room left (notes, questions, links) and turn it into a report. The
+          mirror is depersonalised; commitments carry names.
+        </p>
+        {ended.length === 0 && (
+          <p className="text-sm text-stone-400">No finished sessions yet.</p>
+        )}
+        <div className="space-y-3">
+          {ended.map((s) => {
+            const cs = contribs[s.id];
+            return (
+              <div key={s.id} className={card}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <b className="text-sm">{s.title}</b>
+                  <span className="text-xs text-stone-500 dark:text-stone-400">
+                    {s.startsAt.slice(0, 10)}
+                    {cs ? ` · ${cs.length} contribution${cs.length === 1 ? '' : 's'}` : ''}
+                  </span>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                  {isAdmin && engine && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void loadContribs(s.id).then((list) => onLive(harvestSeed(s, list)));
+                      }}
+                      className="rounded-lg border border-indigo-400 bg-indigo-600 px-2.5 py-1 font-semibold text-white hover:bg-indigo-500"
+                    >
+                      ◆ Harvest report with Mímir
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (openReport === s.id) setOpenReport(null);
+                      else void loadContribs(s.id).then(() => setOpenReport(s.id));
+                    }}
+                    className="rounded-lg border border-stone-300 dark:border-stone-600 px-2.5 py-1 hover:border-indigo-400"
+                  >
+                    {openReport === s.id ? 'Hide raw harvest' : 'Show raw harvest'}
+                  </button>
+                </div>
+                {openReport === s.id && (
+                  <div className="mt-3 rounded-lg border border-dashed border-stone-300 dark:border-stone-700 p-3 text-xs">
+                    {(cs ?? []).length === 0 && (
+                      <p className="text-stone-400">Nothing was collected.</p>
+                    )}
+                    <ul className="space-y-1">
+                      {(cs ?? []).map((c) => (
+                        <li key={c.id}>
+                          <span className="text-stone-400">[{c.kind}]</span> {c.body}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-stone-500 dark:text-stone-400">
+                      With the engine armed, Mímir turns this into a mirror + agreements + report.
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 /* ---------------- rhythm ---------------- */
 
 function Rhythm({ bundle }: { bundle: BundleDto }) {
@@ -720,27 +933,37 @@ function Infographic({ bundle }: { bundle: BundleDto }) {
         </div>
       </div>
       <div>
-        <h2 className="mb-2 text-sm font-semibold">Decisions in motion (pitches by phase)</h2>
-        <div className="flex flex-wrap gap-2 text-xs">
+        <h2 className="mb-3 text-sm font-semibold">Decisions in motion — the pipeline</h2>
+        <div className="flex items-stretch gap-0 overflow-x-auto">
           {(
             [
-              ['concern', '💭 Concern'],
-              ['inquiry', '🔍 Inquiry'],
-              ['proposal', '📋 Proposal'],
-              ['decision', '◇ Decision'],
+              ['concern', '💭', 'Concern', 'bg-indigo-400/15'],
+              ['inquiry', '🔍', 'Inquiry', 'bg-indigo-400/30'],
+              ['proposal', '📋', 'Proposal', 'bg-indigo-400/50'],
+              ['decision', '◇', 'Decision', 'bg-indigo-500/70'],
             ] as const
-          ).map(([k, label]) => (
-            <span
-              key={k}
-              className="rounded-full border border-stone-300 dark:border-stone-700 px-3 py-1"
-            >
-              {label}: <b>{phases[k] ?? 0}</b>
-            </span>
+          ).map(([k, glyph, label, bg], i) => (
+            <div key={k} className="flex min-w-[7.5rem] flex-1 items-center">
+              {i > 0 && (
+                <span aria-hidden className="px-1 text-stone-400 dark:text-stone-600">
+                  →
+                </span>
+              )}
+              <div
+                className={`flex-1 rounded-xl border border-indigo-200 dark:border-indigo-900 ${bg} p-3 text-center`}
+              >
+                <div className="text-lg" aria-hidden>
+                  {glyph}
+                </div>
+                <div className="text-2xl font-bold tabular-nums">{phases[k] ?? 0}</div>
+                <div className="text-[11px] text-stone-600 dark:text-stone-300">{label}</div>
+              </div>
+            </div>
           ))}
         </div>
         <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">
-          A choice is never drawn as an agenda step: here you see where it stands, not an outcome
-          taken for granted.
+          A choice is never drawn as an agenda step: here you see where each one stands, not an
+          outcome taken for granted.
         </p>
       </div>
     </div>
