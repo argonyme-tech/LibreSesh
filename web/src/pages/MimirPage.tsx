@@ -364,7 +364,7 @@ function Hub({
 /* ------------- live interview seeds ------------- */
 
 const SESSION_SEED =
-  'Run the session-design interview with me, live. STEP 1: ask me to write freely what I want to do. From that text, EXTRACT THE INTENTIONALITY and classify the session type — (a) joint process (the group works and decides together), (b) guided seminar/workshop, or (c) talk — tell me which you read and check it with me before going on. STEP 2: think which questions are the RIGHT ones for that type — true questions, one at a time, never a fixed script, never re-asking what I already wrote. STEP 3: propose formats as a fan with discard conditions that fit the TYPE and the non-conference / spontaneous-community model in your corpus (a talk needs harvest, not dot-voting; a joint process needs a decision method; a seminar needs a rhythm of activity). THROUGHOUT: flag clearly anything that does not match — time vs purpose, missing affected voices, or missing LEGITIMATION (who has to back this and has not been asked). You cannot touch the schedule: finish with one clear, visual proposal block (title · type · format · length · needs · open flags) and ask me explicitly if I want it as my draft. I decide everything.';
+  'Run the session-design interview with me, live. STEP 1: ask me to write freely what I want to do — one open question, nothing else. STEP 2: from that text, work out the INTENTIONALITY and name the kind of session you read: a talk, a workshop, a joint process where the group decides, or something else — say which and check it with me before going on; the kind changes every question that follows (a talk needs a harvest and a way for the room to react, not dot-voting; a workshop needs materials, space and a rhythm of doing; a joint process needs a decision method agreed before it starts). STEP 3: ask only what is missing, ONE true question at a time, never a fixed script, never re-asking what I already wrote — and cover, when the kind of session calls for it: purpose, the movement in one sentence, affected voices, format, TIME (attention holds ~90 min with a real cut), SPACE (what room shape the format needs), MATERIALS, and RHYTHM (where the energy sits, what comes before and after). STEP 4: propose formats only from the facilitator corpus you carry, as a fan with the discard condition of each; if the corpus has none that fits, say so plainly instead of inventing one. THROUGHOUT: flag clearly anything that does not match — time against purpose, a format the room or the materials cannot support, missing voices, or missing LEGITIMATION (who has to back this and has not been asked). You cannot touch the schedule: finish with one clear proposal block (kind · purpose · format · length · space · materials · open flags) and ask me if I want it as my draft. I decide everything.';
 
 const EVENT_SEED =
   'Run the event-process interview (Loop A) with me, live: commission, purpose, affected voices and ghost role, what is out of scope, meta-decision — and, optionally, whether the commissioning organisation has its own organisational system (sociocracy, holacracy, traditional hierarchy, other) and decision process, to design with it and not against it. First ask me to write freely what this event is; extract the intentionality and the event type before choosing your questions; one true question at a time; never re-ask what I already said. THROUGHOUT: warn clearly when something does not match or when LEGITIMATION is missing (a commission nobody owns, a voice not consulted, a decision without a decider). You cannot touch the schedule: any change you would suggest must be presented as an explicit, visual proposal that I confirm or reject. Finish with a process charter I can copy. I decide everything.';
@@ -1232,14 +1232,23 @@ function MySessions({
   const toast = useToast();
   const [openReport, setOpenReport] = useState<number | null>(null);
   const [contribs, setContribs] = useState<Record<number, ContributionDto[]>>({});
+  const [showAll, setShowAll] = useState(false);
   const now = Date.now();
 
   const myDesigns = bundle.proposals.filter(
     (p) => p.createdBy === me?.id && p.placedSessionId === null,
   );
-  const ended = bundle.sessions
+  // "Mine" means mine: sessions I created or speak at. An organiser can widen
+  // it, because harvesting the whole event is their job — but never by default,
+  // or the page lies about whose work it shows.
+  const myPersonIds = new Set(bundle.people.filter((p) => p.isMine).map((p) => p.id));
+  const isMine = (s: SessionDto) =>
+    s.createdBy === me?.id || (s.speakerId !== null && myPersonIds.has(s.speakerId));
+  const endedAll = bundle.sessions
     .filter((s) => Date.parse(s.endsAt) < now)
     .sort((a, b) => b.endsAt.localeCompare(a.endsAt));
+  const endedMine = endedAll.filter(isMine);
+  const ended = showAll ? endedAll : endedMine;
 
   const loadContribs = async (sessionId: number): Promise<ContributionDto[]> => {
     if (contribs[sessionId]) return contribs[sessionId];
@@ -1322,8 +1331,23 @@ function MySessions({
           Collect what the room left (notes, questions, links) and turn it into a report. The
           mirror is depersonalised; commitments carry names.
         </p>
+        {isAdmin && endedAll.length !== endedMine.length && (
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            className="mb-3 rounded-lg border border-stone-300 dark:border-stone-600 px-2.5 py-1 text-xs hover:border-indigo-400"
+          >
+            {showAll
+              ? `Showing all ${endedAll.length} — show only mine`
+              : `Showing my ${endedMine.length} — show all ${endedAll.length} (organiser)`}
+          </button>
+        )}
         {ended.length === 0 && (
-          <p className="text-sm text-stone-400">No finished sessions yet.</p>
+          <p className="text-sm text-stone-400">
+            {endedAll.length === 0
+              ? 'No finished sessions yet.'
+              : 'None of the finished sessions are yours.'}
+          </p>
         )}
         <div className="space-y-3">
           {ended.map((s) => {

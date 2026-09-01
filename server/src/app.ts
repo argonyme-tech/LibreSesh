@@ -45,7 +45,8 @@ export function createApp(db: Db, config: Config): App {
 
   if (config.trustProxy) app.set('trust proxy', 1);
   app.disable('x-powered-by');
-  app.use(express.json({ limit: '256kb' }));
+  // The dynamics catalog is a single document and grows with the corpus.
+  app.use(express.json({ limit: '2mb' }));
   app.use(cookieParser(config.cookieSecret));
 
   const api = Router();
