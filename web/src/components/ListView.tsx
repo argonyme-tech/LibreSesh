@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { BreakDto, RoomDto, SessionDto, TagDto } from '@shared/types';
-import { fmtMin, place } from '../lib/format';
+import { readableInk } from '@shared/tagColors';
+import { fmtMin, place, speakerLine } from '../lib/format';
 
 export interface ListViewProps {
   rooms: RoomDto[];
@@ -133,7 +134,7 @@ export function ListView({
                       <div className="truncate text-sm font-semibold">{session.title}</div>
                       <div className="mt-0.5 truncate text-xs text-stone-500 dark:text-stone-400">
                         {fmtMin(startMin)}–{fmtMin(endMin)} · {room?.name ?? '—'}
-                        {session.speaker && ` · ${session.speaker}`}
+                        {session.speakers.length > 0 && ` · ${speakerLine(session.speakers)}`}
                       </div>
                     </div>
                     {live && (
@@ -164,8 +165,8 @@ export function ListView({
                       return (
                         <span
                           key={id}
-                          className="rounded-full px-2 py-0.5 text-xs font-medium text-white"
-                          style={{ background: tag.color }}
+                          className="rounded-full px-2 py-0.5 text-xs font-medium"
+                          style={{ background: tag.color, color: readableInk(tag.color) }}
                         >
                           {tag.name}
                         </span>

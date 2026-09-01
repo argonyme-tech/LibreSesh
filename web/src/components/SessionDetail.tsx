@@ -9,6 +9,7 @@ import type {
   SessionDto,
   TagDto,
 } from '@shared/types';
+import { readableInk } from '@shared/tagColors';
 import { fmtMin, place, relativeTime } from '../lib/format';
 import { renderMarkdown } from '../lib/markdown';
 import { EditIcon, HideIcon, RemoveIcon, UnhideIcon } from './icons';
@@ -150,8 +151,8 @@ export function SessionDetail({
             return (
               <span
                 key={id}
-                className="rounded-full px-2 py-0.5 text-xs font-medium text-white"
-                style={{ background: tag.color }}
+                className="rounded-full px-2 py-0.5 text-xs font-medium"
+                style={{ background: tag.color, color: readableInk(tag.color) }}
               >
                 {tag.name}
               </span>
@@ -169,16 +170,21 @@ export function SessionDetail({
           className={`mt-1 text-stone-500 dark:text-stone-400 ${page ? 'text-base' : 'text-sm'}`}
         >
           {fmtMin(startMin)}–{fmtMin(endMin)} · {room?.name ?? 'unknown room'} ·{' '}
-          {session.speakerId ? (
-            <Link
-              to={`/e/${slug}/p/${session.speakerId}`}
-              className="text-blue-700 dark:text-blue-400 underline"
-            >
-              {session.speaker}
-            </Link>
-          ) : (
-            session.speaker || 'no speaker yet'
-          )}
+          {/* One link each: a name on the bill is a person with a profile,
+              and a panel of four is four people to read about. */}
+          {session.speakers.length === 0
+            ? 'no speaker yet'
+            : session.speakers.map((person, i) => (
+                <span key={person.id}>
+                  {i > 0 && ', '}
+                  <Link
+                    to={`/e/${slug}/p/${person.id}`}
+                    className="text-blue-700 underline dark:text-blue-400"
+                  >
+                    {person.name}
+                  </Link>
+                </span>
+              ))}
         </p>
       </div>
       {headerActions}
