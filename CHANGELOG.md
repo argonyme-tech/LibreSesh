@@ -669,6 +669,37 @@ All notable changes to this project are documented here.
 
 ### Fixed
 
+- **Number fields no longer accept nonsense.** Every typed number in the app
+  was a `type="number"` input, which enforces `min` and `max` on the spinner
+  and on form submit — and a React form reading `e.target.value` never
+  submits. So the bounds were decoration. Worse, the characters the browser
+  half-accepts (`e`, `+`, `-`, `.`) come back out of `e.target.value` as `''`,
+  meaning a field silently emptied itself while you were typing into it.
+
+  What the empty then meant was decided by whatever coercion sat at the save:
+  `Number('')` is `0`, so clearing the audit-retention box to retype it saved
+  "keep every entry for ever"; `Number(x) || 8` meant a mistyped week rail
+  saved 8. Neither said anything. An out-of-range number, meanwhile, went all
+  the way to the server before anyone objected.
+
+  There is now one `NumberField` primitive over one pure module
+  (`web/src/lib/numberField.ts`). Digits are the only thing that can enter it,
+  typed or pasted, capped at the width of the field's own maximum; the range
+  is checked where the number is typed and shown under it; and a field that
+  did not parse blocks the save rather than becoming a value nobody entered.
+  Room capacity, the week rail and audit retention are all on it. The specs
+  mirror the server's zod schemas, and a test holds the two to the same answer
+  either side of every boundary — the server still decides, so the client may
+  be stricter (capacity stops at four digits, because no venue this is for
+  seats ten thousand) and may not be looser.
+
+- **The settings form checks what it can before asking the server.** A slug
+  that was too short, a password under six characters, or a number out of
+  range were all discovered by pressing Save and reading a toast. They are now
+  named under the form, which disables Save while one stands. The server
+  checks all of them still; this is the form answering sooner, not the
+  validation moving.
+
 - **Dialogs opened from the schedule header appeared off screen.** About
   LibreSesh, and device linking before it, were laid out inside the header
   rather than over the page: the dark backdrop covered a strip at the top and

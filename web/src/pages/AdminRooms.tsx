@@ -3,6 +3,7 @@ import type { RoomDto } from "@shared/types";
 import { ROOM_COLORS } from "@shared/roomColors";
 
 import { ColorPicker } from "../components/ColorPicker";
+import { capacityField, parseNumberField } from "../lib/numberField";
 import {
   DangerButton,
   Field,
@@ -10,6 +11,7 @@ import {
   FormRow,
   FormStack,
   IconButton,
+  NumberField,
   PrimaryButton,
   SecondaryButton,
   Section,
@@ -34,17 +36,13 @@ export interface RoomDraft {
 }
 
 
-/** Digits only, four at most — a `type="number"` honours neither on a typed
- *  or pasted value, and no venue seats ten thousand. */
-const digits = (raw: string): string => raw.replace(/\D/g, "").slice(0, 4);
-
-/** '' means "no capacity", which is a real state distinct from 0. */
-const parseCapacity = (raw: string): number | null => {
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-  const n = Number(trimmed);
-  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
-};
+/** '' means "no capacity", which is a real state distinct from 0 — so a blank
+ *  field parses to `null` with no complaint. A value the field cannot make a
+ *  number of also parses to `null`, which is why saving is blocked on the
+ *  error rather than on the value: `null` alone cannot tell "unset" from
+ *  "wrong", and treating the second as the first would clear a capacity
+ *  somebody was in the middle of typing. */
+const parseCapacity = (raw: string) => parseNumberField(raw, capacityField);
 
 const capacityLabel = (capacity: number | null): string =>
   capacity === null
@@ -94,20 +92,22 @@ function RoomRow({
     setOpenBooking(room.openBooking);
   };
 
+  const parsedCapacity = parseCapacity(capacity);
+
   const dirty =
     name.trim() !== room.name ||
-    parseCapacity(capacity) !== room.capacity ||
+    parsedCapacity.value !== room.capacity ||
     description.trim() !== room.description ||
     color !== room.color ||
     openBooking !== room.openBooking;
 
   const save = async () => {
-    if (!name.trim() || saving) return;
+    if (!name.trim() || parsedCapacity.error || saving) return;
     setSaving(true);
     try {
       await onPatch(room, {
         name: name.trim(),
-        capacity: parseCapacity(capacity),
+        capacity: parsedCapacity.value,
         description: description.trim(),
         color,
         openBooking,
@@ -181,15 +181,14 @@ function RoomRow({
                   className={inputClass}
                 />
               </Field>
-              <Field label="Capacity" hint="Leave blank if it does not matter.">
-                <input
-                  inputMode="numeric"
-                  value={capacity}
-                  onChange={(e) => setCapacity(digits(e.target.value))}
-                  aria-label="Capacity"
-                  className={`${inputClass} w-20`}
-                />
-              </Field>
+              <NumberField
+                label="Capacity"
+                hint="Leave blank if it does not matter."
+                spec={capacityField}
+                value={capacity}
+                onChange={setCapacity}
+                className="w-20"
+              />
             </FormGrid>
 
             <Field
@@ -221,7 +220,7 @@ function RoomRow({
             <FormRow className="mt-1">
               <PrimaryButton
                 onClick={() => void save()}
-                disabled={!dirty || !name.trim() || saving}
+                disabled={!dirty || !name.trim() || parsedCapacity.error !== null || saving}
               >
                 {saving ? "Saving…" : "Save room"}
               </PrimaryButton>
@@ -264,13 +263,15 @@ export function AdminRooms({
   const [openBooking, setOpenBooking] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  const parsedCapacity = parseCapacity(capacity);
+
   const add = async () => {
-    if (!name.trim() || busy) return;
+    if (!name.trim() || parsedCapacity.error || busy) return;
     setBusy(true);
     try {
       await onCreate({
         name: name.trim(),
-        capacity: parseCapacity(capacity),
+        capacity: parsedCapacity.value,
         description: "",
         openBooking,
       });
@@ -328,17 +329,15 @@ export function AdminRooms({
           </div>
 
           {capacityOpen ? (
-            <Field label="Capacity">
-              <input
-                inputMode="numeric"
-                value={capacity}
-                onChange={(e) => setCapacity(digits(e.target.value))}
-                onKeyDown={(e) => e.key === "Enter" && void add()}
-                aria-label="Capacity"
-                className={`${inputClass} w-20`}
-                autoFocus
-              />
-            </Field>
+            <NumberField
+              label="Capacity"
+              spec={capacityField}
+              value={capacity}
+              onChange={setCapacity}
+              onKeyDown={(e) => e.key === "Enter" && void add()}
+              className="w-20"
+              autoFocus
+            />
           ) : (
             <SecondaryButton onClick={() => setCapacityOpen(true)}>
               Specify capacity
@@ -347,7 +346,7 @@ export function AdminRooms({
 
           <PrimaryButton
             onClick={() => void add()}
-            disabled={!name.trim() || busy}
+            disabled={!name.trim() || parsedCapacity.error !== null || busy}
           >
             Add room
           </PrimaryButton>

@@ -216,12 +216,6 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   identity holds no role but does hold an event name here — exactly the
   signed-out shape). Scenario documented in ARCHITECTURE §Merging two people. @claude: this should go into a separate to-do file for profile/user related data modelling issues and improvements.
 
-- **Number fields accept nonsense.** Room capacity is `type="number" min={0}`,
-  which the browser enforces on the spinner but not on typing or paste; the
-  client strips a minus sign and `parseCapacity` floors it, and the server
-  takes whatever arrives. Same shape wherever a number is typed. Wants one
-  validated numeric input primitive rather than a guard per field.
-
 - **No write path under flaky connectivity.** Reads recover well — `EventSource`
   auto-reconnects and `useEventData` refetches the whole bundle on reopen, and
   the header shows "reconnecting…". Writes do not: every mutation is a bare

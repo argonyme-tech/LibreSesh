@@ -17,6 +17,7 @@ import { windowLabel } from '@shared/trackHours';
 import { ApiError, api, type BreakWrite, type TrackWrite, type TrashDto } from '../lib/api';
 import { fmtMin, minutesOf, relativeTime, rowId, snapMinute, uid } from '../lib/format';
 import { useEventData } from '../lib/useEventData';
+import { auditKeepField, parseNumberField, weekRailFromField } from '../lib/numberField';
 import { AdminBreaks, dayName } from './AdminBreaks';
 import { AdminRooms, type RoomDraft } from './AdminRooms';
 import { AdminPermissions } from './AdminPermissions';
@@ -29,10 +30,12 @@ import {
   Modal,
   EmptyState,
   Field,
+  FormError,
   FormGrid,
   FormRow,
   FormStack,
   IconButton,
+  NumberField,
   PrimaryButton,
   RoleBadge,
   SecondaryButton,
@@ -464,7 +467,34 @@ export function AdminPage() {
     }
   };
 
+  const parsedWeekRail = parseNumberField(weekRailFrom, weekRailFromField);
+  const parsedAuditKeep = parseNumberField(auditKeep, auditKeepField);
+
+  /**
+   * The first thing wrong with the settings form, or `null` when nothing is.
+   *
+   * These four rules were the server's alone, which meant the way to discover
+   * you had mistyped a slug or a password was to press Save and read a toast.
+   * They are cheap to check here and the server still checks them all — this
+   * is the form telling you before you ask, not the validation itself moving.
+   */
+  const settingsProblem =
+    !name.trim()
+      ? 'The event needs a name'
+      : slugField !== event?.slug && !/^[a-z0-9-]{3,40}$/.test(slugField)
+        ? 'Slug must be 3–40 characters of a–z, 0–9 or -'
+        : parsedWeekRail.error
+          ? `Group days into weeks past: ${parsedWeekRail.error.toLowerCase()}`
+          : parsedAuditKeep.error
+            ? `Audit entries to keep: ${parsedAuditKeep.error.toLowerCase()}`
+            : [viewerPassword, userPassword, adminPassword].some((pw) => pw && pw.length < 6)
+              ? 'Passwords must be at least 6 characters'
+              : null;
+
   const saveSettings = async () => {
+    // The second and third clauses are the narrowing the first already
+    // implies: `settingsProblem` is null only once both numbers parsed.
+    if (settingsProblem || parsedWeekRail.value === null || parsedAuditKeep.value === null) return;
     try {
       const updated = await api.updateSettings(slug, {
         name: name.trim(),
@@ -475,8 +505,11 @@ export function AdminPage() {
         endDate,
         dayStartMin: toMinutes(dayStart),
         dayEndMin: toMinutes(dayEnd),
-        weekRailFrom: Number(weekRailFrom) || 8,
-        auditKeep: Number(auditKeep),
+        // Guarded above rather than coerced here: `Number('')` is 0, which
+        // is how clearing the audit box used to save "keep everything for
+        // ever", and `Number(x) || 8` is how a typo used to save 8.
+        weekRailFrom: parsedWeekRail.value,
+        auditKeep: parsedAuditKeep.value,
         defaultView,
         ...(userRoleLabel.trim() ? { userRoleLabel: userRoleLabel.trim() } : {}),
         ...(viewerPassword ? { viewerPassword } : {}),
@@ -950,27 +983,20 @@ export function AdminPage() {
                 <input type="time" step={300} value={dayEnd} onChange={(e) => setDayEnd(e.target.value)} className={inputClass} />
               </Field>
             </FormGrid>
-            <Field
+            <NumberField
               label="Group days into weeks past"
               hint={`Up to this many days the schedule shows one row of day tabs. Longer than this and they split into a rail of weeks. This event runs ${eventDays} day${eventDays === 1 ? '' : 's'}.`}
-            >
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={1}
-                  max={90}
-                  value={weekRailFrom}
-                  onChange={(e) => setWeekRailFrom(e.target.value)}
-                  className={`${inputClass} w-24`}
-                />
-                <span className="text-xs text-stone-500 dark:text-stone-400">
-                  days
-                  {eventDays > (Number(weekRailFrom) || 8)
-                    ? ' · the rail is on for this event'
-                    : ' · one row of tabs for this event'}
-                </span>
-              </div>
-            </Field>
+              spec={weekRailFromField}
+              value={weekRailFrom}
+              onChange={setWeekRailFrom}
+              suffix={
+                parsedWeekRail.value === null
+                  ? 'days'
+                  : eventDays > parsedWeekRail.value
+                    ? 'days · the rail is on for this event'
+                    : 'days · one row of tabs for this event'
+              }
+            />
             <Field
               label="Opens in"
               hint="Which view someone gets who has not chosen one. The switch above the grid still works for everybody, and a view somebody picks travels in the link they share. The list reads well at any size; the grid earns its place once there are several rooms to compare."
@@ -984,27 +1010,19 @@ export function AdminPage() {
                 <option value="cal">Calendar — a grid of rooms</option>
               </select>
             </Field>
-            <Field
+            <NumberField
               label="Audit entries to keep"
               hint="The log in the Audit tab is append-only and nothing else prunes it. Past this many entries the oldest are dropped as new ones arrive. 0 keeps every entry forever."
-            >
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={0}
-                  max={1000000}
-                  step={100}
-                  value={auditKeep}
-                  onChange={(e) => setAuditKeep(e.target.value)}
-                  className={`${inputClass} w-32`}
-                />
-                <span className="text-xs text-stone-500 dark:text-stone-400">
-                  {Number(auditKeep) === 0
-                    ? 'entries · keeping everything'
-                    : 'entries · older ones are dropped'}
-                </span>
-              </div>
-            </Field>
+              spec={auditKeepField}
+              value={auditKeep}
+              onChange={setAuditKeep}
+              className="w-32"
+              suffix={
+                parsedAuditKeep.value === 0
+                  ? 'entries · keeping everything'
+                  : 'entries · older ones are dropped'
+              }
+            />
             <Field
               label="What you call your participants"
               hint="Shown on role badges and in prompts. “attendee”, “participant”, “member”…"
@@ -1037,7 +1055,13 @@ export function AdminPage() {
               </Field>
             </FormGrid>
             <div>
-              <PrimaryButton onClick={() => void saveSettings()}>Save settings</PrimaryButton>
+              {settingsProblem && <FormError className="mb-2">{settingsProblem}</FormError>}
+              <PrimaryButton
+                onClick={() => void saveSettings()}
+                disabled={settingsProblem !== null}
+              >
+                Save settings
+              </PrimaryButton>
             </div>
             </FormStack>
           </Section>
