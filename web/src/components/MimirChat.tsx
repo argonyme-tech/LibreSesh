@@ -28,6 +28,8 @@ export function MimirChat({
   const [modelDraft, setModelDraft] = useState('');
   const [savingKey, setSavingKey] = useState(false);
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [showConfig, setShowConfig] = useState(false);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
@@ -57,6 +59,8 @@ export function MimirChat({
         ...(modelDraft.trim() ? { model: modelDraft.trim() } : {}),
       });
       setKeyDraft('');
+      setShowConfig(false);
+      setChatError(null);
       await refresh();
       toast.show('Engine armed — the key lives on the server only');
     } catch (err) {
@@ -70,18 +74,19 @@ export function MimirChat({
     async (content: string) => {
       const next = [...messages, { role: 'user' as const, content }];
       setMessages(next);
+      setChatError(null);
       setBusy(true);
       try {
         const res = await api.mimirChat(slug, next);
         setMessages([...next, { role: 'assistant', content: res.reply }]);
       } catch (err) {
-        toast.show((err as Error).message);
-        setMessages(messages);
+        // Keep the thread — an error is information, not an eraser.
+        setChatError((err as Error).message);
       } finally {
         setBusy(false);
       }
     },
-    [messages, slug, toast],
+    [messages, slug],
   );
 
   const seededRef = useRef(false);
@@ -95,25 +100,13 @@ export function MimirChat({
   const send = useCallback(async () => {
     const content = draft.trim();
     if (!content || busy) return;
-    const next = [...messages, { role: 'user' as const, content }];
-    setMessages(next);
     setDraft('');
-    setBusy(true);
-    try {
-      const res = await api.mimirChat(slug, next);
-      setMessages([...next, { role: 'assistant', content: res.reply }]);
-    } catch (err) {
-      toast.show((err as Error).message);
-      setMessages(messages);
-      setDraft(content);
-    } finally {
-      setBusy(false);
-    }
-  }, [busy, draft, messages, slug, toast]);
+    await sendText(content);
+  }, [busy, draft, sendText]);
 
   if (engine === null) return <Spinner label="Checking engine…" />;
 
-  if (!engine) {
+  if (!engine || showConfig) {
     return (
       <div className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-white dark:bg-stone-900 p-5 text-sm">
         <span className={mimirChip}>◆ engine off</span>
@@ -151,22 +144,40 @@ export function MimirChat({
           </PrimaryButton>
         </div>
         <p className="mt-3 text-xs text-stone-500 dark:text-stone-400">
-          Anthropic = best fidelity to the doctrine prompt. NVIDIA free tier logs what you send —
-          demo use only, never real group material. Ollama/DGX works once the server can reach it
-          (base URL <code>http://…:11434/v1</code>, any key).
+          Anthropic = best fidelity to the doctrine prompt (key only, leave URL and model empty).
+          NVIDIA free tier logs what you send — demo use only, never real group material — and
+          NEEDS all three fields. Ollama/DGX works once the server can reach it (base URL{' '}
+          <code>http://…:11434/v1</code>, any key).
         </p>
+        {showConfig && (
+          <button
+            type="button"
+            onClick={() => setShowConfig(false)}
+            className="mt-3 text-xs underline text-stone-500 dark:text-stone-400"
+          >
+            ← back to chat without changing anything
+          </button>
+        )}
       </div>
     );
   }
 
   return (
     <div className={`flex flex-col ${compact ? 'h-full' : 'h-[70vh]'}`}>
-      {!compact && (
-        <div className="mb-2 text-xs text-stone-500 dark:text-stone-400">
-          Engine: <code>{model}</code> · the prompt is the facilitator's own compiled doctrine ·
-          nothing from Mímir reaches the group without human approval.
-        </div>
-      )}
+      <div className="mb-2 flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
+        {!compact && (
+          <span>
+            Engine: <code>{model}</code> · the prompt is the facilitator's own compiled doctrine.
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => setShowConfig(true)}
+          className="ml-auto underline hover:text-indigo-500"
+        >
+          ⚙ Engine settings
+        </button>
+      </div>{' '}
       <div className="flex-1 space-y-3 overflow-y-auto rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-4">
         {messages.length === 0 && (
           <p className="text-sm text-stone-400">
@@ -189,6 +200,15 @@ export function MimirChat({
           </div>
         ))}
         {busy && <p className="text-xs text-stone-400">◆ thinking…</p>}
+        {chatError && (
+          <div className="rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-3 text-xs text-red-700 dark:text-red-300">
+            <b>The engine did not answer:</b> {chatError}
+            <div className="mt-1 text-red-600/80 dark:text-red-400/80">
+              Wrong key or missing Base URL? Fix it in <b>⚙ Engine settings</b> above, then send
+              again — your messages are kept.
+            </div>
+          </div>
+        )}
         <div ref={endRef} />
       </div>
       <div className="mt-3 flex gap-2">
