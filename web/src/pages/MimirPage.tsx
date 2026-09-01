@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import type { BundleDto, ContributionDto, ProposalDto, SessionDto } from '@shared/types';
 import { ApiError, api } from '../lib/api';
 import { useMe } from '../lib/useMe';
@@ -30,7 +30,10 @@ export function MimirPage() {
   const [bundle, setBundle] = useState<BundleDto | null>(null);
   const [status, setStatus] = useState<Status>('loading');
   const [error, setError] = useState<string | null>(null);
-  const [tool, setTool] = useState<Tool>('hub');
+  // Every tool is deep-linkable: /e/:slug/mimir?tool=engine goes straight there.
+  const [params, setParams] = useSearchParams();
+  const tool = (params.get('tool') as Tool | null) ?? 'hub';
+  const setTool = (t: Tool) => setParams(t === 'hub' ? {} : { tool: t });
   const [chatSeed, setChatSeed] = useState<string | undefined>();
   const [engine, setEngine] = useState(false);
 
