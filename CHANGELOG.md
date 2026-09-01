@@ -678,6 +678,13 @@ All notable changes to this project are documented here.
 
 ### Fixed
 
+- **Arrange is gone from the list view.** `arrange` is read by the calendar
+  grid and by nothing else, so in the list the button toggled a mode with no
+  effect — it lit up, said "Done arranging", and changed nothing under it.
+  Switching away from the grid now also turns the mode off, rather than leaving
+  it open behind a button that is no longer on screen. Editing from the list is
+  unaffected: it never went through Arrange.
+
 - **Number fields no longer accept nonsense.** Every typed number in the app
   was a `type="number"` input, which enforces `min` and `max` on the spinner
   and on form submit — and a React form reading `e.target.value` never
