@@ -231,6 +231,59 @@ export function mimirRoutes(ctx: Ctx): Router {
     },
   );
 
+  /**
+   * Model probe (admin): asks the configured provider which models the account
+   * can actually reach, and tries a one-token completion on each candidate.
+   * A key can be valid while a model is not enabled for that account — this
+   * turns that guessing game into an answer.
+   */
+  router.post('/mimir/probe', requireRole(ctx.db, 'admin'), async (req, res, next) => {
+    try {
+      const cfg = loadEngine();
+      if (!cfg?.url) {
+        res.status(424).json({ error: { message: 'Probe only applies to OpenAI-compatible providers' } });
+        return;
+      }
+      const base = cfg.url.replace(/\/$/, '');
+      const auth = { Authorization: `Bearer ${cfg.key}` };
+      let listed: string[] = [];
+      try {
+        const lr = await fetch(`${base}/models`, { headers: auth, signal: AbortSignal.timeout(20_000) });
+        if (lr.ok) {
+          const data = (await lr.json()) as { data?: { id?: string }[] };
+          listed = (data.data ?? []).map((m) => String(m.id)).filter(Boolean);
+        }
+      } catch {
+        /* listing is a convenience, not a requirement */
+      }
+      const asked = Array.isArray(req.body?.models) ? (req.body.models as string[]).slice(0, 12) : [];
+      const candidates = (asked.length ? asked : listed).slice(0, 12);
+      const results: { model: string; status: number; ok: boolean; detail?: string }[] = [];
+      for (const model of candidates) {
+        try {
+          const r = await fetch(`${base}/chat/completions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...auth },
+            signal: AbortSignal.timeout(25_000),
+            body: JSON.stringify({ model, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
+          });
+          results.push({
+            model,
+            status: r.status,
+            ok: r.ok,
+            ...(r.ok ? {} : { detail: (await r.text()).slice(0, 120) }),
+          });
+          if (r.ok) break;
+        } catch (e) {
+          results.push({ model, status: 0, ok: false, detail: String(e).slice(0, 100) });
+        }
+      }
+      res.json({ endpoint: base, listed: listed.length, results });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   /** The engine status the UI needs before offering the chat. */
   router.get('/mimir/status', requireRole(ctx.db, 'admin'), (_req, res) => {
     const cfg = loadEngine();
