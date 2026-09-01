@@ -13,20 +13,11 @@ ancestor of `dev` — so its code half is done and written up in CHANGELOG
 `[Unreleased]` and ARCHITECTURE §Breaks; what is left of it is the browser
 confirmation under Blockers. 0.2.0 was tagged 2026-08-30; what shipped is in
 CHANGELOG.md under `[0.2.0]`, and what has landed since is under
-`[Unreleased]`. What is left of the UI-overhaul plan lives in
-`_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
-
-- **Tag colours — asked for 2026-09-01, nothing written yet.** Two parts: the
-  colour control on the add-tag row and in the tag editor should be a circle
-  rather than the browser's rectangular `<input type="color">` chrome, and a
-  new tag should take a colour by itself instead of every tag starting at
-  `DEFAULT_TAG_COLOR` grey (`AdminPage.tsx:42`). The auto-assignment wants its
-  own palette: `ROOM_COLORS` is deliberately washed out because a room colour
-  is a column that text sits on, while a tag is a small chip that has to read
-  at a glance — so a second, brighter list beside it, with the `nextRoomColor`
-  shape, taking the first colour no live tag is using. The server already
-  defaults a colourless tag to `#6B7280`; that default should become the
-  assignment, so an API caller gets what the form gets.
+`[Unreleased]` — including tag colours (`3f723ac`, `0b08a00`),
+multi-speaker sessions (`f26bde3`), the single Calendar menu item
+(`5d020cb`) and per-field profile editing (`aa64417`), all four written up
+2026-09-01 after landing unlogged. What is left of the UI-overhaul plan
+lives in `_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
 
 - **Whole-app UI sweep.** The primitives landed, the admin page is done, and
   as of 2026-08-31 every modal is on the `Modal` primitive — the last six
@@ -39,7 +30,10 @@ CHANGELOG.md under `[0.2.0]`, and what has landed since is under
   five in `ui.tsx`, which are the primitives themselves. Re-counted 2026-08-31
   after the Backup and Audit tabs and the gate's name-collision link: still 21,
   because all three use the primitives (`secondaryButtonClass`, `linkClass`)
-  rather than a bare `underline`.
+  rather than a bare `underline`. Still 21 on 2026-09-01: the per-field
+  profile rework added no bare underline, because its "add a bio" affordance
+  is a `SecondaryButton` — it is an action, not navigation.
+
 - **ARCHITECTURE.md concurrency paragraph.** §Realtime documents broadcast and
   heartbeats but never states the model: last-write-wins, `assertNotStale`
   409 on an `updated_at` mismatch, no CRDT by design.

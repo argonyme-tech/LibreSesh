@@ -6,6 +6,36 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **A session can be given by more than one person.** `sessions.speaker_id`
+  held exactly one, which is wrong for most of what an unconference actually
+  runs: a panel, a pair, a workshop with two facilitators, a talk and its
+  translator. It also decided more than the label — being the speaker is what
+  grants the right to edit the session you are giving, and a second name on the
+  poster had none of it.
+
+  The session form's speaker field is now a chip field that takes as many
+  people as are giving it, matching names against the roster and creating the
+  ones it does not find, exactly as one speaker always did. Order is the
+  billing: the first name is the one a cramped grid block truncates to. A pitch
+  still names one person, through the same control. Everything downstream
+  follows the whole list — the profile page, the merge tool, the ICS feed,
+  search ranking, the export document, and the importer, which takes
+  `speakers` beside the older `speaker`.
+
+- **A new tag takes a colour nobody else is wearing.** Every tag started life
+  the same grey, so an event's tags were told apart by reading them — which is
+  most of what a colour on a chip is for. A new tag now takes the first free
+  colour from a palette of eight, the way a room and a track already did, and
+  the add-tag row shows the colour it is about to get instead of springing it
+  on you.
+
+  The palette is Okabe-Ito, chosen because "told apart at a glance" has to hold
+  for the roughly one in twelve men who would read a red/green pair as the same
+  chip. It is bright rather than dark, so a chip no longer assumes white text:
+  the ink is picked black or white by luminance wherever a tag is drawn — the
+  list, the detail panel, the pitch board — and for a custom colour typed in by
+  hand, which no palette could have answered for.
+
 - **A profile is edited a field at a time.** Opening your own profile used to
   show a name and, if you had written one, a bio — with everything else simply
   absent, and one **Edit profile** button that put every field in a dialog.
@@ -518,6 +548,21 @@ All notable changes to this project are documented here.
   is soft-deleted. Audited; not undoable via /trash, hence admin-only.
 
 ### Changed
+
+- **One colour control, and it is a circle.** Tags, tracks and rooms each drew
+  the browser's own `<input type="color">` — a rectangle every browser paints
+  to its own taste, which beside a row of round swatches read as a different
+  kind of thing entirely. They now share one picker: the palette as swatches,
+  with the system picker still underneath the last one, because nothing
+  hand-rolled beats it on a phone. A tag in Manage Event is also drawn as the
+  chip it actually is, and pressing it opens the editor — the old neutral pill
+  with a dot beside it showed the colour at a size nobody could judge it at.
+
+- **One Calendar item in the menu, not two.** Calendar export and Subscribe
+  opened the same dialog at its two halves, so the menu spent two rows saying
+  what the dialog says in one — and "Subscribe" on its own reads like a mailing
+  list rather than an ICS feed. The item is just **Calendar**; the dialog still
+  holds both halves and still opens at the one that was asked for.
 
 - **The week rail is one line that scrolls, not two that wrap.** On a phone a
   four-week conference wrapped its week chips onto a second line and a six-week
