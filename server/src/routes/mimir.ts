@@ -45,18 +45,43 @@ export function mimirRoutes(ctx: Ctx): Router {
     model?: string;
   }
   const enginePath = dataDir ? join(dataDir, 'mimir-engine.json') : null;
+  /**
+   * A key carries its provider in its prefix. Deducing the endpoint from it
+   * removes the commonest configuration failure: an NVIDIA key sent to the
+   * Anthropic API, which answers a baffling 401. Explicit values always win.
+   */
+  const withProvider = (cfg: Engine | null): Engine | null => {
+    if (!cfg?.key) return null;
+    if (cfg.url) return cfg;
+    const k = cfg.key.trim();
+    if (k.startsWith('nvapi-')) {
+      return {
+        ...cfg,
+        url: 'https://integrate.api.nvidia.com/v1',
+        model: cfg.model ?? 'nvidia/llama-3.1-nemotron-70b-instruct',
+      };
+    }
+    if (k.startsWith('gsk_')) {
+      return {
+        ...cfg,
+        url: 'https://api.groq.com/openai/v1',
+        model: cfg.model ?? 'llama-3.3-70b-versatile',
+      };
+    }
+    return cfg;
+  };
   const loadEngine = (): Engine | null => {
     if (process.env.MIMIR_API_KEY) {
-      return {
+      return withProvider({
         key: process.env.MIMIR_API_KEY,
         url: process.env.MIMIR_ENGINE_URL,
         model: process.env.MIMIR_MODEL,
-      };
+      });
     }
     if (enginePath && existsSync(enginePath)) {
       try {
         const cfg = JSON.parse(readFileSync(enginePath, 'utf8')) as Engine;
-        return cfg.key ? cfg : null;
+        return withProvider(cfg);
       } catch {
         return null;
       }
