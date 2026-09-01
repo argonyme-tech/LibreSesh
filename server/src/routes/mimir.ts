@@ -280,7 +280,7 @@ export function mimirRoutes(ctx: Ctx): Router {
               Authorization: `Bearer ${cfg.key}`,
             },
             body: JSON.stringify({
-              model: cfg.model ?? 'meta/llama-3.3-70b-instruct',
+              model: cfg.model ?? 'nvidia/llama-3.1-nemotron-70b-instruct',
               max_tokens: 4000,
               messages: [{ role: 'system', content: systemText }, ...body.messages],
             }),

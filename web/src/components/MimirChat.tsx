@@ -136,7 +136,7 @@ export function MimirChat({
             className="w-full rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-950 p-2.5 text-sm"
             value={modelDraft}
             onChange={(e) => setModelDraft(e.target.value)}
-            placeholder="Model (optional) — e.g. meta/llama-3.3-70b-instruct"
+            placeholder="Model (optional) — e.g. nvidia/llama-3.1-nemotron-70b-instruct"
             aria-label="Engine model"
           />
           <PrimaryButton onClick={() => void saveKey()} disabled={savingKey || !keyDraft.trim()}>
