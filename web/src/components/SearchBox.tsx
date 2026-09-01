@@ -3,6 +3,7 @@ import type { RoomDto, SessionDto } from '@shared/types';
 import { dayLabel, fmtMin, place } from '../lib/format';
 import { bestField, matchRanges, rankSessions, searchTerms, snippet } from '../lib/search';
 import { ArrowRightIcon, SearchIcon } from './icons';
+import { popoverPanelClass, usePopover } from './Popover';
 
 /** How many hits the popdown shows before it hands you off to the full page. */
 const PREVIEW = 5;
@@ -142,7 +143,6 @@ export function SearchBox({
   const [open, setOpen] = useState(false);
   // -1 = nothing picked, which is what makes Enter mean "show me everything".
   const [active, setActive] = useState(-1);
-  const wrap = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
 
   const terms = useMemo(() => searchTerms(query), [query]);
@@ -159,15 +159,6 @@ export function SearchBox({
   // The results page owns the query in its URL; going back or forward there has
   // to move the box with it, or the box says one thing and the page another.
   useEffect(() => setQuery(initialQuery), [initialQuery]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: PointerEvent) => {
-      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('pointerdown', onPointer);
-    return () => document.removeEventListener('pointerdown', onPointer);
-  }, [open]);
 
   // "/" focuses the box from anywhere on the page, unless you are typing.
   useEffect(() => {
@@ -197,8 +188,18 @@ export function SearchBox({
 
   const showPanel = open && terms.length > 0;
 
+  // The box itself is the anchor, not the input inside it, so the results line
+  // up with the whole control and a press on the clear "×" still counts as
+  // inside. Escape stays this component's own — see the input's keydown.
+  const { refs, floatingStyles, getFloatingProps } = usePopover({
+    open: showPanel,
+    onOpenChange: setOpen,
+    role: 'listbox',
+    escapeKey: false,
+  });
+
   return (
-    <div ref={wrap} className={`relative shrink-0 ${className}`}>
+    <div ref={refs.setReference} className={`relative shrink-0 ${className}`}>
       <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-stone-400 dark:text-stone-500" />
       <input
         ref={input}
@@ -255,9 +256,12 @@ export function SearchBox({
 
       {showPanel && (
         <div
+          ref={refs.setFloating}
+          style={floatingStyles}
+          {...getFloatingProps()}
           id="search-results"
           role="listbox"
-          className="absolute left-0 z-40 mt-1 w-[min(28rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-stone-200 bg-white p-1 shadow-lg dark:border-stone-700 dark:bg-stone-900"
+          className={`${popoverPanelClass} w-[28rem] p-1`}
         >
           {hits.length === 0 ? (
             <p className="px-3 py-3 text-xs text-stone-500 dark:text-stone-400">

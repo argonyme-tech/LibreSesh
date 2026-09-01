@@ -482,6 +482,31 @@ All notable changes to this project are documented here.
 
 ### Fixed
 
+- **The filter panel no longer shoves the page sideways on a phone.** Opening
+  **Filter** on mobile zoomed the whole schedule out and left you pinching back
+  in to read it. The panel was positioned `absolute left-0` inside a wrapper
+  that sits partway along the filter bar, and sized `min(22rem, 100vw - 2rem)` —
+  a width that is only ever right for an element starting at the left edge of
+  the screen. Its right edge therefore landed at *the button's* left edge plus a
+  full viewport, hanging a couple of hundred pixels off the page. Nothing
+  clipped it, so the document itself became wider than the screen, and a mobile
+  browser answers that by shrinking everything to fit. The search box's results
+  had the same bug and 28rem of it.
+
+  Both panels are now placed by Floating UI: positioned against the *viewport*
+  rather than the document, slid back inside it when they would overhang,
+  flipped above the anchor when there is no room below, and capped to the width
+  and height actually left beside them — which also retires a `max-h-[70vh]`
+  that counted the strip behind the address bar. The same move deletes four
+  hand-rolled copies of "close on outside click or Escape", and closing the
+  filter panel now returns focus to the button that opened it. Tapping
+  **Filter** deliberately does *not* focus the search field inside, so a phone
+  keyboard no longer covers the panel you just opened.
+
+  Behind them, `html` is `overflow-x: clip` as a backstop, so no future element
+  can widen the page this way — `clip` rather than `hidden`, which would make
+  `html` a scroll container and stop the schedule header sticking.
+
 - **The session sheet fits the phone it opens on.** The sheet is bottom-anchored
   inside a `fixed inset-0` parent, but capped its height with `max-h-[85vh]` —
   and `vh` measures the viewport with the mobile address bar *hidden*. With the

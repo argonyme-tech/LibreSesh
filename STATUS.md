@@ -345,6 +345,14 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
 ## Medium Priority
 
+- **Put the last two popdowns on `usePopover`.** `ProfileMenu` and
+  `SpeakerCombobox` still position themselves and still carry their own
+  outside-click/Escape effects. Neither can overhang today — one is `right-0
+  w-48`, the other `w-full` — so they are exempted by name in
+  `tests/popoverOverflow.test.ts`, which also asserts the reason still holds.
+  Moving them over would delete the last two copies of the dismiss effect and
+  let that allowlist go away.
+
 - **A track window cannot close a day.** Noted 2026-09-01 when track hours
   landed. An override row is a window and a window must end after it starts, so
   "the workshops track does not run on the last day" cannot be said — the
