@@ -6,6 +6,48 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **The organiser says which view a schedule opens in.** Manage Event →
+  Settings has an **Opens in** choice: the list, one column in time order, or
+  the calendar, a grid of rooms. New events open in the list.
+
+  It used to be the browser's call — under 640px wide you got the list, above
+  it the grid — which answers a question about the device when the question is
+  about the event. A dense multi-room programme is unreadable as a list on a
+  laptop; a single-track unconference is a column of empty grid on a desktop.
+  Only the *default* moves: the view switch above the grid still works for
+  everybody, and a view somebody picks travels in the link they share. The
+  choice carries into a clone, exports with the event, and is honoured on
+  import.
+
+- **A help menu behind the "?", with the version in it.** The button beside
+  your name now opens two things: **Take the tour**, and **About LibreSesh** —
+  what this is, and the exact build you are looking at, selectable, which is
+  the first thing anyone is asked for when they report something odd.
+
+- **A running event opens at the current time.** The day already defaulted to
+  today, but the grid still opened at the day's first hour: arriving at half
+  past three meant scrolling past the whole morning, or finding **Now**, before
+  seeing what was actually on. A schedule opened while the event is running now
+  lands on the current time.
+
+  Once per visit, and never over a position you asked for. A link to one
+  session, or a URL carrying `?day=`, already says where to be and is left
+  alone; and outside the day's hours there is no now line to jump to, so the
+  day opens at its start as it always did. It lands rather than travels —
+  no animated scroll to sit through on the way in.
+
+- **The week rail says when the line goes on.** A long event's weeks scroll
+  sideways on one line, with the scrollbar hidden — which left nothing at all
+  to say there was more. Past the third or fourth chip the rail simply looked
+  like a shorter conference: on a touch screen you found out by flicking, and
+  on a desktop, with no horizontal wheel, you did not find out.
+
+  There is now an arrow at each end of the rail, up only while there is more
+  that way, and a press moves the line by most of a screenful — an overlap, so
+  the week you were reading is still there afterwards. They are pointer
+  affordances rather than tab stops: every chip they scroll to is a button of
+  its own, and tabbing to one already brings it into view.
+
 - **An event can be renamed, and its old address keeps working.** Manage Event
   → Settings has a **Slug** field. Changing it moves the event to the new URL —
   `/e/unconf-2026` becomes the real address, not a redirect to the old one —
@@ -453,6 +495,12 @@ All notable changes to this project are documented here.
 
 ### Changed
 
+- **The week rail is one line that scrolls, not two that wrap.** On a phone a
+  four-week conference wrapped its week chips onto a second line and a six-week
+  one onto a third, each of them header height the grid wanted. The rail now
+  scrolls sideways within a single line, the same way the day strip beside it
+  already did.
+
 - **A room's column header is its name, and nothing else.** The header used to
   carry a second line — the seats, and "attendees may book this room" — in the
   176 pixels of a column card, where it truncated, while the organiser's
@@ -551,6 +599,128 @@ All notable changes to this project are documented here.
   instance one; the README gained a section on the same distinction.
 
 ### Fixed
+
+- **The header folds in the list view too.** Folding was pinned to the grid's
+  own scroller, so in the list — which has none of its own — there was nothing
+  for it to listen to and the header simply never folded. With the list now
+  where an event opens by default, that was most people.
+
+- **A filter row that fits a phone.** Three things were spending width nobody
+  had: the collapse button carried the day as text, so it was a different size
+  in each state and a different size again on a Tuesday than on a Wednesday —
+  a control that moves under the thumb reaching for it. It is a calendar and
+  an arrow now, the same width in both states. The **Filter** button drops its
+  label below `sm`, like Manage and Add above it, and has lost the ▾ at every
+  width — a panel opening under the button already says that. And the search
+  field is sized for what it holds rather than for its own placeholder.
+
+- **The version pill is gone from the corner of every page.** It sat over the
+  bottom-right of the grid on a phone, permanently, for a question asked twice
+  a year. It is in **About LibreSesh** under the "?" now.
+
+- **The week rail's arrows are drawn rather than typed.** ‹ and › are set on
+  the text baseline at the font's own optical size, so they came out small and
+  sitting low against the chips they belong to. They are icons now, centred by
+  the same flexbox that centres the rest of the row — as is the cog on
+  **Manage Event**, which was a ⚙ glyph and rendered at a different size and
+  weight in every browser.
+
+- **The tour no longer shows up uninvited.** A first visit to an event opened
+  the schedule under a stack of coach-marks, before anyone had seen the thing
+  they came for. The tour is unchanged and is still one press away on the **?**
+  button beside your name — it just waits to be asked for now, every time,
+  rather than remembering whether it has been taken.
+
+- **Signing in on a phone no longer leaves the app zoomed in.** Safari on iOS
+  zooms the page whenever you focus a field whose text is under 16px, and it
+  does not zoom back out when you leave it. The event password gate is a text
+  field on an otherwise empty page, so the first thing an iPhone did with a
+  new event was magnify it and strand you there, with the right-hand side of
+  every screen off the edge and a pinch the only way back.
+
+  Text entry is floored at 16px on a touch screen, where that zoom exists;
+  fields stay their designed size on a desktop, where it does not. Pinch zoom
+  is untouched — the cheap cure for this is a viewport that forbids zooming
+  altogether, which takes it away from the people who need it to read.
+
+- **The folded header no longer runs off the right of the screen.** With the
+  header fold in, the profile menu at the end of the event bar sat half off the
+  edge on a phone, and a long event's week rail stopped scrolling and ran off
+  the same edge — everything past the third week was unreachable rather than
+  merely out of sight.
+
+  One cause for both. The fold wraps each row in a grid so it can animate its
+  own height, and a grid's default column grows to fit its content instead of
+  constraining it: a row wider than the phone made the row wider than the
+  header rather than being made to fit, and `overflow-x: clip` — the net that
+  stops a stray element widening the page — hid what was left. The column is
+  now pinned to the width that is actually there, which hands the squeeze back
+  to the rows, each of which already knows how to take it: the event bar
+  truncates, the rail scrolls.
+
+- **Scrolling down the grid no longer takes the room names with it.** Past the
+  first screenful of a day the column labels were gone, while the event bar,
+  the week rail and the day strip — the chrome you were done with — stayed
+  exactly where they were. What was left was an unlabelled field of blocks: you
+  could see a 14:00 session but not which room it was in, and getting the
+  answer meant scrolling back up.
+
+  The cause was two scrollers, one of them accidental. The room cards are
+  `sticky top-0` inside the grid's own scroll box, so they hold their place
+  only while the grid is the thing being scrolled. That box was sized
+  `calc(100vh - 200px)` — a guess at the header's height — and the header is
+  routinely taller than 200px, with a week rail on a multi-week event and a
+  filter row that wraps on a phone. The surplus made the *document* scrollable
+  too, so once the grid hit its bottom the page took over, the sticky header
+  slid up under the page header, and the labels went with it.
+
+  The schedule is now an app shell: the viewport holds the header and the grid,
+  the page itself cannot scroll, and the grid takes the height that is left
+  rather than guessing at it. The room cards stay on screen for the whole day,
+  at every header height, on every screen.
+
+- **The schedule header folds itself away once you are into the day.** Reading
+  the afternoon of a conference on a laptop, the top ~150px went on choosing a
+  day you had already chosen. Past 24px of scroll the event bar, the week rail
+  and the day strip fold away, leaving one row: which day you are on, search,
+  filters, and **Now** — moved down beside **Filter**, because jumping to the
+  current time is the thing you reach for mid-scroll and the row it used to
+  live in is one of the rows that folds.
+
+  Scrolling back to the top of the day brings everything back. So does the
+  ⌄/⌃ button at the head of the row that stays: it is the way back that does
+  not cost you your place in the day, and it folds the header by hand from the
+  other side. A header you opened stays open until you deliberately scroll
+  another 120px down — the momentum still arriving from the flick that folded
+  it is not an instruction to fold it again — and one you folded by hand stays
+  folded until you come back to the top of the day.
+
+  The fold and the button used to fight, which made the button look broken: you
+  pressed it, the header came back, and the next flick of the wheel put it
+  away. Three rules keep them apart. The header unfolds at the very top and
+  folds at 24px rather than swapping on one threshold in both directions.
+  Nothing folds while a fold is still moving, because every height the
+  animation passes through fires scroll events of its own. And it will not fold
+  when folding would move the day under you: the rows hand the grid the height
+  they were using, and on a day not much longer than the screen that is more
+  scroll than is left, so the browser clamps the position back — a lurch, and
+  at the top an instant unfold, leaving the header flickering a notch either
+  side of the threshold. Days that short do not fold at all. The rule measures
+  the rows rather than assuming a height, so a wrapped filter row on a phone
+  and a week rail on a long conference are both accounted for.
+
+  The fold takes 700ms and is a movement rather than a cut: the rows shrink to
+  nothing while the grid grows into the space, so it reads as one gesture with
+  the wheel that started it instead of the header being chopped off. The height
+  animates `grid-template-rows` from `0fr` to `1fr`, which means nothing has to
+  name a max-height larger than the content — a number that would ease through
+  empty space and be wrong the day a row wraps onto another line. Anyone who
+  has asked their system for less motion gets the old instant swap.
+
+  Past 160px into the day, a **↑** button appears in the bottom-right corner:
+  one press back to the top, however far down you are. It scrolls rather than
+  jumps, so the header unfolds on the way up. It has its own threshold rather
+  than riding on the fold's, so it still appears on a day too short to fold.
 
 - **The filter panel no longer shoves the page sideways on a phone.** Opening
   **Filter** on mobile zoomed the whole schedule out and left you pinching back

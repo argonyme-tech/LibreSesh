@@ -127,3 +127,60 @@ export function InfoIcon({ className }: { className?: string }) {
     </Icon>
   );
 }
+
+/** A chevron each way — the rail continues past this edge. */
+export function ChevronLeftIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M10 3.5 5.5 8l4.5 4.5" />
+    </Icon>
+  );
+}
+
+export function ChevronRightIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M6 3.5 10.5 8 6 12.5" />
+    </Icon>
+  );
+}
+
+/** A cog — the settings behind Manage Event. Eight stubs rather than drawn
+ *  teeth: at 16px a real toothed gear silts up into a grey disc, and the stubs
+ *  keep the 1.6 stroke the rest of the set is drawn at. */
+export function SettingsIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <circle cx="8" cy="8" r="3" />
+      <path d="M12.5 8H14M8 3.5V2M3.5 8H2M8 12.5V14" />
+      <path d="m11.18 4.82 1.06-1.06M4.82 4.82 3.76 3.76M4.82 11.18l-1.06 1.06M11.18 11.18l1.06 1.06" />
+    </Icon>
+  );
+}
+
+/** A chevron down and up — show or hide the rows folded away above. */
+export function ChevronDownIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M3.5 6 8 10.5 12.5 6" />
+    </Icon>
+  );
+}
+
+export function ChevronUpIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M3.5 10 8 5.5l4.5 4.5" />
+    </Icon>
+  );
+}
+
+/** A month block — the day picker this button puts away and brings back. */
+export function CalendarIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <rect x="2.25" y="3.25" width="11.5" height="10.5" rx="1.75" />
+      <path d="M2.25 6.5h11.5M5.5 2v2.5M10.5 2v2.5" />
+    </Icon>
+  );
+}
