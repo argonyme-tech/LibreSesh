@@ -6,6 +6,28 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **A profile is edited a field at a time.** Opening your own profile used to
+  show a name and, if you had written one, a bio — with everything else simply
+  absent, and one **Edit profile** button that put every field in a dialog.
+  The first profile anyone sees is their own empty one (the menu creates it on
+  the way there), and it was the least legible thing on the site: nothing said
+  a bio or a set of links existed to be filled in.
+
+  Each field now reads in place and edits in place. An empty one keeps its
+  spot and says what it is — "Nothing about you yet. **Add a bio**" — and the
+  pencil beside a filled one opens just that field, with Save and Cancel under
+  it. Every save is its own request carrying only that field, so a slow-typed
+  bio no longer holds a name hostage, and two people editing different halves
+  of a profile no longer overwrite each other. A failed save keeps the editor
+  open with the message under the control and your text still in it, instead
+  of a toast across the page.
+
+  Empty *and* not yours to fill is the one case that draws nothing: a stranger
+  reading a sparse profile sees a name and what there is, not a column of
+  blanks. Your display name stays a field of its own — it is your identity in
+  the event rather than a column of this profile, it saves through the rename
+  route, and an organiser editing your profile still cannot touch it.
+
 - **About LibreSesh links to the source.** Under the "?", beside the licence.
 
 - **The organiser says which view a schedule opens in.** Manage Event →
