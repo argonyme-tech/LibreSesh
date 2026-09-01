@@ -14,12 +14,15 @@ export function MimirChat({
   slug,
   compact = false,
   seed,
+  openConfig = false,
 }: {
   slug: string;
   compact?: boolean;
   /** Optional kickoff instruction, auto-sent once when the engine is armed —
    *  used to start a live interview. Shown as a normal message: transparent. */
   seed?: string;
+  /** Land straight on the engine form — the "Engine" tool in the Mímir tab. */
+  openConfig?: boolean;
 }) {
   const [engine, setEngine] = useState<boolean | null>(null);
   const [model, setModel] = useState('');
@@ -29,7 +32,7 @@ export function MimirChat({
   const [savingKey, setSavingKey] = useState(false);
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const [chatError, setChatError] = useState<string | null>(null);
-  const [showConfig, setShowConfig] = useState(false);
+  const [showConfig, setShowConfig] = useState(openConfig);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);

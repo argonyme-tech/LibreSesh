@@ -22,7 +22,8 @@ type Tool =
   | 'rhythm'
   | 'chat'
   | 'infographic'
-  | 'sessions';
+  | 'sessions'
+  | 'engine';
 
 export function MimirPage() {
   const { slug = '' } = useParams();
@@ -128,6 +129,7 @@ export function MimirPage() {
           <MySessions slug={slug} bundle={bundle} isAdmin={isAdmin} engine={engine} onLive={goLive} />
         )}
         {tool === 'chat' && isAdmin && <MimirChat slug={slug} seed={chatSeed} />}
+        {tool === 'engine' && isAdmin && <MimirChat slug={slug} openConfig />}
       </main>
     </div>
   );
@@ -227,7 +229,7 @@ function Hub({
         {isAdmin && (
           <button
             type="button"
-            onClick={() => onOpen('chat')}
+            onClick={() => onOpen('engine')}
             className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
               engine
                 ? 'bg-green-500/15 text-green-700 dark:text-green-400 border border-green-500/30'
@@ -309,6 +311,14 @@ function Hub({
             sub="Organisers only · the craft engine"
             onClick={() => onOpen('chat')}
             accent
+          />
+        )}
+        {isAdmin && (
+          <Tile
+            glyph="⚙"
+            title="Engine settings"
+            sub={engine ? 'Armed — change key, URL or model' : 'Off — add an API key to switch Mímir on'}
+            onClick={() => onOpen('engine')}
           />
         )}
       </HubSection>
