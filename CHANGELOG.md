@@ -6,6 +6,31 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **Enter an event by scanning a QR code.** Manage Event → Settings → **Invite
+  by QR** turns one of the three event passwords into a code for a badge, a
+  poster or a sheet of paper at the door. Scanning it opens the gate with the
+  password already applied — no password box, a badge reading *Invited as
+  Attendee*, one name field and one **Enter** button. The name is still asked
+  for, because names are unique inside an event and everyone arriving under an
+  auto-generated one is a roster nobody can read.
+
+  The password rides in the URL **fragment** (`…/e/democonf#k=…`), which
+  browsers never send to a server: it appears in no access log and no `Referer`
+  header, and the gate strips it with `history.replaceState` the moment it
+  reads it. So the URL an attendee is left holding — the one they paste into a
+  group chat — is a plain `/e/democonf` that asks the next person for the
+  password rather than handing it to them. The code itself still carries it,
+  exactly as if the password were printed on the poster; that is what it is
+  for.
+
+  The organiser types the password to encode it, because the event stores
+  bcrypt hashes and the server has no plaintext to give. It confirms the typing
+  instead — a new admin-only `POST /e/:slug/password-role` names the role a
+  password grants without granting it, so a code is never drawn for a typo, and
+  minting one is audited. The address the code points at is shown and editable
+  beside it: behind a real hostname the current origin is right, and on a
+  forwarded dev port or a laptop on the local network it is not.
+
 - **A track can keep hours.** "Workshops run in the mornings" was a rule that
   lived in the organiser's head and was enforced by watching the grid; a track
   now says it once — a window of the local clock — and the schedule holds

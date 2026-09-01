@@ -328,6 +328,82 @@ is a row keyed on (identity, event); a display name is a row keyed on (event,
 identity). Signing out of an event deletes the role, never the identity — which
 is what lets authorship survive it.
 
+### Invite QR codes, and why the password rides in the fragment
+
+An organiser can turn one of the three event passwords into a QR code — Manage
+Event → Settings → Invite by QR — for a badge, a poster or a sheet of paper at
+the door. The code encodes
+
+```
+https://schedule.example.org/e/democonf#k=<password>&r=<role>
+```
+
+and the choice of `#` over `?` is the whole design.
+
+- **A fragment is never sent to the server.** It stays in the browser, so the
+  password appears in no access log, no `Referer` header and nothing a reverse
+  proxy in front of the app writes down. A query string would put an event's
+  password into Caddy's log once per scan.
+- **It is taken out of the address bar before anything renders.**
+  `takeInvite()` runs in `main.tsx`, reads the hash once and calls
+  `history.replaceState`, leaving a bare `/e/:slug`; the gate then reads that
+  one copy rather than the URL. Deliberately at startup and not inside the
+  gate, because the gate does not always appear — an organiser who scans the
+  attendee code already holds a role and walks straight through to the
+  schedule, and would otherwise be left with the password sitting in their
+  address bar with nothing to clear it. `replaceState` and not `pushState`, so
+  Back does not return to a URL carrying the secret and the browser's history
+  list never holds one. The consequence is the one people actually want: an
+  attendee who scans the poster and then pastes "the link" into a group chat
+  has shared a page that *asks* for the password, not one that hands it out.
+- **`r` is a caption, never a grant.** The role in the fragment only decides
+  what the gate says — "Invited as Attendee" — before anything is submitted.
+  Entry is still `POST /auth` with the password, and the server derives the role
+  from the password as it always did. A forged `r` produces a wrong label on a
+  screen and nothing else, which is why it is not signed.
+- **Scanning is not entry.** The gate still asks for a display name, because
+  names are unique per event and claimed at entry (§Why a display name belongs
+  to the event). Entering everyone automatically under whatever seed their
+  device happened to mint would fill the roster with strangers nobody can
+  identify — the QR saves the password, not the introduction.
+
+What this deliberately does *not* do is make the code itself a secret. Anyone
+who photographs the poster holds that password until it is changed, exactly as
+if it were printed underneath — an event password is a shared secret read off a
+wall, and this only saves the typing. A revocable per-invite token would be a
+different feature with its own table; the QR is the password, made scannable.
+
+The panel that draws it lives in `web/src/pages/AdminInvite.tsx`, and two
+things about it follow from the storage model rather than from taste:
+
+- **The organiser has to type the password.** `events` holds bcrypt hashes and
+  nothing else, so the server cannot produce a plaintext to encode, for an
+  admin or for anyone.
+- **So the server confirms the typing instead.** `POST /e/:slug/password-role`
+  is admin-only, rate-limited on the same bucket as the gate, and answers with
+  the role a password grants without granting it. It exists because a QR is
+  printed once and scanned by everyone, and a typo in it is not discovered
+  until two hundred people are standing at the door. It is deliberately not
+  `POST /auth`, for the same reason `/confirm-admin` is not: that route upserts
+  a role, so an organiser encoding the *viewer* password would silently demote
+  themselves out of the page they were standing on. Minting is audited
+  (`invite_qr`) — "who printed the organiser code, and when" is exactly what
+  the log is for, and a printed code outlives the session that made it.
+
+The address the code points at is remembered per browser and editable, because
+`window.location.origin` is only sometimes right: behind Caddy it is the public
+hostname, but in a dev container the app is reached through a forwarded port
+and on a laptop wired to a projector it can be a LAN address no phone can
+resolve. There is no server-side `PUBLIC_BASE_URL`; the organiser can see the
+address they are about to print, which is the check that matters.
+
+QR encoding is `qrcode-generator` (MIT, zero dependencies, pinned), rendered as
+inline SVG in `web/src/components/QrCode.tsx` — one `<path>` for the whole
+symbol rather than a rect per module, since it re-renders on every keystroke in
+the password box. It is black on white in both themes on purpose: the thing
+gets printed, and a dark-mode inversion is something many phone cameras will
+not read.
+
 ### One person, many devices
 
 A browser identity lives in one cookie jar, so the same human on a phone and a
