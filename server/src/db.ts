@@ -70,6 +70,20 @@ export interface TagRow {
 }
 
 /**
+ * What kind of thing a session is — a talk, a workshop, a panel. Per event and
+ * organiser-defined; see migration 014 for why this is not `sessions.type`,
+ * which says who placed the session rather than what it is.
+ */
+export interface FormatRow {
+  id: number;
+  event_id: number;
+  name: string;
+  color: string;
+  sort_order: number;
+  deleted_at: string | null;
+}
+
+/**
  * Lunch, dinner, the coffee break. Event furniture, drawn behind the grid and
  * attached to no room. `date` null means every day of the event.
  */
@@ -90,6 +104,9 @@ export interface SessionRow {
   room_id: number;
   track_id: number | null;
   type: 'official' | 'open';
+  /** The kind of session this is, or null when the event has no formats or
+   *  nobody picked one. Not `type` — see migration 014. */
+  format_id: number | null;
   /** 1 = while this runs, attendees may place nothing anywhere in the event. */
   blocks_open_booking: number;
   title: string;
@@ -124,6 +141,9 @@ export interface PersonRow {
   links: string;
   created_at: string;
   updated_at: string;
+  /** Tidied out of the organiser's lists, but still a live profile: it keeps
+   *  its sessions, its role and its holder. See migration 013. */
+  archived_at: string | null;
   deleted_at: string | null;
 }
 

@@ -85,6 +85,42 @@ describe('event import from JSON', () => {
     return (res.body as { error: { message: string } }).error.message;
   };
 
+  it('declares formats once and refers to them by name from a session', async () => {
+    const doc = document();
+    const result = await post({
+      ...doc,
+      formats: [{ name: 'Keynote' }, { name: 'Workshop' }],
+      sessions: [{ ...doc.sessions[0], format: 'Keynote' }, doc.sessions[1]],
+    });
+    expect(result.counts.formats).toBe(2);
+
+    const admin = await actorWithRole(
+      harness,
+      'photoconf',
+      result.generatedPasswords.adminPassword!,
+    );
+    const bundle = (await admin.get('/api/e/photoconf/bundle').expect(200)).body as {
+      formats: { id: number; name: string }[];
+      sessions: { title: string; formatId: number | null }[];
+    };
+    // Document order is the running order, the way it is for rooms.
+    expect(bundle.formats.map((f) => f.name)).toEqual(['Keynote', 'Workshop']);
+
+    const keynote = bundle.sessions.find((x) => x.title === 'Opening keynote');
+    expect(keynote!.formatId).toBe(bundle.formats[0]!.id);
+    const hallway = bundle.sessions.find((x) => x.title === 'Hallway track, formalised');
+    expect(hallway!.formatId).toBeNull();
+  });
+
+  it('refuses a session naming a format the document never declares', async () => {
+    const doc = document();
+    const message = await failure(
+      { ...doc, sessions: [{ ...doc.sessions[0], format: 'Fireside chat' }] },
+      400,
+    );
+    expect(message).toContain('no format called "Fireside chat" is declared');
+  });
+
   it('needs the instance password', async () => {
     await importer.post('/api/events/import').send(document()).expect(403);
     await importer
@@ -97,7 +133,7 @@ describe('event import from JSON', () => {
   it('builds the event, its rooms, tracks, tags and sessions', async () => {
     const result = await post(document());
 
-    expect(result.counts).toEqual({ rooms: 2, tracks: 2, tags: 1, breaks: 0, sessions: 2, people: 1 });
+    expect(result.counts).toEqual({ rooms: 2, tracks: 2, tags: 1, formats: 0, breaks: 0, sessions: 2, people: 1 });
     expect(result.warnings).toEqual([]);
 
     const admin = await actorWithRole(harness, 'photoconf', result.generatedPasswords.adminPassword!);
@@ -241,7 +277,7 @@ describe('event import from JSON', () => {
 
       expect(result.dryRun).toBe(true);
       expect(result.eventId).toBeNull();
-      expect(result.counts).toEqual({ rooms: 2, tracks: 2, tags: 1, breaks: 0, sessions: 2, people: 1 });
+      expect(result.counts).toEqual({ rooms: 2, tracks: 2, tags: 1, formats: 0, breaks: 0, sessions: 2, people: 1 });
 
       const events = (await agentFor(harness).get('/api/events').expect(200)).body as unknown[];
       expect(events).toHaveLength(0);
@@ -526,6 +562,7 @@ describe('event import from JSON', () => {
     expect(result.counts).toEqual({
       rooms: 3,
       tracks: 2,
+      formats: 3,
       tags: 2,
       breaks: 2,
       sessions: 6,

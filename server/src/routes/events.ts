@@ -77,7 +77,8 @@ export function eventRoutes(ctx: Ctx): Router {
     res.status(201).json({ ...toEventSummary(row as EventRow), generatedPasswords: generated });
   });
 
-  /** Copy rooms and tags into a fresh event — never sessions or contributions. */
+  /** Copy rooms, tags and formats into a fresh event — never sessions or
+   *  contributions. */
   router.post('/events/:slug/clone', limit(ctx.limiter, 'write'), (req, res) => {
     const source = getEventBySlug(ctx.db, req.params.slug ?? '');
     if (!source) throw notFound('No such event');
@@ -135,6 +136,15 @@ export function eventRoutes(ctx: Ctx): Router {
         .prepare(
           `INSERT INTO tags (event_id, name, color)
            SELECT ?, name, color FROM tags WHERE event_id = ? AND deleted_at IS NULL`,
+        )
+        .run(id, source.id);
+      // Formats are setup, like rooms and tags: the same event again runs the
+      // same kinds of session, even though none of the sessions come along.
+      ctx.db
+        .prepare(
+          `INSERT INTO session_formats (event_id, name, color, sort_order)
+           SELECT ?, name, color, sort_order
+             FROM session_formats WHERE event_id = ? AND deleted_at IS NULL`,
         )
         .run(id, source.id);
       return id;

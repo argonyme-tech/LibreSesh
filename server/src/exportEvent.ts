@@ -6,6 +6,7 @@ import type {
   ProposalRow,
   RoomRow,
   SessionRow,
+  FormatRow,
   TagRow,
   TrackRow,
 } from './db.js';
@@ -70,6 +71,11 @@ export function exportEvent(db: Db, event: EventRow): EventExport {
   const tags = db
     .prepare<[number], TagRow>(
       'SELECT * FROM tags WHERE event_id = ? AND deleted_at IS NULL ORDER BY name',
+    )
+    .all(eventId);
+  const formats = db
+    .prepare<[number], FormatRow>(
+      'SELECT * FROM session_formats WHERE event_id = ? AND deleted_at IS NULL ORDER BY sort_order, id',
     )
     .all(eventId);
   const people = db
@@ -175,6 +181,7 @@ export function exportEvent(db: Db, event: EventRow): EventExport {
       windows: trackWindows.get(t.id) ?? [],
     })),
     tags: tags.map((t) => ({ id: t.id, name: t.name, color: t.color })),
+    formats: formats.map((f) => ({ id: f.id, name: f.name, color: f.color })),
     breaks: breaks.map((b) => ({
       id: b.id,
       label: b.label,
@@ -195,6 +202,7 @@ export function exportEvent(db: Db, event: EventRow): EventExport {
       id: s.id,
       roomId: s.room_id,
       trackId: s.track_id,
+      formatId: s.format_id,
       type: s.type,
       blocksOpenBooking: s.blocks_open_booking === 1,
       title: s.title,

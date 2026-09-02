@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
+import { FloatingFocusManager } from '@floating-ui/react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type {
   BreakDto,
+  FormatDto,
   PersonDto,
   Role,
   RoomDto,
@@ -12,6 +14,7 @@ import type {
 } from '@shared/types';
 import { ROOM_COLORS } from '@shared/roomColors';
 import { TAG_COLORS, nextTagColor, readableInk } from '@shared/tagColors';
+import { SUGGESTED_FORMATS } from '@shared/formats';
 
 import { ColorPicker } from '../components/ColorPicker';
 import { windowLabel } from '@shared/trackHours';
@@ -29,6 +32,7 @@ import {
   type PeopleSortColumn,
 } from '../lib/people';
 import { PersonStatusBadge } from '../components/PersonLine';
+import { popoverPanelClass, usePopover } from '../components/Popover';
 import { RoleControl } from '../components/RoleControl';
 
 /**
@@ -45,7 +49,7 @@ const PEOPLE_COL = {
   uid: 'hidden w-16 shrink-0 sm:block',
   role: 'w-24 shrink-0',
   seen: 'hidden w-14 shrink-0 sm:block',
-  actions: 'w-40 shrink-0',
+  actions: 'w-28 shrink-0',
 };
 
 /**
@@ -103,9 +107,112 @@ function PeopleHeader({
 
 /** One size for every action, so the column is a column. */
 const peopleActionClass =
-  'w-[4.25rem] rounded-lg border border-stone-300 bg-white px-1 py-1 text-xs font-semibold ' +
+  'w-[3.5rem] rounded-lg border border-stone-300 bg-white px-1 py-1 text-xs font-semibold ' +
   'text-stone-700 hover:border-stone-500 dark:border-stone-600 dark:bg-stone-900 ' +
   'dark:text-stone-200 dark:hover:border-stone-400';
+
+/**
+ * Everything you can do to a row that is not opening it.
+ *
+ * They were three buttons in the row until archiving made them four, and four
+ * did not fit a column this table can spare the width for. A menu is the
+ * better shape anyway: Merge, Archive and Delete are each consequential and
+ * each need a sentence to be safe to press, and a sentence does not fit on a
+ * 56-pixel button. What is left in the row is the one that is neither — Open.
+ */
+function PersonActions({
+  person,
+  onMerge,
+  onArchive,
+  onDelete,
+}: {
+  person: PersonDto;
+  onMerge: () => void;
+  onArchive: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const { refs, floatingStyles, context, getReferenceProps, getFloatingProps } = usePopover({
+    open,
+    onOpenChange: setOpen,
+    role: 'menu',
+    placement: 'bottom-end',
+  });
+  const archived = person.archivedAt !== null;
+
+  const run = (act: () => void) => {
+    setOpen(false);
+    act();
+  };
+  const itemClass =
+    'flex w-full flex-col items-start rounded-lg px-2 py-1.5 text-left hover:bg-stone-100 disabled:opacity-40 disabled:hover:bg-transparent dark:hover:bg-stone-800';
+
+  return (
+    <>
+      <button
+        ref={refs.setReference}
+        type="button"
+        aria-label={`More for ${person.name}`}
+        {...getReferenceProps({ onClick: () => setOpen((o) => !o) })}
+        className={`${peopleActionClass} w-8 text-center`}
+      >
+        ⋯
+      </button>
+      {open && (
+        <FloatingFocusManager context={context} modal={false}>
+          <div
+            ref={refs.setFloating}
+            style={floatingStyles}
+            aria-label={`Actions for ${person.name}`}
+            {...getFloatingProps()}
+            className={`${popoverPanelClass} w-64 p-1 text-xs`}
+          >
+            <button type="button" role="menuitem" onClick={() => run(onMerge)} className={itemClass}>
+              <span className="font-semibold text-stone-700 dark:text-stone-200">Merge…</span>
+              <span className="text-stone-500 dark:text-stone-400">
+                Fold a duplicate of {person.name} into this profile.
+              </span>
+            </button>
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => run(onArchive)}
+              className={itemClass}
+            >
+              <span className="font-semibold text-stone-700 dark:text-stone-200">
+                {archived ? 'Take out of the archive' : 'Archive'}
+              </span>
+              <span className="text-stone-500 dark:text-stone-400">
+                {archived
+                  ? 'Back into the People list and the speaker picker.'
+                  : 'Out of this list and the speaker picker. Keeps their sessions, their role and their way in — and they can take themselves back out.'}
+              </span>
+            </button>
+
+            {/* Deleting a profile somebody holds was always refused; the
+                button explaining that is gone, and the explanation now points
+                at the thing that does work. */}
+            <button
+              type="button"
+              role="menuitem"
+              disabled={person.claimed}
+              onClick={() => run(onDelete)}
+              className={`${itemClass} enabled:text-red-700 dark:enabled:text-red-400`}
+            >
+              <span className="font-semibold">Delete</span>
+              <span className={person.claimed ? 'text-stone-500 dark:text-stone-400' : ''}>
+                {person.claimed
+                  ? 'They are in this event, so their profile cannot be deleted. Archive it instead.'
+                  : 'Gone for good. Its sessions keep their slot and lose the speaker.'}
+              </span>
+            </button>
+          </div>
+        </FloatingFocusManager>
+      )}
+    </>
+  );
+}
 import { MergeModal } from '../components/MergeModal';
 import { auditKeepField, parseNumberField, weekRailFromField } from '../lib/numberField';
 import { AdminBreaks, dayName } from './AdminBreaks';
@@ -171,6 +278,8 @@ export function AdminPage() {
   const [reordering, setReordering] = useState(false);
   const [tagName, setTagName] = useState('');
   const [editingTag, setEditingTag] = useState<TagDto | null>(null);
+  const [formatName, setFormatName] = useState('');
+  const [editingFormat, setEditingFormat] = useState<FormatDto | null>(null);
   const [trackName, setTrackName] = useState('');
   const [editingTrack, setEditingTrack] = useState<TrackDto | null>(null);
   const [movingTracks, setMovingTracks] = useState(false);
@@ -396,6 +505,14 @@ export function AdminPage() {
    *  same one for a tag created without a colour; doing it here as well means
    *  the swatch shows what you are about to get rather than a surprise. */
   const suggestedTagColor = nextTagColor((bundle?.tags ?? []).map((t) => t.color));
+
+  /** The shipped suggestions this event has not defined yet, matched the way
+   *  the server matches names — case-insensitively, since "Workshop" and
+   *  "workshop" are the same format and the second would be refused. */
+  const definedFormats = new Set((bundle?.formats ?? []).map((f) => f.name.toLowerCase()));
+  const suggestedFormats = SUGGESTED_FORMATS.filter(
+    (s) => !definedFormats.has(s.name.toLowerCase()),
+  );
   const newTagColor = tagColor ?? suggestedTagColor;
 
   const addTag = async () => {
@@ -524,6 +641,46 @@ export function AdminPage() {
     }
   };
 
+  const addFormat = async (name: string) => {
+    if (!name.trim()) return;
+    try {
+      // No colour sent: the server picks the first the event is not using,
+      // the same rule tags follow, so a list of formats is legible without
+      // anyone choosing colours by hand.
+      const created = await api.createFormat(slug, { name: name.trim() });
+      data.apply({ type: 'format.created', entity: created });
+      setFormatName('');
+    } catch (err) {
+      fail(err);
+    }
+  };
+
+  const patchFormat = async (format: FormatDto, patch: Partial<FormatDto>): Promise<boolean> => {
+    try {
+      data.apply({ type: 'format.updated', entity: await api.updateFormat(slug, format.id, patch) });
+      return true;
+    } catch (err) {
+      fail(err);
+      return false;
+    }
+  };
+
+  const removeFormat = async (format: FormatDto): Promise<boolean> => {
+    const ok = await confirm({
+      title: `Delete the “${format.name}” format?`,
+      body: 'The sessions that use it keep their slot and simply stop saying what kind of session they are. The bin does not hold formats, so this cannot be undone.',
+    });
+    if (!ok) return false;
+    try {
+      await api.deleteFormat(slug, format.id);
+      data.apply({ type: 'format.deleted', entity: { id: format.id } });
+      return true;
+    } catch (err) {
+      fail(err);
+      return false;
+    }
+  };
+
   const addPerson = async () => {
     if (!personName.trim()) return;
     try {
@@ -544,6 +701,29 @@ export function AdminPage() {
     try {
       const updated = await api.setPersonRole(slug, person.id, role);
       data.apply({ type: 'person.updated', entity: updated });
+    } catch (err) {
+      fail(err);
+    }
+  };
+
+  /**
+   * Put a profile away, or take it back out. No confirmation: nothing is lost
+   * and the same menu item undoes it, which is the difference between this and
+   * Delete — and asking twice about a reversible tidy-up is how an organiser
+   * learns to click through dialogs without reading them.
+   */
+  const toggleArchive = async (person: PersonDto) => {
+    try {
+      const updated =
+        person.archivedAt === null
+          ? await api.archivePerson(slug, person.id)
+          : await api.unarchivePerson(slug, person.id);
+      data.apply({ type: 'person.updated', entity: updated });
+      toast.show(
+        updated.archivedAt === null
+          ? `${updated.name} is back in the list`
+          : `${updated.name} archived — find them under Archived`,
+      );
     } catch (err) {
       fail(err);
     }
@@ -983,6 +1163,90 @@ export function AdminPage() {
             </div>
           </Section>
 
+          <Section
+            title="Formats"
+            description="What kind of thing a session is — a talk, a workshop, a panel. Picked at the top of the session form. It says what a session is, never how long it runs."
+            className="mb-6"
+          >
+            <ul className="mb-4 flex flex-wrap gap-2">
+              {bundle.formats.map((format) => (
+                <li key={format.id}>
+                  <button
+                    type="button"
+                    onClick={() => setEditingFormat(format)}
+                    title={`Edit ${format.name}`}
+                    style={{ background: format.color, color: readableInk(format.color) }}
+                    className="rounded-full px-2.5 py-1 text-xs font-medium ring-offset-2 ring-offset-white hover:ring-2 hover:ring-stone-400 dark:ring-offset-stone-900"
+                  >
+                    {format.name}
+                    <span className="sr-only">— edit this format</span>
+                  </button>
+                </li>
+              ))}
+              {bundle.formats.length === 0 && (
+                <li className="text-sm text-stone-400 dark:text-stone-500">No formats yet.</li>
+              )}
+            </ul>
+
+            {/* Suggestions rather than defaults: nothing is created until it is
+                clicked, so an event that runs none of these — or invents its
+                own — is not left deleting a dozen rows it never asked for.
+                Each drops off the list once it exists. */}
+            {suggestedFormats.length > 0 && (
+              <div className="mb-4">
+                <p className="mb-2 text-xs text-stone-500 dark:text-stone-400">
+                  {bundle.formats.length === 0
+                    ? 'Common ones, if any of them fit. Click to add.'
+                    : 'More to add:'}
+                </p>
+                <ul className="flex flex-wrap gap-1.5">
+                  {suggestedFormats.map((s) => (
+                    <li key={s.name}>
+                      <button
+                        type="button"
+                        title={s.hint}
+                        onClick={() => void addFormat(s.name)}
+                        className="rounded-full border border-dashed border-stone-300 px-2.5 py-1 text-xs text-stone-600 hover:border-stone-500 hover:text-stone-900 dark:border-stone-600 dark:text-stone-300 dark:hover:border-stone-400 dark:hover:text-stone-100"
+                      >
+                        + {s.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <FormRow>
+              <div className="min-w-40 flex-1">
+                <Field label="New format">
+                  <input
+                    value={formatName}
+                    onChange={(e) => setFormatName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && void addFormat(formatName)}
+                    maxLength={40}
+                    className={inputClass}
+                  />
+                </Field>
+              </div>
+              <PrimaryButton
+                onClick={() => void addFormat(formatName)}
+                disabled={!formatName.trim()}
+              >
+                Add format
+              </PrimaryButton>
+            </FormRow>
+          </Section>
+
+          {editingFormat && (
+            <FormatEditor
+              format={editingFormat}
+              sessions={bundle.sessions.filter((x) => x.formatId === editingFormat.id).length}
+              onPatch={patchFormat}
+              onDelete={removeFormat}
+              onClose={() => setEditingFormat(null)}
+            />
+          )}
+
           {editingTag && (
             <TagEditor
               tag={editingTag}
@@ -1196,38 +1460,27 @@ export function AdminPage() {
                     {person.lastSeenAt == null ? '—' : relativeTime(person.lastSeenAt)}
                   </span>
 
-                  {/* Three buttons the same size on every row, so the column
-                      reads as a column. Delete stays put rather than
-                      disappearing, and says why it is off. */}
+                  {/* Open first, the rest behind one button. Three buttons
+                      fitted the column; four did not, and the fourth is the
+                      one an organiser reaches for most — so the row keeps the
+                      thing it does every time and puts the three occasional,
+                      consequential ones in a menu where each can say what it
+                      does. The column got narrower doing it, which the name
+                      column took. */}
                   <span className={`${PEOPLE_COL.actions} flex justify-end gap-1`}>
-                    <button
-                      type="button"
-                      onClick={() => setMerging(person)}
-                      title={`Fold a duplicate of ${person.name} into this profile`}
-                      className={peopleActionClass}
-                    >
-                      Merge
-                    </button>
                     <Link
                       to={`/e/${slug}/p/${person.id}`}
                       state={{ back: { to: `/e/${slug}/admin?tab=people`, label: 'People' } }}
                       className={`${peopleActionClass} text-center`}
                     >
-                      Edit
+                      Open
                     </Link>
-                    <button
-                      type="button"
-                      disabled={person.claimed}
-                      onClick={() => void removePerson(person)}
-                      title={
-                        person.claimed
-                          ? 'They are in this event, so their profile cannot be deleted. Fold a duplicate in with Merge, or change their role.'
-                          : 'Remove this profile. Its sessions keep their slot and lose the speaker.'
-                      }
-                      className={`${peopleActionClass} enabled:text-red-700 enabled:hover:border-red-400 disabled:opacity-40 dark:enabled:text-red-400`}
-                    >
-                      Delete
-                    </button>
+                    <PersonActions
+                      person={person}
+                      onMerge={() => setMerging(person)}
+                      onArchive={() => void toggleArchive(person)}
+                      onDelete={() => void removePerson(person)}
+                    />
                   </span>
                 </li>
               ))}
@@ -1598,6 +1851,95 @@ export function AdminPage() {
  * nothing and offers no way back out. It also gives the name clash somewhere
  * to be reported — tag names are unique per event.
  */
+/**
+ * Rename, recolour or delete one format. Exactly the tag editor's shape,
+ * because a format is exactly a tag's data — a name and a colour. It carries
+ * no length: see migration 015.
+ */
+function FormatEditor({
+  format,
+  sessions,
+  onPatch,
+  onDelete,
+  onClose,
+}: {
+  format: FormatDto;
+  /** How many sessions call themselves this, so deleting is informed. */
+  sessions: number;
+  onPatch: (format: FormatDto, patch: Partial<FormatDto>) => Promise<boolean>;
+  onDelete: (format: FormatDto) => Promise<boolean>;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(format.name);
+  const [color, setColor] = useState(format.color);
+  const [busy, setBusy] = useState(false);
+
+  const dirty = name.trim() !== format.name || color !== format.color;
+
+  const save = async () => {
+    if (!name.trim() || busy) return;
+    setBusy(true);
+    try {
+      if (await onPatch(format, { name: name.trim(), color })) onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (await onDelete(format)) onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      title="Edit format"
+      onClose={onClose}
+      onSubmit={() => void save()}
+      footer={
+        <>
+          <DangerButton className="mr-auto" onClick={() => void remove()} disabled={busy}>
+            Delete
+          </DangerButton>
+          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+          <PrimaryButton type="submit" disabled={!name.trim() || !dirty || busy}>
+            Save
+          </PrimaryButton>
+        </>
+      }
+    >
+      <FormStack>
+        <Field label="Name">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={40}
+            className={inputClass}
+            autoFocus
+          />
+        </Field>
+        <ColorPicker
+          value={color}
+          onChange={setColor}
+          palette={TAG_COLORS}
+          label="Format colour"
+        />
+      </FormStack>
+
+      <p className="mt-3 text-xs text-stone-500 dark:text-stone-400">
+        {sessions === 0
+          ? 'No session calls itself this yet. Deleting it affects nothing.'
+          : `${plural(sessions, 'session')} call themselves this. Deleting the format leaves them where they are, without a kind.`}
+      </p>
+    </Modal>
+  );
+}
+
 function TagEditor({
   tag,
   sessions,

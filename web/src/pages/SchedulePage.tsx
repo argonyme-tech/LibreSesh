@@ -477,13 +477,56 @@ export function SchedulePage() {
     if (selected) void loadContributions(selected.id);
   }, [selected?.id, loadContributions, selected]);
 
+  /** The profiles this device holds. A person is credited on a session by
+   *  profile id, not by identity, so this is the bridge between them. */
+  const myPersonIds = useMemo(
+    () => new Set((bundle?.people ?? []).filter((p) => p.isMine).map((p) => p.id)),
+    [bundle?.people],
+  );
+  const speaksOn = useCallback(
+    (session: SessionDto) => session.speakers.some((p) => myPersonIds.has(p.id)),
+    [myPersonIds],
+  );
+
+  /**
+   * Mirrors `assertMayMutate` on the server. Being credited on a session is
+   * enough on its own — one of five co-hosts as much as the only one, and an
+   * official session as much as an open one, because the official one is
+   * precisely the one an organiser typed your name onto. Whether you may
+   * *move* it is a separate question; see `canMove`.
+   */
   const canEdit = useCallback(
     (session: SessionDto) =>
       bundle?.role === "admin" ||
-      (bundle?.role === "user" &&
+      speaksOn(session) ||
+      (bundle !== null &&
+        can(bundle.permissions, bundle.role, "session.edit_own") &&
         session.type === "open" &&
         session.createdBy === me?.id),
-    [bundle?.role, me?.id],
+    [bundle, me?.id, speaksOn],
+  );
+
+  /** Deleting is the creator's and the organiser's, never a co-speaker's:
+   *  being billed on a session is not a mandate to remove it from the
+   *  programme. The server draws the same line — it never passes `speaksHere`
+   *  to `assertMayMutate` on a delete. */
+  const canDelete = useCallback(
+    (session: SessionDto) =>
+      bundle?.role === "admin" ||
+      (bundle !== null &&
+        can(bundle.permissions, bundle.role, "session.edit_own") &&
+        session.type === "open" &&
+        session.createdBy === me?.id),
+    [bundle, me?.id],
+  );
+
+  /** An official session's slot belongs to the organisers, so a speaker
+   *  editing one gets the words and not the placement — the fields are
+   *  disabled rather than left to fail on save. */
+  const canMove = useCallback(
+    (session: SessionDto | undefined) =>
+      bundle?.role === "admin" || session === undefined || session.type !== "official",
+    [bundle?.role],
   );
 
   const reportError = useCallback(
@@ -959,7 +1002,7 @@ export function SchedulePage() {
     {
       target: "session-block",
       title: "Open a session",
-      body: "Tap any block for its description, speaker and everyone's notes, links and questions. Dashed green blocks are open sessions that anyone may propose.",
+      body: "Tap any block for its description, speaker and everyone's notes, links and questions. Dashed green blocks are non-official — anyone may propose one, and something else can always run alongside it.",
     },
     {
       target: "filters",
@@ -978,7 +1021,7 @@ export function SchedulePage() {
     tourSteps.push({
       target: "add",
       title: "Add a session",
-      body: "Organisers add official sessions anywhere; everyone else proposes open sessions in the rooms that anyone may book.",
+      body: "Organisers add official sessions anywhere; everyone else proposes non-official ones in the rooms that anyone may book.",
     });
   }
   if (role === "admin") {
@@ -1413,11 +1456,13 @@ export function SchedulePage() {
             slug={slug}
             rooms={bundle.rooms}
             tags={bundle.tags}
+            formats={bundle.formats}
             contributions={data.contributions[selected.id]}
             role={role}
             me={me}
             timezone={timezone}
             canEdit={canEdit(selected)}
+            canDelete={canDelete(selected)}
             archived={event.archived}
             starred={starredIds.has(selected.id)}
             userLabel={event.userRoleLabel}
@@ -1600,11 +1645,13 @@ export function SchedulePage() {
           slug={slug}
           rooms={bundle.rooms}
           tags={bundle.tags}
+          formats={bundle.formats}
           contributions={data.contributions[selected.id]}
           role={role}
           me={me}
           timezone={timezone}
           canEdit={canEdit(selected)}
+          canDelete={canDelete(selected)}
           archived={event.archived}
           starred={starredIds.has(selected.id)}
           userLabel={event.userRoleLabel}
@@ -1624,6 +1671,7 @@ export function SchedulePage() {
           session={editing.session}
           rooms={bundle.rooms}
           tags={bundle.tags}
+          formats={bundle.formats}
           tracks={bundle.tracks}
           people={bundle.people}
           role={role}
@@ -1637,8 +1685,9 @@ export function SchedulePage() {
           saving={saving}
           onCancel={() => setEditing(null)}
           onSave={(body, repeat) => void saveSession(body, repeat)}
+          canMove={canMove(editing.session)}
           onDelete={
-            editing.session
+            editing.session && canDelete(editing.session)
               ? () => void deleteSession(editing.session as SessionDto)
               : undefined
           }

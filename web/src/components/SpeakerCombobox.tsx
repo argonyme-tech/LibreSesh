@@ -67,9 +67,19 @@ export function SpeakerCombobox({
    * creditable and yourself. Your own row is pinned first — crediting
    * yourself is the common case at an unconference, and the newcomer this
    * exists for should not have to search for their own name.
+   *
+   * Archived profiles are not offered, which is most of the point of
+   * archiving: the test profiles and the walk-ins who never came back are
+   * exactly what clutters this list when you are trying to find a real
+   * person. One already on the session stays on it — this filters the
+   * suggestions, not the bill — and typing the name in full still finds
+   * them, because the server matches an archived profile rather than
+   * spawning a twin of it.
    */
   const offered = useMemo(() => {
-    const rows = people.filter((p) => p.isMine || (!onlySelf && (isAdmin || p.creditable)));
+    const rows = people.filter(
+      (p) => p.archivedAt === null && (p.isMine || (!onlySelf && (isAdmin || p.creditable))),
+    );
     return [...rows.filter((p) => p.isMine), ...rows.filter((p) => !p.isMine)];
   }, [people, isAdmin, onlySelf]);
 

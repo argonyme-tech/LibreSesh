@@ -6,7 +6,95 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **A session can say what kind of thing it is.** The app had one word for a
+  session — `type`, meaning `official` or `open` — and that says who put it
+  up, not what it is. So nothing anywhere distinguished a five-minute
+  lightning slot from a three-hour hands-on workshop, and a reader had to
+  infer it from the description and the height of the block.
+
+  Sessions now carry a **format**: a talk, a workshop, a panel, a jam. It is
+  the first control in the session form, above the title, because it is the
+  first thing anyone asks about a session. It carries no length — what a
+  session *is* and how long it runs are two different facts, and a workshop
+  is a workshop at ninety minutes or at a whole afternoon. It shows as a
+  coloured badge at the head of the session sheet, and it is named first
+  there too: what the session is comes before who placed it.
+
+  Formats are defined per event in Manage Event → Programme, beside rooms,
+  tracks and tags, because an unconference invents them. Nothing is created
+  by default; the section offers a dozen common ones — keynote, lightning
+  talks, poster session, excursion — as one-click suggestions, and an event
+  that runs none of them can type its own and never see the list again. An
+  organiser who has defined none is told so in the session form rather than
+  shown nothing, which was indistinguishable from the feature not existing.
+  Deleting a format leaves its sessions where they are, without a kind.
+
+  Its own table rather than a reserved tag: a session wears many tags and
+  exactly one format, and a uniqueness rule the tag UI cannot express is a
+  rule that gets broken. Clones carry formats over with the rooms and tags,
+  the export carries them, and an import document declares them by name the
+  way it already declares rooms and tracks. Migrations 014 and 015.
+
+  The official/open control moved and was renamed in the same pass. It is
+  **Placement** now — a second field called Type would have been
+  indistinguishable from the format — and it sits at the top of the form
+  beside it rather than at the bottom under Extras. Official is the default
+  and the one choice that locks a session against whoever put it up; an
+  organiser who never scrolled that far made everything official without
+  ever being asked.
+
+### Fixed
+
+- **A speaker could not edit their own session.** An organiser schedules a talk
+  and types the speaker's name onto it; that person arrives at the gate as an
+  ordinary attendee — the role almost every speaker holds, since the speaker
+  role is only handed out by a code somebody has to remember to send — and the
+  session was read-only to them. Three separate rules had to agree before it
+  worked, and none of them did:
+
+  - the right to edit demanded the billing **and** the speaker role. Being
+    credited is the qualification now, whatever role the person holds, for one
+    of five co-hosts as much as for the only name, and on an official session
+    as much as an open one — the official one is precisely the session an
+    organiser typed their name onto;
+  - editing was gated on the capability to *create* sessions, so an event that
+    stops attendees adding their own — a curated conference, the ordinary case
+    — also stopped its speakers fixing a typo in the talk it had scheduled for
+    them;
+  - and every placement check asked which fields the request carried rather
+    than which had changed. The form posts the whole session on every save, so
+    a speaker correcting a description was told only organisers can move
+    official sessions, about a save that moved nothing.
+
+  What has not changed: a speaker still cannot move an official session or
+  delete it. The form now says so above the fields and disables them, rather
+  than refusing after Save. The Delete button is no longer offered to someone
+  who is billed on a session but did not create it.
+
 ### Changed
+
+- **"Open session" is gone from the schedule; the word meant the wrong thing.**
+  A block that is not part of the published programme was badged `open session`
+  on the grid, `open` in the list and `open session` on the sheet — and read as
+  *open to join*, which every session on a schedule is. The one word meant to
+  mark the exception described the rule. All three say **non-official** now,
+  and the session form's Placement control offers **Official** and
+  **Non-official: allow parallel sessions**, which states the consequence that
+  actually differs: only an official session can hold the floor, so something
+  can always run alongside a non-official one. The stored values are unchanged.
+
+- **A session can run longer than three hours, and for any number of minutes.**
+  The duration picker offered seven fixed choices ending at 180, and the server
+  refused anything over 480 — so a full-day excursion, an all-afternoon poster
+  hall and a hackathon were unplaceable, and the workaround was to chop one
+  thing into three blocks that lied about what was happening. The list now runs
+  to eight hours and ends in **Other…**, which takes any multiple of five up to
+  a day; a day is the real limit, because a session already has to start and
+  end on one. Editing a session whose length is not on the list opens straight
+  into that field — before, the select silently showed the first option
+  instead, so saving anything else would have quietly shortened the session to
+  15 minutes. Both dialogs that place a session share one list now, so they
+  cannot disagree about how long one may run.
 
 - **Deleting asks in the app's own voice, and says where things go.** Every
   confirmation was a `window.confirm`: an alert drawn by the browser rather
@@ -66,6 +154,29 @@ All notable changes to this project are documented here.
   the role is wrong — and the only place to change it was the row they had
   just left. The role now sits under the name, organisers only, as the same
   editable badge; a profile nobody holds shows why it has none instead.
+
+- **A profile can be archived instead of deleted.** The profiles that pile
+  up at a real event are the ones made while testing the room, a shell typed
+  twice, a walk-in who never came back — and deleting was the only tidy-up
+  there was. It cannot be undone, it strips the name off every session the
+  profile was credited on, and it refuses outright for anyone who holds their
+  own profile, which is exactly the case an organiser most wants tidied.
+
+  An archived profile keeps its sessions, its bio, its role, its speaker code
+  and whoever holds it. All it loses is its place in the lists: every segment
+  of Manage → People except the new **Archived** one drops it, and the speaker
+  picker stops offering it. Crediting by name still finds it rather than
+  making a twin.
+
+  **Whoever holds it can take it back out.** They still have their cookie and
+  their role, so an archived profile tells its holder what happened and offers
+  them the way back — no organiser needed. That is the difference from
+  deleting, and it is why an organiser can file a profile away without having
+  to be sure the person is gone for good.
+
+  The row's three action buttons became a menu behind ⋯ to make room for the
+  fourth, keeping Open in the row; the actions column got narrower doing it
+  and the name column took the space.
 
 - **Every column of the People table sorts, both ways.** One button offered
   two of the five orders — by name, or by last seen — so "who has no

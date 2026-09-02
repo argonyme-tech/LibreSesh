@@ -265,6 +265,16 @@ export const tagSchema = z.object({
 });
 export const tagPatchSchema = tagSchema.partial();
 
+/**
+ * A format — what kind of session it is. Exactly a tag's shape: a name and a
+ * colour. Deliberately no length; see migration 015.
+ */
+export const formatSchema = z.object({
+  name: trimmed(40),
+  color: colorSchema.optional(),
+});
+export const formatPatchSchema = formatSchema.partial();
+
 /** A labelled link. Profiles carry a handful; so does a session, one per
  *  stream. Same rules as a contribution's link — see `safeLink`. */
 const linkSchema = z.object({
@@ -329,6 +339,9 @@ export const sessionSchema = z.object({
   endsAt: isoInstantSchema,
   tagIds: z.array(z.number().int().positive()).max(20).optional(),
   trackId: z.number().int().positive().nullable().optional(),
+  /** What kind of session it is. `null` clears it; absent leaves it alone on
+   *  a PATCH, the way the track does. */
+  formatId: z.number().int().positive().nullable().optional(),
 });
 export const sessionPatchSchema = sessionSchema.partial().extend({
   expectedUpdatedAt: isoInstantSchema.optional(),

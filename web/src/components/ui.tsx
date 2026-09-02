@@ -625,15 +625,19 @@ export function FieldGroup({
   children,
   className = '',
 }: {
-  title: string;
+  /** Optional: a group whose contents say what they are needs no heading, and
+   *  an empty one would still cost the space above the first field. */
+  title?: string;
   children: ReactNode;
   className?: string;
 }) {
   return (
     <section className={className}>
-      <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-500">
-        {title}
-      </h3>
+      {title && (
+        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-500">
+          {title}
+        </h3>
+      )}
       <FormStack>{children}</FormStack>
     </section>
   );

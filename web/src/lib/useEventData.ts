@@ -10,6 +10,7 @@ import type {
   RoomDto,
   SessionDto,
   TagDto,
+  FormatDto,
   TrackDto,
 } from '@shared/types';
 import { ApiError, api } from './api';
@@ -219,6 +220,27 @@ function applyChange(state: State, change: ChangeEvent): State {
           sessions: bundle.sessions.map((s) =>
             s.tagIds.includes(id) ? { ...s, tagIds: s.tagIds.filter((t) => t !== id) } : s,
           ),
+        },
+      };
+    }
+    case 'format.created':
+    case 'format.updated':
+      // Appended in the order the organiser made them, not sorted: the running
+      // order is the point, and the server hands them back in it.
+      return {
+        ...state,
+        bundle: { ...bundle, formats: upsert(bundle.formats, change.entity as FormatDto) },
+      };
+    case 'format.deleted': {
+      const { id } = change.entity as { id: number };
+      return {
+        ...state,
+        bundle: {
+          ...bundle,
+          formats: bundle.formats.filter((f) => f.id !== id),
+          // The server clears the column; the open tabs have to agree, or a
+          // session keeps showing a badge for a format that is gone.
+          sessions: bundle.sessions.map((s) => (s.formatId === id ? { ...s, formatId: null } : s)),
         },
       };
     }

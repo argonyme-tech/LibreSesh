@@ -15,6 +15,7 @@ import {
   assertNoOverlap,
   assertNotBlocked,
   assertNotStale,
+  assertFormatBelongs,
   assertTagsBelong,
   assertTrackBelongs,
   assertValidTimes,
@@ -69,6 +70,16 @@ export function sessionRoutes(ctx: Ctx): Router {
     requireWritable,
     limit(ctx.limiter, 'session'),
   ];
+  /**
+   * Editing and deleting are *not* gated on the capability to create, which is
+   * a different permission and was the second half of the same bug: an event
+   * that stops attendees putting sessions up — a curated conference, the
+   * ordinary case — would otherwise stop a speaker fixing a typo in the talk
+   * an organiser scheduled for them. Who may change what is decided per
+   * session by `assertMayMutate`, which consults `session.edit_own` and the
+   * billing.
+   */
+  const userEdit = [requireWritable, limit(ctx.limiter, 'session')];
 
   router.post('/sessions', ...userWrite, (req, res) => {
     const body = parse(sessionSchema, req.body);
@@ -90,6 +101,8 @@ export function sessionRoutes(ctx: Ctx): Router {
     const trackId = body.trackId ?? null;
     assertTrackBelongs(ctx.db, req.event.id, trackId);
     assertWithinTrackHours(ctx.db, req.event, req.role, trackId, window);
+    const formatId = body.formatId ?? null;
+    assertFormatBelongs(ctx.db, req.event.id, formatId);
 
     const now = new Date().toISOString();
     const id = ctx.db.transaction((): number => {
@@ -97,15 +110,16 @@ export function sessionRoutes(ctx: Ctx): Router {
       const info = ctx.db
         .prepare(
           `INSERT INTO sessions
-            (event_id, room_id, track_id, type, blocks_open_booking, title,
+            (event_id, room_id, track_id, format_id, type, blocks_open_booking, title,
              description, speaker, livestreams, starts_at, ends_at,
              created_by, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           req.event.id,
           room.id,
           trackId,
+          formatId,
           type,
           blocks ? 1 : 0,
           body.title,
@@ -170,6 +184,9 @@ export function sessionRoutes(ctx: Ctx): Router {
       assertTagsBelong(ctx.db, req.event.id, tagIds);
       const trackId = body.trackId ?? null;
       assertTrackBelongs(ctx.db, req.event.id, trackId);
+      // Every occurrence is the same kind of thing as the first one.
+      const formatId = body.formatId ?? null;
+      assertFormatBelongs(ctx.db, req.event.id, formatId);
 
       // The run is a claim about the printed clock, so it is the wall-clock
       // start and end that repeat, not the instants. Each day is resolved
@@ -210,10 +227,10 @@ export function sessionRoutes(ctx: Ctx): Router {
         const speakerIds = resolveSpeakers(ctx.db, req.event.id, body.speakers ?? [], actor(req));
         const insert = ctx.db.prepare(
           `INSERT INTO sessions
-            (event_id, room_id, track_id, type, blocks_open_booking, title,
+            (event_id, room_id, track_id, format_id, type, blocks_open_booking, title,
              description, speaker, livestreams, starts_at, ends_at,
              created_by, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?)`,
         );
         return windows.map((window) => {
           const newId = Number(
@@ -221,6 +238,7 @@ export function sessionRoutes(ctx: Ctx): Router {
               req.event.id,
               room.id,
               trackId,
+              formatId,
               type,
               blocks ? 1 : 0,
               body.title,
@@ -258,7 +276,7 @@ export function sessionRoutes(ctx: Ctx): Router {
     },
   );
 
-  router.patch('/sessions/:id', ...userWrite, (req, res) => {
+  router.patch('/sessions/:id', ...userEdit, (req, res) => {
     const existing = getSession(ctx.db, req.event.id, Number(req.params.id));
     const speaksHere = speaksFor(ctx.db, req.identity.id, existing);
     assertMayMutate(getPermissions(ctx.db, req.event.id), req.role, req.identity.id, existing, speaksHere);
@@ -266,22 +284,38 @@ export function sessionRoutes(ctx: Ctx): Router {
     const body = parse(sessionPatchSchema, req.body);
     assertNotStale(existing, body.expectedUpdatedAt);
 
+    /**
+     * Every placement rule below asks *what changed*, never *which keys
+     * arrived*. The session form posts the whole session on every save — room,
+     * type, start and end included and untouched — so presence checks refused
+     * a speaker fixing a typo in their own description and told them only
+     * organisers can move official sessions, about a save that moved nothing.
+     *
+     * Instants are compared normalised: `2026-06-01T08:00:00Z` and
+     * `2026-06-01T08:00:00.000Z` are the same moment and only one of them is
+     * the string the row holds.
+     */
+    const sameInstant = (sent: string | undefined, stored: string): boolean =>
+      sent === undefined || new Date(sent).toISOString() === stored;
+    const roomChanged = body.roomId !== undefined && body.roomId !== existing.room_id;
+    const typeChanged = body.type !== undefined && body.type !== existing.type;
+    const timeChanged =
+      !sameInstant(body.startsAt, existing.starts_at) ||
+      !sameInstant(body.endsAt, existing.ends_at);
+
     // A speaker may rewrite their talk's words, not its slot: placement of an
     // official session stays with organisers.
     if (
       req.role !== 'admin' &&
       existing.type === 'official' &&
-      (body.roomId !== undefined ||
-        body.type !== undefined ||
-        body.startsAt !== undefined ||
-        body.endsAt !== undefined)
+      (roomChanged || typeChanged || timeChanged)
     ) {
       throw forbidden('Only organisers can move official sessions');
     }
 
     const room = getRoom(ctx.db, req.event.id, body.roomId ?? existing.room_id);
     const type = req.role === 'admin' ? (body.type ?? existing.type) : existing.type;
-    if (body.roomId !== undefined || body.type !== undefined) {
+    if (roomChanged || typeChanged) {
       assertMayPlace(getPermissions(ctx.db, req.event.id), req.role, room, type);
     }
     // A patch that would leave the hold on an open session is refused, not
@@ -325,19 +359,25 @@ export function sessionRoutes(ctx: Ctx): Router {
     if (replaced) {
       assertWithinTrackHours(ctx.db, req.event, req.role, nextTrackId, window);
     }
+    // `undefined` leaves the format alone; an explicit `null` clears it. It is
+    // a description of the session rather than a claim on the grid, so anyone
+    // who may edit the session may change it — no placement rule applies.
+    const nextFormatId = body.formatId === undefined ? existing.format_id : body.formatId;
+    assertFormatBelongs(ctx.db, req.event.id, nextFormatId);
 
     const now = new Date().toISOString();
     ctx.db.transaction(() => {
       ctx.db
         .prepare(
-          `UPDATE sessions SET room_id = ?, track_id = ?, type = ?, blocks_open_booking = ?,
-                  title = ?, description = ?,
+          `UPDATE sessions SET room_id = ?, track_id = ?, format_id = ?, type = ?,
+                  blocks_open_booking = ?, title = ?, description = ?,
                   livestreams = ?, starts_at = ?, ends_at = ?, updated_at = ?
             WHERE id = ?`,
         )
         .run(
           room.id,
           nextTrackId,
+          nextFormatId,
           type,
           blocks ? 1 : 0,
           body.title ?? existing.title,
@@ -372,7 +412,7 @@ export function sessionRoutes(ctx: Ctx): Router {
     res.json(dto);
   });
 
-  router.delete('/sessions/:id', ...userWrite, (req, res) => {
+  router.delete('/sessions/:id', ...userEdit, (req, res) => {
     const existing: SessionRow = getSession(ctx.db, req.event.id, Number(req.params.id));
     assertMayMutate(getPermissions(ctx.db, req.event.id), req.role, req.identity.id, existing);
     ctx.db

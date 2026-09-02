@@ -7,6 +7,7 @@ import type {
   RoomDto,
   Role,
   SessionDto,
+  FormatDto,
   TagDto,
 } from '@shared/types';
 import { readableInk } from '@shared/tagColors';
@@ -39,11 +40,16 @@ export interface SessionDetailProps {
   slug: string;
   rooms: RoomDto[];
   tags: TagDto[];
+  /** Every format the event defines, to name the one this session wears. */
+  formats: FormatDto[];
   contributions: ContributionDto[] | undefined;
   role: Role;
   me: Me | null;
   timezone: string;
   canEdit: boolean;
+  /** Deleting is narrower than editing: a co-speaker may rewrite a session
+   *  they are billed on, but not take it off the programme. */
+  canDelete: boolean;
   archived: boolean;
   /** Whether this session is on the current identity's personal agenda. */
   starred: boolean;
@@ -71,11 +77,13 @@ export function SessionDetail({
   slug,
   rooms,
   tags,
+  formats,
   contributions,
   role,
   me,
   timezone,
   canEdit,
+  canDelete,
   archived,
   starred,
   userLabel,
@@ -158,9 +166,22 @@ export function SessionDetail({
     <div className={`flex items-start gap-2 ${page ? 'mb-6' : 'mb-3'}`}>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
+          {/* First in the row, because it is what the thing *is*; the
+              official/open badge beside it says who put it there. */}
+          {(() => {
+            const format = formats.find((f) => f.id === session.formatId);
+            return format ? (
+              <span
+                className="rounded-full px-2 py-0.5 text-xs font-semibold"
+                style={{ background: format.color, color: readableInk(format.color) }}
+              >
+                {format.name}
+              </span>
+            ) : null;
+          })()}
           {session.type === 'open' ? (
             <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
-              open session
+              non-official
             </span>
           ) : (
             <span className="rounded-full bg-stone-100 dark:bg-stone-800 px-2 py-0.5 text-xs font-semibold text-stone-600 dark:text-stone-300">
@@ -272,14 +293,16 @@ export function SessionDetail({
           <EditIcon className="h-3.5 w-3.5" />
           Edit session
         </SecondaryButton>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
-        >
-          <RemoveIcon className="h-3.5 w-3.5" />
-          Delete
-        </button>
+        {canDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
+          >
+            <RemoveIcon className="h-3.5 w-3.5" />
+            Delete
+          </button>
+        )}
       </div>
     ) : null;
 

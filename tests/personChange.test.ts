@@ -14,6 +14,7 @@ const person = (over: Partial<PersonDto> & { id: number; name: string }): Person
   links: [],
   isMine: false,
   claimed: true,
+  archivedAt: null,
   username: 'ada',
   creditable: true,
   updatedAt: '2026-09-02T10:00:00.000Z',

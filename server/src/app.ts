@@ -29,6 +29,7 @@ import { settingsRoutes } from './routes/settings.js';
 import { trashRoutes } from './routes/trash.js';
 import { streamRoutes } from './routes/stream.js';
 import { tagRoutes } from './routes/tags.js';
+import { formatRoutes } from './routes/formats.js';
 import { trackRoutes } from './routes/tracks.js';
 import { Broker } from './sse.js';
 
@@ -70,6 +71,7 @@ export function createApp(db: Db, config: Config): App {
   event.use(streamRoutes(ctx));
   event.use(roomRoutes(ctx));
   event.use(tagRoutes(ctx));
+  event.use(formatRoutes(ctx));
   event.use(trackRoutes(ctx));
   event.use(breakRoutes(ctx));
   event.use(sessionRoutes(ctx));

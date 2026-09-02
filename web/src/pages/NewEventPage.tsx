@@ -219,7 +219,7 @@ export function NewEventPage() {
           />
         </Field>
         <Field
-          label={`${userRoleLabel.trim() || 'Attendee'} — add contributions and open sessions`}
+          label={`${userRoleLabel.trim() || 'Attendee'} — add contributions and propose sessions`}
           hint="Optional — blank generates one."
         >
           <input

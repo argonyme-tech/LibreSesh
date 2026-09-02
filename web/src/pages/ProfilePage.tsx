@@ -184,6 +184,27 @@ export function ProfilePage() {
   };
 
   /**
+   * Put this profile away, or take it back out.
+   *
+   * Both directions are here because both callers are: an organiser tidying
+   * up, and the person themselves finding out that they were tidied. The
+   * server decides who may do which — an organiser either way, the holder
+   * only outwards.
+   */
+  const toggleArchive = async () => {
+    try {
+      const updated =
+        person.archivedAt === null
+          ? await api.archivePerson(slug, person.id)
+          : await api.unarchivePerson(slug, person.id);
+      setDetail((d) => (d ? { ...d, person: updated } : d));
+      data.apply({ type: 'person.updated', entity: updated });
+    } catch (err) {
+      toast.show((err as Error).message);
+    }
+  };
+
+  /**
    * Hand them a different role. The server refuses to demote the last
    * organiser — an event nobody can administer has no way back — so that
    * refusal arrives as a toast rather than being predicted here.
@@ -297,11 +318,52 @@ export function ProfilePage() {
               )}
             </div>
             {isAdmin && (
-              <SecondaryButton className="shrink-0 py-1.5" onClick={() => setMerging(true)}>
-                Merge…
-              </SecondaryButton>
+              <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                <SecondaryButton className="py-1.5" onClick={() => setMerging(true)}>
+                  Merge…
+                </SecondaryButton>
+                {/* Only inwards. Coming back out is the notice below, which
+                    is where the holder finds it too. */}
+                {person.archivedAt === null && (
+                  <SecondaryButton
+                    className="py-1.5"
+                    title="Take this profile out of the People list and the speaker picker. Nothing is lost, and it can come back."
+                    onClick={() => void toggleArchive()}
+                  >
+                    Archive
+                  </SecondaryButton>
+                )}
+              </div>
             )}
           </div>
+
+          {/* Archived, said to the two people it concerns: whoever holds the
+              profile, and whoever runs the event. A stranger arriving from a
+              session's speaker link is shown nothing — the profile still
+              works, and "archived" is an organiser's filing note, not a fact
+              about the person.
+
+              The holder's copy is the whole reason archiving is not deleting.
+              Their cookie still works, their role is untouched, and this is
+              where they find out that they were put away and take themselves
+              back out without having to find an organiser. */}
+          {person.archivedAt !== null && (person.isMine || isAdmin) && (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900/60 dark:bg-amber-950/30">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-stone-700 dark:text-stone-300">
+                  {person.isMine
+                    ? 'This profile was archived, so it is out of the People list and the speaker picker. Nothing was lost — you keep your role, your sessions and everything you have posted.'
+                    : `Archived ${new Date(person.archivedAt).toLocaleDateString()}. It is out of the People list and the speaker picker, and keeps its sessions, its role and its holder.`}
+                </span>
+                <PrimaryButton
+                  className="ml-auto py-1 text-xs"
+                  onClick={() => void toggleArchive()}
+                >
+                  {person.isMine ? 'I’m still here' : 'Take out of the archive'}
+                </PrimaryButton>
+              </div>
+            </div>
+          )}
 
           {!person.claimed && !isAdmin && (
             <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm dark:border-stone-700 dark:bg-stone-800/60">

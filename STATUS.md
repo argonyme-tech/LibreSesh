@@ -54,12 +54,33 @@ lives in `_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
   profile** (the "This is me" button on an unclaimed profile, and the
   approval queue above the People list), **the next-day button** at the
   end of a day's list, **several stream links** on a session, which
-  changed the session form, and **the role tag** — the People list's role
-  select is now a coloured badge with a pencil in it, opening a menu, and
-  the same control is on the profile page under the name. The two things
-  to look at there: whether the badge still fits the `w-24` role column at
-  the longest role word an event can set, and whether the menu opens over
-  the row rather than pushing it.
+  changed the session form, and everything from 2026-09-02's People work:
+
+  - **The role tag.** The People list's role select is a coloured badge
+    with a pencil in it, opening a menu, and the same control is on the
+    profile page under the name. Look at whether the badge still fits the
+    `w-24` role column at the longest role word an event can set, and
+    whether the menu opens over the row rather than pushing it.
+  - **Sortable columns.** Every heading in the People table is now the
+    control that orders by it. Look at the arrow on the active column and
+    whether the headings still line up with the rows under them.
+  - **Archiving.** The row's three action buttons became `Open` plus a ⋯
+    menu (Merge, Archive, Delete). Look at the menu's placement on the last
+    row of a long list — it is `bottom-end` and flips, but that is
+    untested against a real viewport — and at the amber notice on an
+    archived profile, which is the one screen the holder is meant to find
+    on their own.
+
+  And from later the same day, **formats** (migration 014), none of it seen:
+  the chip row at the top of the session form — whether a dozen formats wrap
+  into three lines above the title, which is the case the design is weakest
+  at, and whether picking one visibly moves the Duration select below it; the
+  **Formats** section in Manage Event → Programme, where the suggestion chips
+  are a dashed row that has never been rendered; and the format badge at the
+  head of the session sheet, which now sits before the official/open badge and
+  may crowd the title on a narrow phone. The official/open control's label
+  changed to **Placement** in the same pass — worth checking it does not now
+  read as a duplicate of the Room and Day fields it sits near.
 
   The **gate** is still the one nobody has opened, and it is the screen
   every attendee must get through: it now refuses an empty username and
@@ -108,6 +129,134 @@ holding 3000 with its API half no longer listening on 3001.
 _The only queue of future work, priority-ordered. Top High-Priority item = next up._
 
 ## High Priority
+
+- **Publishing a session: a link that works without the gate.** Every read
+  under `/api/e/:slug` sits behind `event.use(requireRole(db, 'viewer'))`
+  (`server/src/app.ts:69`), so today there is no way to show one session to
+  someone who has not been given a password. Sharing a session means sharing
+  the event, and the only link that exists — the invite QR — hands over a
+  role, which is the opposite of what "here is the talk I am giving" wants.
+
+  There is one precedent for reading before the gate and it is worth copying
+  the shape of, not the substance: `calendarRoutes` is mounted _above_ the
+  role check (`app.ts:66`, route at `routes/agenda.ts:71`) and authenticates
+  by `identities.ics_token` in `?token=` instead of a cookie. It still
+  refuses unless that token's owner holds a role, so it is not public — a
+  published session would be the first genuinely unauthenticated read in the
+  app, and the first place a wrong decision leaks a real event.
+
+  **Decided 2026-09-02: the snapshot.** Publishing copies the session into a
+  table nothing else joins to, and the public route reads only that table.
+  Nothing private can leak by omission, because nothing private is in there —
+  which is the property worth paying for on the app's first unauthenticated
+  read. The costs are known and accepted: a re-publish after every edit (an
+  "update the public copy" button, or a republish on save), and a second place
+  a session's text lives. The rejected alternative is kept here because it is
+  the one to revisit if the re-publish step turns out to annoy people more
+  than the safety is worth.
+
+  Two shapes were on the table. **Live, flagged**: a `published_at` on `sessions`, plus a route above
+  the gate that reads the row now and strips what must not travel. Edits show
+  up immediately; the stripping is a filter that has to stay correct as
+  `SessionDto` grows. **Snapshot, copied**: publishing writes a frozen row
+  into a table nothing else joins to — the "unprotected DB area" — and the
+  public route reads only that table. Nothing private can leak by omission
+  because nothing private is in there, at the cost of a re-publish after
+  every edit and a second place a session's text lives.
+
+  What must not travel, either way: contributions are this app's comments —
+  `ContributionDto` (`shared/types.ts:273`) carries `kind` (`note` / `link` /
+  `question`), a `body`, `createdBy`, `createdByName` and a `hidden` flag —
+  and none of them go on a public page. Nor do stars, agendas, `createdBy` /
+  `createdByName` on the session itself, or anything about who is in the
+  room. Speakers are the exception a programme exists to show, but a
+  `PersonRef` leads to a profile carrying a bio, links and a claim state, so
+  decide what a public page renders for a speaker rather than linking to the
+  profile page and finding out. Anonymised contributions are a later
+  question, not this one.
+
+  Also to settle: who may publish (organiser only, or a speaker for their own
+  session), whether unpublishing is real revocation or only a hidden link,
+  whether the URL is guessable (`/s/:id`) or a capability (a random token
+  like the ics one), and what an unpublished-but-linked page says. And the
+  event's own visibility bounds it — a session inside an archived event
+  should not stay readable because a link was minted once.
+
+- **The format exists; three places still do not use it.** Landed 2026-09-02
+  (migrations 014 and 015, `session_formats`): defined per event in Manage
+  Event, picked at the top of the session form, shown on the session sheet,
+  carried by clones, the export and the importer. It carries no length —
+  migration 014 gave it one and 015 took it away, because a format that
+  retimes the session it describes makes one field answer two questions. What was left
+  out on purpose, because none of it is needed for a format to be worth
+  having, and each is a separate decision:
+
+  - **Filtering by format.** It is the obvious second filter after tags, and
+    `useFilters.ts` already carries `rooms`, `tags` and `tracks` in the URL —
+    a fourth is the same shape. Wants a decision about the filter panel on a
+    narrow header before it goes in, since that row already wraps.
+  - **The format on a block.** The grid card has room for about one more word
+    and currently spends it on nothing. A colour dot rather than the name may
+    be the answer at column width; worth looking at a real grid first.
+  - **A placed pitch has no format.** `POST /proposals/:id/place` builds the
+    session without one (`routes/proposals.ts`), which is defensible — a pitch
+    never said what kind of thing it was — but it means the one path that
+    creates a session outside the form always creates a formatless one. Either
+    the pitch form gains the picker, or placing one asks.
+
+  Also from the same pass, and not backlog because they are done: the
+  official/open control is **Placement** now and sits at the top beside the
+  format rather than under Extras, and the duration picker runs to eight hours
+  with an **Other…** field behind it (any multiple of five up to a day —
+  `shared/sessionLimits.ts`, `MAX_DURATION_MINUTES` raised from 480).
+
+  Two smaller notes from building it. The import document now has `format` at
+  the top meaning "this is a LibreSesh document" **and** `format` on a session
+  meaning what kind of session it is; they are different scopes and both read
+  correctly, but it is a collision worth remembering before either is renamed.
+  And `SUGGESTED_FORMATS` in `shared/formats.ts` is the seed list — suggestions
+  an organiser clicks, never rows created for them — so adding to it is free.
+
+- **Mentioning a person, and somewhere for a mention to land.** Nothing in the
+  app addresses anyone. A `@name` typed into a description, a contribution, a
+  pitch or a bio is plain text that renders as plain text, so the way to tell
+  a co-host their room moved is to find them in the hallway. Two halves, and
+  the second is the larger one: resolving `@name`, and having a place a
+  resolved mention shows up.
+
+  Resolution is the cheap half and the app is already shaped for it. Display
+  names are unique per event (migration 009) and `people` rows are per event
+  (010), so `@ada` means exactly one person inside one event and means
+  nothing outside it — no global user table to consult, no ambiguity to
+  disambiguate. `NameResolver` (`server/src/eventIdentity.ts`) already turns
+  an identity into the name to show. Mentions belong in the same shared
+  renderer the links went into (`shared/links.ts`), so a mention written in a
+  bio and one written in a session description cannot disagree about what
+  parses — and so the parse happens once, on the server, rather than in each
+  of the four places markdown is rendered.
+
+  Delivery is the half with nothing built. There is no notification concept
+  at all: `sse.ts` is an in-process broker per event slug that carries
+  schedule changes to open tabs, which is the right transport and not the
+  storage — a mention has to survive a closed tab. That wants a
+  `notifications` table (recipient, event, source, read-at), a panel in the
+  header with an unread count, and answers to the questions such a table
+  always raises: what else creates one besides a mention (being added as a
+  speaker, a session you starred moving, a pitch of yours scheduled), whether
+  anything leaves the app by mail (nothing does today, and adding it changes
+  what this project stores about people), and pruning, since `pruneAudit`
+  already exists as the precedent for a table that would otherwise grow
+  forever.
+
+  Two edges that are specific to this app, and both are the reason to design
+  before building. **Merging**: identities merge (`mergePeople.ts`) and
+  profiles archive (migration 013), so notifications must follow a person
+  through a merge the way authorship does, or an organiser tidying up
+  duplicates silently deletes someone's inbox. **Unclaimed profiles**: an
+  organiser can type a speaker's name onto a session before that person ever
+  arrives, so a mention can be addressed to a profile with no identity behind
+  it. It should wait and be delivered on adoption (`adoptProfile` in
+  `people.ts`), not be dropped for having nowhere to go.
 
 - **A production event export is sitting untracked in a directory git will
   happily commit.** Noticed 2026-09-02 when a `git add -A` swept

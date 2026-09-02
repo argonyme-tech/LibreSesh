@@ -12,6 +12,7 @@ import type {
   RoomDto,
   SessionDto,
   TagDto,
+  FormatDto,
   TrackDto,
   TrackWindowDto,
 } from './shared/types.js';
@@ -25,6 +26,7 @@ import type {
   RoomRow,
   SessionRow,
   TagRow,
+  FormatRow,
   TrackRow,
 } from './db.js';
 
@@ -80,6 +82,12 @@ export const toBreakDto = (b: BreakRow): BreakDto => ({
 });
 
 export const toTagDto = (t: TagRow): TagDto => ({ id: t.id, name: t.name, color: t.color });
+
+export const toFormatDto = (f: FormatRow): FormatDto => ({
+  id: f.id,
+  name: f.name,
+  color: f.color,
+});
 
 /** Links are stored as a JSON string; a malformed row must not break the page. */
 export function parseLinks(raw: string): LabelledLink[] {
@@ -137,6 +145,7 @@ export const toPersonDto = (
   links: parseLinks(row.links),
   isMine: row.identity_id !== null && row.identity_id === viewerIdentityId,
   claimed: row.identity_id !== null,
+  archivedAt: row.archived_at,
   username: facts.username,
   creditable: facts.creditable,
   ...(disclose
@@ -252,6 +261,7 @@ export function toSessionDto(
     roomId: row.room_id,
     trackId: row.track_id,
     type: row.type,
+    formatId: row.format_id,
     blocksOpenBooking: row.blocks_open_booking === 1,
     title: row.title,
     description: row.description,

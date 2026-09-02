@@ -190,3 +190,116 @@ describe('every speaker on the bill may edit the session', () => {
     expect(patched.body.description).toBe('What we will actually cover.');
   });
 });
+
+/**
+ * The bug this covers: an organiser schedules a talk and types the speaker's
+ * name onto it, that person arrives at the gate as an ordinary attendee — the
+ * role almost every speaker holds, since the speaker role is only handed out
+ * by a code somebody has to remember to send — and could not touch their own
+ * session. `assertMayMutate` wanted the billing *and* `atLeast('speaker')`.
+ */
+describe('a speaker holding the attendee role owns their own session', () => {
+  let harness: Harness;
+  let eventId: number;
+  let roomId: number;
+  let admin: Agent;
+  let sessionId: number;
+  /** Signed in as Ada, who is billed on the official session, role `user`. */
+  let ada: Agent;
+
+  beforeEach(async () => {
+    harness = makeHarness();
+    eventId = seedEvent(harness.db, { slug: 'testconf' });
+    roomId = seedRoom(harness.db, eventId, { name: 'Main hall' });
+    admin = await actorWithRole(harness, 'testconf', 'admin-pw');
+
+    const session = await admin
+      .post('/api/e/testconf/sessions')
+      .send({
+        roomId,
+        title: 'Panel',
+        type: 'official',
+        speakers: ['Ada Lovelace', 'Grace Hopper'],
+        startsAt: at(DAY_ONE, 600),
+        endsAt: at(DAY_ONE, 660),
+      })
+      .expect(201);
+    sessionId = session.body.id as number;
+
+    ada = agentFor(harness);
+    await ada.get('/api/me').expect(200);
+    await ada
+      .post('/api/e/testconf/auth')
+      .send({ password: 'user-pw', displayName: 'Ada Lovelace', claimProfile: true })
+      .expect(200);
+  });
+  afterEach(() => harness.close());
+
+  it('is only an attendee, and still edits the official session she is on', async () => {
+    const bundle = await ada.get('/api/e/testconf/bundle').expect(200);
+    expect(bundle.body.role).toBe('user');
+
+    const patched = await ada
+      .patch(`/api/e/testconf/sessions/${sessionId}`)
+      .send({ description: 'What we will actually cover.' })
+      .expect(200);
+    expect(patched.body.description).toBe('What we will actually cover.');
+  });
+
+  it('may save the whole session back unchanged, which is what the form posts', async () => {
+    // The form sends room, start and end every time, untouched. Judged on
+    // presence rather than on change, this was refused as "moving" it.
+    const res = await ada
+      .patch(`/api/e/testconf/sessions/${sessionId}`)
+      .send({
+        roomId,
+        title: 'Panel',
+        description: 'A fuller description.',
+        startsAt: at(DAY_ONE, 600),
+        endsAt: at(DAY_ONE, 660),
+      });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+  });
+
+  it('still cannot move it: the slot is the programme', async () => {
+    await ada
+      .patch(`/api/e/testconf/sessions/${sessionId}`)
+      .send({ startsAt: at(DAY_ONE, 660), endsAt: at(DAY_ONE, 720) })
+      .expect(403);
+  });
+
+  it('still cannot delete it: being billed is not a mandate to remove it', async () => {
+    await ada.delete(`/api/e/testconf/sessions/${sessionId}`).expect(403);
+  });
+
+  it('edits it even where attendees may not create sessions at all', async () => {
+    // A curated conference turns this off — and it used to take the speakers'
+    // own talks with it, because the edit route asked for the create
+    // capability.
+    await admin
+      .patch('/api/e/testconf/permissions')
+      .send({ 'session.create_open': ['admin'] })
+      .expect(200);
+
+    await ada
+      .patch(`/api/e/testconf/sessions/${sessionId}`)
+      .send({ description: 'Still mine to write.' })
+      .expect(200);
+  });
+
+  it('leaves a session she is not on alone', async () => {
+    const other = await admin
+      .post('/api/e/testconf/sessions')
+      .send({
+        roomId,
+        title: 'Someone else',
+        startsAt: at(DAY_ONE, 720),
+        endsAt: at(DAY_ONE, 780),
+      })
+      .expect(201);
+    await ada
+      .patch(`/api/e/testconf/sessions/${other.body.id}`)
+      .send({ description: 'Not mine.' })
+      .expect(403);
+  });
+});

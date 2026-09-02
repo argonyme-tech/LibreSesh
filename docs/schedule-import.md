@@ -1,7 +1,7 @@
 # Importing a schedule
 
-`POST /api/events/import` builds a whole event — rooms, tracks, tags and a full
-grid of sessions — from one JSON document.
+`POST /api/events/import` builds a whole event — rooms, tracks, tags, formats
+and a full grid of sessions — from one JSON document.
 
 It exists because the usual way a programme arrives is not as data. It is a
 printed booklet, a conference website, a photograph of a wall of sticky notes.
@@ -56,7 +56,7 @@ The response is the same either way:
   "slug": "valley-2026",
   "eventId": 7,
   "dryRun": false,
-  "counts": { "rooms": 3, "tracks": 2, "tags": 2, "sessions": 4, "people": 2 },
+  "counts": { "rooms": 3, "tracks": 2, "tags": 2, "formats": 3, "sessions": 4, "people": 2 },
   "warnings": [],
   "generatedPasswords": {
     "viewerPassword": "cedar-lantern-quiet-river",
@@ -167,6 +167,27 @@ nothing — a session may still run through lunch.
 Up to 40 of them. A `date` outside the event's dates is refused — a break
 nobody is there for is invisible, and silently so.
 
+### `formats`
+
+What kind of thing a session is — a talk, a workshop, a panel. Optional, and
+declared here or not at all.
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `name` | ✓ | Up to 40 characters. Unique within the list |
+| `color` | | `#RRGGBB`. Defaults to grey |
+
+Document order is the order an organiser sees them in, so declare them in the
+order they run: keynote, talk, lightning, workshop.
+
+A format carries no length. What a session *is* and how long it runs are two
+different facts, and a workshop is a workshop at ninety minutes or at a whole
+afternoon.
+
+A format is not `type`. `type` is `official` or `open` and says who put the
+session up; a format says what the session *is*, and the two are independent —
+an open session can be a workshop, and an official one can be a jam.
+
 ### `sessions`
 
 | Field | Required | Notes |
@@ -175,6 +196,7 @@ nobody is there for is invisible, and silently so.
 | `title` | ✓ | Up to 120 characters |
 | `track` | | The name of a declared track, or `null` |
 | `tags` | | Names of declared tags, up to 20 |
+| `format` | | The name of a declared format, or `null` |
 | `description` | | Markdown, up to 5000 characters |
 | `speaker` | | Free text. Matches an existing profile in this event, or creates an unclaimed one |
 | `speakers` | | The same, as a list, for a session given by more than one person — in billing order. Use either spelling; a row with both is billed to the list |
@@ -184,7 +206,7 @@ nobody is there for is invisible, and silently so.
 | `startsAt`, `endsAt` | | ISO instants instead, for a document a program wrote |
 | `repeat` | | Say the row once, land it on every day it happens — see below |
 
-**Rooms, tracks and tags are declared once and referred to by name.** Matching
+**Rooms, tracks, tags and formats are declared once and referred to by name.** Matching
 ignores case and collapses whitespace, because transcription is not consistent —
 `"main  hall"` finds `"Main hall"`. A session naming something undeclared is
 refused rather than invented: a typo that quietly grew a fourth column is far

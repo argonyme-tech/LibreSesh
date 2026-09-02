@@ -21,6 +21,7 @@ import type {
   SessionDetailDto,
   SessionDto,
   TagDto,
+  FormatDto,
   TrackDto,
   TrackWindowDto,
   ViewMode,
@@ -182,6 +183,15 @@ export const api = {
     request<TagDto>('PATCH', `/e/${encode(slug)}/tags/${id}`, body),
   deleteTag: (slug: string, id: number) => request<void>('DELETE', `/e/${encode(slug)}/tags/${id}`),
 
+  // Formats — what kind of thing a session is. Managed like tags; the list is
+  // whatever this event runs.
+  createFormat: (slug: string, body: { name: string; color?: string }) =>
+    request<FormatDto>('POST', `/e/${encode(slug)}/formats`, body),
+  updateFormat: (slug: string, id: number, body: Partial<Omit<FormatDto, 'id'>>) =>
+    request<FormatDto>('PATCH', `/e/${encode(slug)}/formats/${id}`, body),
+  deleteFormat: (slug: string, id: number) =>
+    request<void>('DELETE', `/e/${encode(slug)}/formats/${id}`),
+
   // Tracks — thematic strands the schedule can use as columns instead of rooms.
   createTrack: (slug: string, body: TrackWrite & { name: string }) =>
     request<TrackDto>('POST', `/e/${encode(slug)}/tracks`, body),
@@ -225,6 +235,16 @@ export const api = {
   /** Withdraw your own request, or clear one you were refused. */
   withdrawClaim: (slug: string, id: number) =>
     request<ProfileClaimDto[]>('DELETE', `/e/${encode(slug)}/claims/${id}`),
+
+  /**
+   * Tidy a profile out of the organiser's lists without deleting it: it keeps
+   * its sessions, its role and its holder.
+   */
+  archivePerson: (slug: string, id: number) =>
+    request<PersonDto>('POST', `/e/${encode(slug)}/people/${id}/archive`),
+  /** Out again — an organiser's doing, or the holder's own. */
+  unarchivePerson: (slug: string, id: number) =>
+    request<PersonDto>('DELETE', `/e/${encode(slug)}/people/${id}/archive`),
 
   /** Hand the holder of a profile a different role at this event. */
   setPersonRole: (slug: string, id: number, role: Role) =>
@@ -366,6 +386,9 @@ export interface SessionWrite {
   tagIds?: number[];
   /** `null` clears the track; omitting the key leaves it as it was. */
   trackId?: number | null;
+  /** What kind of session it is. `null` clears it; omitting the key leaves it
+   *  as it was. */
+  formatId?: number | null;
 }
 
 export interface TrackWrite {
