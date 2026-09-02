@@ -7,19 +7,23 @@ Last updated: 2026-09-02
 
 ## In Progress
 
-- **Everyone who enters is a person — Steps 0–2 landed, 3–5 to hand off.**
-  Plan `_planning/plans/2026-09-02-everyone-is-a-person.md`, spec
-  `_planning/specs/self-as-speaker-and-merge-ux.md`. On `dev` as of
-  2026-09-02: `5142d10` (a `people` row for every identity at the gate,
-  required username, non-unique full name, the gate's "is that you?"
-  prompt, migration 010 backfill), `79e5044` (the picker offers you first,
-  `@username` on rows, viewers not creditable), and the
-  `session.credit_others` capability, open by default. Left for a second
-  agent on `feat/everyone-is-a-person`, per the spec's hand-off section:
-  Step 3 (one dense, filtered People list with a role control, replacing
-  the two stacked lists and `/attendees`; drop `ID: 00054`), Step 4 (the
-  layered merge dialog with a confirm step, moved out of ProfilePage),
-  Step 5 (the back link from the profile page to Manage → People).
+- **Everyone who enters is a person — all six steps landed, none seen in a
+  browser.** Spec `_planning/specs/self-as-speaker-and-merge-ux.md`, plan
+  `_planning/plans/2026-09-02-everyone-is-a-person.md`, all of it written up
+  in CHANGELOG `[Unreleased]`. On `dev` 2026-09-02: `5142d10` (a `people`
+  row for every identity at the gate, required username, non-unique full
+  name, the "is that you?" prompt, migration 010), `79e5044` (the picker
+  offers you first; viewers are not creditable), `39003b5`
+  (`session.credit_others`, open by default), `2c913e3` (one People list
+  with a role control; `/attendees` removed), `3f353a0` (the merge dialog),
+  `3d19d74` (the way back from a profile). 730 tests, lint clean.
+
+  **What is left is looking at it.** Four screens changed and none has been
+  opened: the gate (required username, the "is that you?" prompt), Manage →
+  People (one dense list, segments, search, role select), the merge dialog
+  (suggestions, search, confirm step), and the profile page (two names, the
+  back link). The gate is the one to check first — it is the only screen
+  every attendee must get through, and it now refuses an empty name.
 
 Working on `dev`; `main` is the released line and only takes merges. The
 breaks rework has landed — `feat/event-level-breaks` (`5e53811`) is an
@@ -74,6 +78,24 @@ holding 3000 with its API half no longer listening on 3001.
 _The only queue of future work, priority-ordered. Top High-Priority item = next up._
 
 ## High Priority
+
+- **A production event export is sitting untracked in a directory git will
+  happily commit.** Noticed 2026-09-02 when a `git add -A` swept
+  `_planning/valley-2026-09-02.json` (72 KB, 2447 lines), its `.import.json`
+  twin and `export-to-import.py` into a commit; they were taken back out
+  before it was pushed, but nothing stops it happening again. `.gitignore`
+  covers only `_planning/transcripts-backup/` and
+  `_planning/deployment-guide.md`, so every other working file there is
+  fair game — and this one is a real event's export, carrying real
+  attendees' names, in a repo whose upstream is public
+  (`Valley-of-the-Commons/LibreSesh`).
+
+  The fix is a line or two: ignore `_planning/*.json` and
+  `_planning/*.import.json` (or invert it — ignore `_planning/` and
+  un-ignore `specs/`, `plans/` and the files meant to be shared). Decide
+  which way round, because the inverted form is the one that stays safe as
+  new working files appear. Nothing has leaked: the files have never been
+  committed, on any ref.
 
 - **An event this app exported cannot be imported back.** Found 2026-09-02
   restoring a production event onto a fresh staging box: the export downloads,
@@ -509,6 +531,23 @@ w-48`, the other `w-full` — so they are exempted by name in
   is 1440, before the `% 24` folds it — and the two helpers should keep matching
   each other, which is the reason to do them in the same commit rather than
   fixing whichever one is noticed first.
+
+- **The People list cannot put somebody out of the event.** Left undone
+  deliberately in the identity work (2026-09-02, spec
+  `self-as-speaker-and-merge-ux.md` §What was built). The role control
+  moves a person between viewer, attendee, speaker and organiser, and a row
+  whose holder has no role reads `signed out` — but only a merge or the
+  person's own logout can produce that state. So an organiser can hand a
+  role back but cannot take one away entirely, and somebody admitted by
+  mistake stays admitted until the event password changes.
+
+  It is a `DELETE /people/:id/role` calling the `clearRole` that
+  `/logout` already uses, plus a "Sign out of this event" item on the role
+  select. What needs deciding first is what it means: the person keeps
+  their username, their profile and everything they wrote, and can walk
+  back in through the gate with the password they still know — so it is a
+  nudge, not a ban, and the UI should not imply otherwise. Wait until an
+  organiser actually asks.
 
 ## Low Priority / Ideas
 

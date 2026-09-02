@@ -1,13 +1,13 @@
 # Everyone who enters is a person: username and full name, one People list, and a merge dialog that shows who is who
 
-Status: **draft, fourth revision 2026-09-02.** Decisions so far: the
+Status: **built and on `dev`, 2026-09-02** — see *What was built* below.
+Was: draft, fourth revision. Decisions so far: the
 credit-others capability defaults to open; every identity that enters an
 event gets a `people` row; a person has a **username and a full name**;
 and **the username is required at the gate** (no more `attendee_x7f2k`);
 **viewers are persons like anyone else, visible and active, but not
 offered as speakers** (revised 2026-09-02 after the first cut hid them
 entirely, which was wrong).
-Nothing is built yet.
 
 Wording note: earlier drafts said "billing" for who a session is credited
 to. That is stage jargon (whose name is on the poster) borrowed from the
@@ -472,6 +472,66 @@ ARCHITECTURE.md needs a paragraph under §Why a display name belongs to
 the event naming the two things (username, unique, on the event
 membership; full name, free, on the person), and a line in §Data model
 for the invariant. The identity spec's B1/B2 sections stay true.
+
+## Decisions taken
+
+- **`session.credit_others` defaults open** for attendee, speaker and
+  admin: the app leans towards rooms where people trust each other and
+  invite co-hosts.
+- **Everyone who enters is a person**, viewers included, visible to all
+  and able to star and post like anyone; a viewer's person is simply not
+  `creditable`, so it is not offered as a speaker.
+- **The username is required at the gate.** No auto-generated
+  `attendee_x7f2k`; the field is prefilled with the last name you chose
+  once you have one.
+- **Username and full name.** Username = `event_identities.display_name`,
+  unique per event, typed at the gate. Full name = `people.name`, not
+  unique. A pre-registered speaker is a full name without a username.
+- **Agents are identities, never persons.** The `identities.kind` column
+  is the seam; not added until an agent exists.
+- **Pre-fill "You"** on a non-admin's new session and pitch.
+- **Claiming on someone's behalf is a merge**, not a separate endpoint.
+- **Role changes stay explicit**: merging never changes a role; the People
+  list gets a role control.
+- **The `ID: 00054` label goes** from the People list and the profile
+  page; the UID is the identifier. It stays on the audit page.
+- **One database per event is the direction.** Not built here; this spec
+  puts nothing new on `identities` and nothing that spans events, so the
+  split later is a storage move, not a redo.
+
+## Open questions — resolved 2026-09-02
+
+1. The gate's "is that you?" prompt: **build it** as specified in Step 0.
+2. The UI word is **username**. The gate's hint says it is per event and
+   not a login.
+
+## What was built
+
+**All six steps are on `dev`, 2026-09-02**, in this order: `5142d10`
+(Step 0), `79e5044` (Step 1), `39003b5` (Step 2), `2c913e3` (Step 3),
+`3f353a0` (Step 4), `3d19d74` (Step 5). Steps 0–2 were built in the main
+session; 3–5 were picked up in the same session after the model changed,
+so they went on `dev` rather than the `feat/…` branch this section used
+to ask for — that rule exists to stop two writers sharing a branch, and
+there was only ever one.
+
+Two things were decided while building, and the prose above is corrected
+to match rather than left to disagree with the code:
+
+- **Deleting a person somebody holds is hidden, not refused** (Step 0's
+  paragraph). Refusing would corner an organiser who minted a speaker
+  code by mistake, and the invariant heals at the next gate entry.
+- **`person.*` broadcasts must not carry viewer-scoped facts.** Found in
+  Step 3: `isMine` and the organiser-only fields were computed for
+  whoever caused a change and sent to every subscriber, so an organiser
+  editing a bio told the owner the profile was not theirs. The wire frame
+  is public now, the reply to the caller discloses, and the client keeps
+  what it already knew (`applyPersonChange`).
+
+Not built, and deliberately: **signing somebody out** from the People
+list. The role control can move a person between roles but cannot put
+them outside the event, so a "signed out" row can be given a role back
+but nothing can take one away entirely. Nobody has asked for it yet.
 
 ## Decisions taken
 
