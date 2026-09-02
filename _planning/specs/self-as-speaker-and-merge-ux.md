@@ -498,19 +498,25 @@ for the invariant. The identity spec's B1/B2 sections stay true.
 
 ## Handing this to another agent
 
-Read `CLAUDE.md`, `.claude/CLAUDE.md`, `ARCHITECTURE.md` §What a cookie
-is, exactly, and `_planning/specs/identity-and-people.md` first; then
-this file top to bottom. Then:
+**Steps 0, 1 and 2 are on `dev`** (2026-09-02: `5142d10`, `79e5044` and
+the capability commit after it). What remains is Steps 3, 4 and 5. Read
+`CLAUDE.md`, `.claude/CLAUDE.md`, `ARCHITECTURE.md` §Why a display name
+belongs to the event (rewritten for the two names), and
+`_planning/specs/identity-and-people.md` first; then this file top to
+bottom; then the three commits above, which show the shape of things:
+`PersonDto` now carries `username` and `creditable` for everyone and
+`role`/`holderUid`/`codePending` for organisers (`personFacts` in
+`server/src/mappers.ts` is the one query to extend for Step 3's
+`lastSeenAt`, `joinedAt`, `sessionCount`). Then:
 
 - Work on a branch `feat/everyone-is-a-person` off `dev`. A second agent
   never commits to `dev` (`.claude/CLAUDE.md` §Git Conventions).
 - One commit per step, each with its tests, lint clean, `npm test` green.
   Tests-with-features is the recorded policy.
-- **Stop after Step 0 and report** before going on: it is the migration
-  and the gate, and the one step that touches a live event's data. The
-  report should say what the backfill did on a copy of `data/app.db`
-  (row counts inserted per event, any duplicate full names it left for
-  merging).
+- **Stop after Step 3 and report** before going on: it removes an
+  endpoint and a component and adds a role-changing route with the
+  last-admin guard, and that is worth a look before the merge dialog is
+  built on top of it.
 - Do not add anything to `identities` or anything that spans events (see
   *Direction*). If a step seems to need it, stop and ask.
 - Where this spec and the code disagree on a detail, the code wins for

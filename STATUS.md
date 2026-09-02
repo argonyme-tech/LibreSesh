@@ -7,14 +7,19 @@ Last updated: 2026-09-02
 
 ## In Progress
 
-- **Everyone who enters is a person.** Started 2026-09-02, plan in
-  `_planning/plans/2026-09-02-everyone-is-a-person.md`, spec in
-  `_planning/specs/self-as-speaker-and-merge-ux.md`. Step 0 (a `people`
-  row for every identity at the gate, required username, non-unique full
-  name, the gate's "is that you?" prompt, backfill migration 010) is in
-  the main session on `dev`; Steps 1–2 follow here; Steps 3–5 (one People
-  list with a role control, the merge dialog, the back link) are handed
-  to a second agent on `feat/everyone-is-a-person`.
+- **Everyone who enters is a person — Steps 0–2 landed, 3–5 to hand off.**
+  Plan `_planning/plans/2026-09-02-everyone-is-a-person.md`, spec
+  `_planning/specs/self-as-speaker-and-merge-ux.md`. On `dev` as of
+  2026-09-02: `5142d10` (a `people` row for every identity at the gate,
+  required username, non-unique full name, the gate's "is that you?"
+  prompt, migration 010 backfill), `79e5044` (the picker offers you first,
+  `@username` on rows, viewers not creditable), and the
+  `session.credit_others` capability, open by default. Left for a second
+  agent on `feat/everyone-is-a-person`, per the spec's hand-off section:
+  Step 3 (one dense, filtered People list with a role control, replacing
+  the two stacked lists and `/attendees`; drop `ID: 00054`), Step 4 (the
+  layered merge dialog with a confirm step, moved out of ProfilePage),
+  Step 5 (the back link from the profile page to Manage → People).
 
 Working on `dev`; `main` is the released line and only takes merges. The
 breaks rework has landed — `feat/event-level-breaks` (`5e53811`) is an
