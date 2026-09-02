@@ -28,6 +28,7 @@ import {
   loadSessionDto,
   loadProposalDtos,
 } from '../mappers.js';
+import { loadClaims } from '../claims.js';
 import { getPermissions } from '../permissions.js';
 import { limit } from '../ratelimit.js';
 import { trackWindowsFor } from '../trackHours.js';
@@ -148,6 +149,7 @@ export function bundleRoutes(ctx: Ctx): Router {
       ),
       contributionCounts: Object.fromEntries(counts.map((c) => [c.session_id, c.n])),
       permissions: getPermissions(ctx.db, eventId),
+      claims: loadClaims(ctx.db, eventId, req.identity.id, req.role === 'admin'),
     };
     res.json(bundle);
   });

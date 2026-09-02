@@ -244,6 +244,18 @@ export function AdminPage() {
 
   // Derived rather than stored: SSE edits land in the bundle, and a list that
   // remembered its own copy would show a role change one refresh late.
+  const openClaims = bundle.claims.filter((c) => c.declinedAt === null);
+  /** Approving runs a merge, so the whole bundle moves; reload rather than
+   *  guess which parts. */
+  const decideClaim = async (run: () => Promise<unknown>) => {
+    try {
+      await run();
+      await data.reload();
+    } catch (err) {
+      fail(err);
+    }
+  };
+
   const peopleCounts = filterCounts(bundle.people);
   const shownPeople = filterPeople(bundle.people, peopleFilter, peopleQuery, peopleSort);
 
@@ -905,6 +917,59 @@ export function AdminPage() {
 
       {tab === 'people' && (
         <div role="tabpanel" id="admin-panel-people" aria-labelledby="admin-tab-people">
+          {/* People asking for a profile somebody left for them. Above the
+              list because it is the one thing here that is waiting on you,
+              and it disappears the moment the queue is empty. */}
+          {openClaims.length > 0 && (
+            <Section
+              className="mb-4"
+              title={`Waiting for you (${openClaims.length})`}
+              description="Someone says one of these profiles is them. Approving hands it over and folds their own profile into it, exactly as merging the two by hand would. It cannot be undone, so check the username against who you were expecting."
+            >
+              <ul>
+                {openClaims.map((claim) => {
+                  const theirs = bundle.people.find((p) => p.id === claim.requesterPersonId);
+                  return (
+                    <li
+                      key={claim.id}
+                      className="flex flex-wrap items-center gap-2 border-b border-stone-100 py-2 text-sm last:border-0 dark:border-stone-800"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="font-medium">@{claim.username}</span>
+                        {claim.requesterUid != null && (
+                          <span className="ml-1.5 font-mono text-xs text-stone-400 dark:text-stone-500">
+                            {claim.requesterUid.toUpperCase()}
+                          </span>
+                        )}
+                        <span className="text-stone-500 dark:text-stone-400"> says they are </span>
+                        <span className="font-medium">{claim.personName}</span>
+                        {theirs && (
+                          <span className="block text-xs text-stone-400 dark:text-stone-500">
+                            Their profile “{theirs.name}” is folded in and removed.
+                          </span>
+                        )}
+                      </span>
+                      <span className="flex shrink-0 gap-1">
+                        <button
+                          type="button"
+                          className={peopleActionClass}
+                          onClick={() => void decideClaim(() => api.declineClaim(slug, claim.id))}
+                        >
+                          Decline
+                        </button>
+                        <PrimaryButton
+                          className="w-[4.25rem] px-1 py-1 text-xs"
+                          onClick={() => void decideClaim(() => api.approveClaim(slug, claim.id))}
+                        >
+                          Approve
+                        </PrimaryButton>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Section>
+          )}
           <Section
             title="People"
             description="Everyone who has entered this event, plus the people you are expecting. Entering claims a username and creates a profile; a profile nobody holds is one you or a session named, still waiting for them to arrive."

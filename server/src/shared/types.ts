@@ -185,6 +185,29 @@ export interface PersonDto {
   updatedAt: string;
 }
 
+/**
+ * Somebody asking for the profile an organiser left for them, waiting on an
+ * organiser to agree. Organisers see every open request; everyone else sees
+ * only their own, including one that was turned down, so a request does not
+ * simply vanish without an answer.
+ */
+export interface ProfileClaimDto {
+  id: number;
+  /** The profile being asked for. */
+  personId: number;
+  personName: string;
+  /** Who is asking, as this event knows them. */
+  username: string;
+  /** Organisers only: the identity behind the request. */
+  requesterUid?: string;
+  /** Organisers only: the profile they hold now, which approving folds in. */
+  requesterPersonId?: number | null;
+  requestedAt: string;
+  /** Set when an organiser turned it down. */
+  declinedAt: string | null;
+  isMine: boolean;
+}
+
 export interface PersonDetailDto {
   person: PersonDto;
   sessions: SessionDto[];
@@ -326,6 +349,9 @@ export interface BundleDto {
   contributionCounts: Record<number, number>;
   /** capability -> roles allowed to use it. Admin is always present. */
   permissions: Record<string, Role[]>;
+  /** Open requests to hold a profile: all of them for an organiser, your own
+   *  for everyone else. */
+  claims: ProfileClaimDto[];
 }
 
 /**

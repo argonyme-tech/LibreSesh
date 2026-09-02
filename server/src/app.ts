@@ -15,6 +15,7 @@ import { auditRoutes } from './routes/audit.js';
 import { backupRoutes, exportRoutes } from './routes/backup.js';
 import { breakRoutes } from './routes/breaks.js';
 import { bundleRoutes } from './routes/bundle.js';
+import { claimRoutes } from './routes/claims.js';
 import { contributionRoutes } from './routes/contributions.js';
 import { eventAuthRoutes } from './routes/eventAuth.js';
 import { eventRoutes } from './routes/events.js';
@@ -75,6 +76,7 @@ export function createApp(db: Db, config: Config): App {
   event.use(proposalRoutes(ctx));
   event.use(contributionRoutes(ctx));
   event.use(peopleRoutes(ctx));
+  event.use(claimRoutes(ctx));
   event.use(agendaRoutes(ctx));
   event.use(settingsRoutes(ctx));
   event.use(trashRoutes(ctx));

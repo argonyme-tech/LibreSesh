@@ -35,6 +35,25 @@ All notable changes to this project are documented here.
   speaker (`PersonDto.creditable`), and the server refuses a non-organiser
   crediting one. Organisers may still credit anyone.
 
+- **You can ask for the profile an organiser left for you.** An organiser
+  adds *Marcel Jackisch* as a speaker before he arrives; Marcel enters as
+  `marcel`, gets a profile of his own, and the shell sits there with his
+  talks on it. Joining the two took a minted speaker phrase, an organiser
+  merging by hand, or the gate happening to offer the shell because the
+  username typed matched its full name — every route needing somebody else
+  to act first, or a coincidence.
+
+  Now the person asks. An unclaimed profile carries a "This is me" button,
+  and the request waits in a queue above the People list until an organiser
+  agrees. **It stops at asking on purpose**: a shell is usually credited on
+  sessions, and holding the profile a session credits is the right to
+  rewrite that talk, so left unguarded this would have been the cheapest
+  way into somebody else's keynote. Approving runs exactly the merge an
+  organiser would have run by hand, with the shell surviving so it keeps
+  its name and its sessions, and everyone else waiting on that profile is
+  told they were not chosen. Declining says so rather than letting the
+  request vanish. Both are audited.
+
 - **A profile page goes back where you opened it from.** Every profile sent
   you to the schedule, so an organiser working through Manage → People had
   to navigate back in for each person they looked at. The link now names

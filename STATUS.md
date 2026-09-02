@@ -101,46 +101,6 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
 ## High Priority
 
-- **A person cannot claim the shell an organiser left for them.** Asked for
-  2026-09-02. Three routes exist from "an organiser added *Marcel Jackisch*
-  as a speaker" to "that profile is mine", and all three need somebody else
-  or an exact coincidence: an organiser mints a **speaker code** and sends
-  it; an organiser **merges** two profiles, having to work out which way
-  round; or the **gate prompt** fires, which it only does when the username
-  you type matches the shell's full name case-insensitively — so entering as
-  `marcel` against a shell called *Marcel Jackisch* misses it entirely. What
-  is missing is the direct one: you are in, you can see the shell, you say
-  "that is me".
-
-  **The reason it is not just an endpoint.** A shell is usually credited on
-  sessions, and claiming it makes `speaksFor` true, which is the right to
-  rewrite those talks. Unguarded, anyone holding the event password could
-  claim the keynote speaker's profile and edit their description. Each of the
-  three routes above is gated for exactly that reason. So this needs a
-  decision before it needs code:
-
-  1. **A capability, `person.claim_listed`, off by default.** Cheapest, and
-     it fits the matrix that already exists. An organiser running an event
-     where the speakers are all pre-entered turns it on and stops answering
-     emails. Recommended.
-  2. **A claim that waits for approval.** Safe under any setting, and the
-     People list is the natural inbox — a "2 waiting" segment beside the
-     others. More to build, and the app has no notifications, so an organiser
-     only sees it when they look.
-  3. **Restrict to shells with nothing on them.** Safe and nearly useless:
-     the case people actually hit is a shell that already has the sessions.
-
-  Whichever way, three things come with it: audit the claim, since it is a
-  privilege change; give an organiser a way to take it back, which nothing
-  can do today except a merge; and leave the role alone, per the standing
-  decision that role changes stay explicit.
-
-  Most of the parts exist. `suggestDuplicates` (`web/src/lib/people.ts`)
-  already ranks profiles by name against a person and would put the right
-  shell first; `PersonLine` renders the row; `adoptProfile`
-  (`server/src/people.ts`) does the write, and the gate already calls it.
-  The UI is an "Is one of these you?" section on your own profile page.
-
 - **A production event export is sitting untracked in a directory git will
   happily commit.** Noticed 2026-09-02 when a `git add -A` swept
   `_planning/valley-2026-09-02.json` (72 KB, 2447 lines), its `.import.json`

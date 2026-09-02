@@ -2,15 +2,11 @@ import { Router } from 'express';
 import { atLeast, getRole, requireRole, requireWritable, setRole } from '../auth.js';
 import { audit } from '../audit.js';
 import type { Ctx } from '../context.js';
-import {
-  mintSpeakerCode,
-  revokeSpeakerCode,
-  settleSpeakerCodeAfterMerge,
-} from '../deviceLink.js';
+import { mintSpeakerCode, revokeSpeakerCode } from '../deviceLink.js';
 import type { PersonRow, SessionRow } from '../db.js';
 import { badRequest, conflict, forbidden, notFound } from '../errors.js';
-import { rekeyIdentityWork } from '../mergeIdentityWork.js';
-import { factsFor, loadProposalDtos, loadSessionDto, toPersonDto } from '../mappers.js';
+import { auditMerge, broadcastMerge, mergePeople } from '../mergePeople.js';
+import { factsFor, loadSessionDto, toPersonDto } from '../mappers.js';
 import { ensureOwnProfile } from '../people.js';
 import { requireCapability } from '../permissions.js';
 import { limit } from '../ratelimit.js';
@@ -275,92 +271,19 @@ export function peopleRoutes(ctx: Ctx): Router {
       if (from === survivor.id) throw badRequest('A profile cannot be merged into itself');
       const loser = load(req.event.id, from);
 
-      const now = new Date().toISOString();
-      const movedSessions = ctx.db
-        .prepare<[number], { id: number }>(
-          'SELECT session_id AS id FROM session_speakers WHERE person_id = ?',
-        )
-        .all(loser.id)
-        .map((r) => r.id);
-      let rekeyed = { sessionIds: [] as number[], proposalIds: [] as number[] };
-
-      ctx.db.transaction(() => {
-        // A session billed to both halves of a merge must not end up billed
-        // to the survivor twice — which the primary key would refuse anyway,
-        // taking the whole merge down with it. Drop the duplicate, then move
-        // what is left.
-        ctx.db
-          .prepare(
-            `DELETE FROM session_speakers
-              WHERE person_id = ?
-                AND session_id IN (SELECT session_id FROM session_speakers WHERE person_id = ?)`,
-          )
-          .run(loser.id, survivor.id);
-        ctx.db
-          .prepare('UPDATE session_speakers SET person_id = ? WHERE person_id = ?')
-          .run(survivor.id, loser.id);
-        ctx.db
-          .prepare('UPDATE proposals SET speaker_id = ? WHERE speaker_id = ?')
-          .run(survivor.id, loser.id);
-        // The loser's claim must be nulled before the survivor takes it:
-        // (event_id, identity_id) is unique among live rows, and the loser is
-        // still live at this point in the transaction.
-        ctx.db
-          .prepare('UPDATE people SET identity_id = NULL, deleted_at = ? WHERE id = ?')
-          .run(now, loser.id);
-        const survivingIdentity = survivor.identity_id ?? loser.identity_id;
-        ctx.db
-          .prepare(
-            'UPDATE people SET identity_id = ?, bio = ?, links = ?, updated_at = ? WHERE id = ?',
-          )
-          .run(
-            survivingIdentity,
-            survivor.bio || loser.bio,
-            survivor.links === '[]' ? loser.links : survivor.links,
-            now,
-            survivor.id,
-          );
-        // The loser's row is gone from the roster; its speaker code must not
-        // outlive it as a phrase nobody can revoke.
-        settleSpeakerCodeAfterMerge(ctx.db, loser.id, survivor.id, survivingIdentity);
-        // Only a both-claimed merge leaves a second identity behind to strip.
-        // When the survivor inherited the loser's identity, the work already
-        // belongs to the surviving pair and there is nothing to move.
-        if (
-          loser.identity_id !== null &&
-          survivor.identity_id !== null &&
-          survivor.identity_id !== loser.identity_id
-        ) {
-          rekeyed = rekeyIdentityWork(ctx.db, req.event.id, loser.identity_id, survivor.identity_id);
-        }
-      })();
-
+      const result = mergePeople(ctx.db, req.event.id, survivor, loser);
       const { own, pub } = views(req, survivor.id);
-      audit(ctx.db, {
-        identityId: req.identity.id,
-        eventId: req.event.id,
-        action: 'merge',
-        entity: 'person',
-        entityId: loser.id,
-      });
-      ctx.broker.publish(req.event.slug, 'person.deleted', { id: loser.id });
-      ctx.broker.publish(req.event.slug, 'person.updated', pub);
-      if (rekeyed.proposalIds.length > 0) {
-        const changed = new Set(rekeyed.proposalIds);
-        for (const proposal of loadProposalDtos(ctx.db, req.event.id, req.identity.id)) {
-          if (changed.has(proposal.id)) {
-            ctx.broker.publish(req.event.slug, 'proposal.updated', proposal);
-          }
-        }
-      }
-      for (const sessionId of new Set([...movedSessions, ...rekeyed.sessionIds])) {
-        const row = ctx.db
-          .prepare<[number], SessionRow>('SELECT * FROM sessions WHERE id = ?')
-          .get(sessionId);
-        if (row && row.deleted_at === null) {
-          ctx.broker.publish(req.event.slug, 'session.updated', loadSessionDto(ctx.db, row));
-        }
-      }
+      auditMerge(ctx.db, req.identity.id, req.event.id, loser.id, 'merge');
+      broadcastMerge(
+        ctx.db,
+        ctx.broker,
+        req.event.slug,
+        req.event.id,
+        req.identity.id,
+        loser.id,
+        pub,
+        result,
+      );
       res.json(own);
     },
   );

@@ -107,6 +107,23 @@ export function ProfilePage() {
   );
 
   const isAdmin = bundle?.role === 'admin';
+  /**
+   * Asking for a profile an organiser left for you. It stops at asking: a
+   * shell is usually credited on sessions, and holding it is the right to
+   * rewrite those talks, so an organiser agrees before anything moves.
+   */
+  const myClaim = bundle?.claims.find((c) => c.isMine && c.personId === id);
+  const waitingElsewhere = bundle?.claims.find(
+    (c) => c.isMine && c.personId !== id && c.declinedAt === null,
+  );
+  const claimAction = async (run: () => Promise<unknown>) => {
+    try {
+      await run();
+      await data.reload();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
   const canEdit = !!person && (person.isMine || isAdmin);
 
   if (status === 'loading') return <Spinner label="Loading profile…" />;
@@ -248,6 +265,54 @@ export function ProfilePage() {
               </SecondaryButton>
             )}
           </div>
+
+          {!person.claimed && !isAdmin && (
+            <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm dark:border-stone-700 dark:bg-stone-800/60">
+              {myClaim && myClaim.declinedAt === null ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-stone-700 dark:text-stone-300">
+                    You have asked to hold this profile. An organiser decides.
+                  </span>
+                  <SecondaryButton
+                    className="ml-auto py-1 text-xs"
+                    onClick={() => void claimAction(() => api.withdrawClaim(slug, myClaim.id))}
+                  >
+                    Withdraw
+                  </SecondaryButton>
+                </div>
+              ) : myClaim ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-stone-700 dark:text-stone-300">
+                    An organiser turned that request down.
+                  </span>
+                  <SecondaryButton
+                    className="ml-auto py-1 text-xs"
+                    onClick={() => void claimAction(() => api.withdrawClaim(slug, myClaim.id))}
+                  >
+                    Dismiss
+                  </SecondaryButton>
+                </div>
+              ) : waitingElsewhere ? (
+                <p className="text-stone-600 dark:text-stone-400">
+                  You are already waiting on{' '}
+                  <span className="font-medium">{waitingElsewhere.personName}</span>. Withdraw that
+                  request before asking for this one.
+                </p>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-stone-600 dark:text-stone-400">
+                    Nobody holds this profile. If it is you, an organiser can hand it over.
+                  </span>
+                  <PrimaryButton
+                    className="ml-auto py-1 text-xs"
+                    onClick={() => void claimAction(() => api.claimPerson(slug, person.id))}
+                  >
+                    This is me
+                  </PrimaryButton>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="mt-4 space-y-4 border-t border-stone-100 pt-4 dark:border-stone-800">
             {person.isMine && (

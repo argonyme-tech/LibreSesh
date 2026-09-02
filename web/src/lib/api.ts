@@ -14,6 +14,7 @@ import type {
   PersonDetailDto,
   PersonDto,
   PersonLink,
+  ProfileClaimDto,
   ProposalDto,
   Role,
   RoomDto,
@@ -214,6 +215,17 @@ export const api = {
   revokeSpeakerCode: (slug: string, id: number) =>
     request<void>('DELETE', `/e/${encode(slug)}/people/${id}/speaker-code`),
   /** Fold profile `from` into `id`: sessions/pitches repoint, `from` disappears. */
+  /** "That profile is me." Returns the claims the caller may see. */
+  claimPerson: (slug: string, id: number) =>
+    request<ProfileClaimDto[]>('POST', `/e/${encode(slug)}/people/${id}/claim`),
+  approveClaim: (slug: string, id: number) =>
+    request<ProfileClaimDto[]>('POST', `/e/${encode(slug)}/claims/${id}/approve`),
+  declineClaim: (slug: string, id: number) =>
+    request<ProfileClaimDto[]>('POST', `/e/${encode(slug)}/claims/${id}/decline`),
+  /** Withdraw your own request, or clear one you were refused. */
+  withdrawClaim: (slug: string, id: number) =>
+    request<ProfileClaimDto[]>('DELETE', `/e/${encode(slug)}/claims/${id}`),
+
   /** Hand the holder of a profile a different role at this event. */
   setPersonRole: (slug: string, id: number, role: Role) =>
     request<PersonDto>('PUT', `/e/${encode(slug)}/people/${id}/role`, { role }),
