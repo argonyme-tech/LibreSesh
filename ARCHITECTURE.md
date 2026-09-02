@@ -100,8 +100,15 @@ redirects cannot be handed to a new event.
 published programme, or an attendee booking a room that allows it. The stored
 values are unchanged, but nothing shows the word "open" to a reader any more —
 it read as *open to join*, which every session on the schedule is, so the badge
-meant to mark the exception described the rule. The UI says **Official** and
-**Non-official** throughout. It decides
+meant to mark the exception described the rule. The session form says
+**Official** and **Non-official**.
+
+The grid and the list mark neither by default. `events.show_official_badge`
+(migration 016, off) turns on a small **Official** on blocks and cards, for the
+event that actually mixes a published programme with an open floor. Marking the
+programme rather than the exception is the way round that survives both ends:
+an event where everything is official has nothing to say, and an unconference
+has nothing to say either. The session's own panel always says which it is. It decides
 permissions — who may move the session, whether it can hold the floor — and it
 is the oldest column in the table.
 

@@ -376,24 +376,26 @@ export function SessionModal({
                     <strong className="font-semibold text-stone-800 dark:text-stone-100">
                       Official
                     </strong>{' '}
-                    is the published programme. Only organisers can add one or change it.
+                    means the organisers put it on. Only they can add one, move it or delete
+                    it — though anyone named as a speaker can still edit what it says.
                   </p>
                   <p>
                     <strong className="font-semibold text-stone-800 dark:text-stone-100">
                       Non-official
                     </strong>{' '}
-                    is attendee-placed. Whoever created it can keep editing it, and it can only
-                    go in a room that allows booking.
+                    means an attendee put it on. Whoever created it keeps editing it, and it
+                    can only go in a room that anyone may book.
                   </p>
                   <p>
-                    Only an official session can hold the floor — that is what “allow parallel
-                    sessions” means here: a non-official one never stops anybody putting
-                    something on at the same time.
+                    Why “allow parallel sessions”: an official session can be marked{' '}
+                    <em>Everyone should be at this</em>, which stops attendees adding anything
+                    while it runs. A non-official one can never be marked that way, so
+                    something else can always run at the same time.
                   </p>
                   <p>
-                    Making a session official therefore locks it against the person who put it
-                    up. Neither choice affects timing: organisers may double-book a room,
-                    everyone else may not, whichever it is.
+                    Worth knowing before you switch one: making somebody&rsquo;s non-official
+                    session official takes it out of their hands, unless they are named as a
+                    speaker on it.
                   </p>
                 </HelpNote>
               )}

@@ -25,6 +25,9 @@ export interface EventRow {
   user_role_label: string;
   /** Audit entries kept for this event; 0 keeps everything. */
   audit_keep: number;
+  /** 1 = the grid and the list mark official sessions with a badge. Off by
+   *  default: see migration 016. */
+  show_official_badge: number;
   /** Which view the schedule opens in when the reader has not picked one. */
   default_view: string;
   created_at: string;

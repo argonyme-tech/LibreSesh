@@ -321,6 +321,10 @@ export interface CalendarProps {
   /** Small line under the title — the room, when rooms are not the columns. */
   subtitleOf?: (session: SessionDto) => string;
   tags: TagDto[];
+  /** Mark the official programme on the block. Off unless the organiser has
+   *  turned it on: on an event where everything is official the badge says
+   *  nothing, and on an unconference it is noise. */
+  showOfficialBadge: boolean;
   sessions: SessionDto[];
   /** Lunch and friends. Drawn behind the grid, and only ever drawn: a break
    *  belongs to the event, not to a column, and nothing opens it. */
@@ -357,6 +361,7 @@ export function Calendar({
   moveBetweenColumns,
   subtitleOf,
   tags,
+  showOfficialBadge,
   sessions,
   breaks,
   matchedIds,
@@ -826,13 +831,14 @@ export function Calendar({
                     {subtitleOf(session)}
                   </div>
                 )}
-                {/* "open session" read as *open to join*, which every session
-                    on this grid is — so the one word meant to mark the
-                    exception described the rule. Named as the negative of
-                    official, the way the session form says it. */}
-                {session.type === 'open' && (
-                  <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                    non-official
+                {/* Positive and optional. The block used to label the *other*
+                    kind — "open session", which read as open to join, which
+                    every session here is. Marking the programme instead says
+                    something on an event that has both, and an event that does
+                    not leaves this off and keeps the block quiet. */}
+                {showOfficialBadge && session.type === 'official' && (
+                  <span className="text-xs font-medium text-stone-500 dark:text-stone-400">
+                    Official
                   </span>
                 )}
                 {editable && (

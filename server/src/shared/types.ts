@@ -101,6 +101,10 @@ export interface EventDto extends EventSummary {
   userRoleLabel: string;
   /** How many audit entries this event keeps; 0 keeps everything. */
   auditKeep: number;
+  /** Whether the grid and the list badge an official session. Off by default —
+   *  on an event where everything is official the badge says nothing, and on
+   *  an unconference it is noise. The session's own panel always says. */
+  showOfficialBadge: boolean;
   /** The view a reader who has not picked one gets. The switch still works;
    *  this is only where the schedule opens. */
   defaultView: ViewMode;

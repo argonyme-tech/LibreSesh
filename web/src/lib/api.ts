@@ -470,5 +470,7 @@ export interface SettingsWrite {
   auditKeep?: number;
   /** Where the schedule opens for a reader who has not picked a view. */
   defaultView?: ViewMode;
+  /** Whether the grid and the list badge an official session. */
+  showOfficialBadge?: boolean;
   archived?: boolean;
 }

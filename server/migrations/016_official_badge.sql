@@ -1,0 +1,15 @@
+-- Whether the schedule marks which sessions are the official programme.
+--
+-- The grid and the list used to label the *other* kind — a green "open
+-- session" on every attendee-placed block — which was both the ambiguous word
+-- and the wrong way round: it drew attention to the exception on an event
+-- where the exception is most of the board, and it said nothing on an event
+-- where nothing is attendee-placed at all.
+--
+-- So: off by default, and positive when it is on. An organiser running a
+-- programme alongside an open floor turns it on and every official session
+-- wears a small "Official"; an unconference where the distinction is noise
+-- leaves it off and the grid stays quiet. The dashed border still tells the
+-- two apart for anyone who needs it, and the session's own panel always says
+-- which it is.
+ALTER TABLE events ADD COLUMN show_official_badge INTEGER NOT NULL DEFAULT 0;

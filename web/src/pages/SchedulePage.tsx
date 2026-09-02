@@ -1537,6 +1537,7 @@ export function SchedulePage() {
               moveBetweenColumns={axis === "room"}
               subtitleOf={axis === "track" ? roomNameOf : undefined}
               tags={bundle.tags}
+              showOfficialBadge={event.showOfficialBadge}
               sessions={daySessions}
               breaks={bundle.breaks}
               matchedIds={matchedIds}
@@ -1561,6 +1562,7 @@ export function SchedulePage() {
           <ListView
             rooms={bundle.rooms}
             tags={bundle.tags}
+            showOfficialBadge={event.showOfficialBadge}
             sessions={visibleSessions}
             breaks={bundle.breaks}
             contributionCounts={bundle.contributionCounts}
