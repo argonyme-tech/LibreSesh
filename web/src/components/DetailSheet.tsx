@@ -24,6 +24,7 @@ export interface DetailSheetProps {
   me: Me | null;
   timezone: string;
   canEdit: boolean;
+  canDelete: boolean;
   archived: boolean;
   /** Whether this session is on the current identity's personal agenda. */
   starred: boolean;

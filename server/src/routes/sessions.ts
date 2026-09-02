@@ -70,6 +70,16 @@ export function sessionRoutes(ctx: Ctx): Router {
     requireWritable,
     limit(ctx.limiter, 'session'),
   ];
+  /**
+   * Editing and deleting are *not* gated on the capability to create, which is
+   * a different permission and was the second half of the same bug: an event
+   * that stops attendees putting sessions up — a curated conference, the
+   * ordinary case — would otherwise stop a speaker fixing a typo in the talk
+   * an organiser scheduled for them. Who may change what is decided per
+   * session by `assertMayMutate`, which consults `session.edit_own` and the
+   * billing.
+   */
+  const userEdit = [requireWritable, limit(ctx.limiter, 'session')];
 
   router.post('/sessions', ...userWrite, (req, res) => {
     const body = parse(sessionSchema, req.body);
@@ -266,7 +276,7 @@ export function sessionRoutes(ctx: Ctx): Router {
     },
   );
 
-  router.patch('/sessions/:id', ...userWrite, (req, res) => {
+  router.patch('/sessions/:id', ...userEdit, (req, res) => {
     const existing = getSession(ctx.db, req.event.id, Number(req.params.id));
     const speaksHere = speaksFor(ctx.db, req.identity.id, existing);
     assertMayMutate(getPermissions(ctx.db, req.event.id), req.role, req.identity.id, existing, speaksHere);
@@ -274,22 +284,38 @@ export function sessionRoutes(ctx: Ctx): Router {
     const body = parse(sessionPatchSchema, req.body);
     assertNotStale(existing, body.expectedUpdatedAt);
 
+    /**
+     * Every placement rule below asks *what changed*, never *which keys
+     * arrived*. The session form posts the whole session on every save — room,
+     * type, start and end included and untouched — so presence checks refused
+     * a speaker fixing a typo in their own description and told them only
+     * organisers can move official sessions, about a save that moved nothing.
+     *
+     * Instants are compared normalised: `2026-06-01T08:00:00Z` and
+     * `2026-06-01T08:00:00.000Z` are the same moment and only one of them is
+     * the string the row holds.
+     */
+    const sameInstant = (sent: string | undefined, stored: string): boolean =>
+      sent === undefined || new Date(sent).toISOString() === stored;
+    const roomChanged = body.roomId !== undefined && body.roomId !== existing.room_id;
+    const typeChanged = body.type !== undefined && body.type !== existing.type;
+    const timeChanged =
+      !sameInstant(body.startsAt, existing.starts_at) ||
+      !sameInstant(body.endsAt, existing.ends_at);
+
     // A speaker may rewrite their talk's words, not its slot: placement of an
     // official session stays with organisers.
     if (
       req.role !== 'admin' &&
       existing.type === 'official' &&
-      (body.roomId !== undefined ||
-        body.type !== undefined ||
-        body.startsAt !== undefined ||
-        body.endsAt !== undefined)
+      (roomChanged || typeChanged || timeChanged)
     ) {
       throw forbidden('Only organisers can move official sessions');
     }
 
     const room = getRoom(ctx.db, req.event.id, body.roomId ?? existing.room_id);
     const type = req.role === 'admin' ? (body.type ?? existing.type) : existing.type;
-    if (body.roomId !== undefined || body.type !== undefined) {
+    if (roomChanged || typeChanged) {
       assertMayPlace(getPermissions(ctx.db, req.event.id), req.role, room, type);
     }
     // A patch that would leave the hold on an open session is refused, not
@@ -386,7 +412,7 @@ export function sessionRoutes(ctx: Ctx): Router {
     res.json(dto);
   });
 
-  router.delete('/sessions/:id', ...userWrite, (req, res) => {
+  router.delete('/sessions/:id', ...userEdit, (req, res) => {
     const existing: SessionRow = getSession(ctx.db, req.event.id, Number(req.params.id));
     assertMayMutate(getPermissions(ctx.db, req.event.id), req.role, req.identity.id, existing);
     ctx.db

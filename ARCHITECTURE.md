@@ -129,6 +129,29 @@ minutes or at a whole afternoon, and picking a format to *describe* a session
 should not silently retime it. How long a session runs is the session's, bounded
 by `shared/sessionLimits.ts`: five minutes to a day, in five-minute steps.
 
+### Who may change a session
+
+Three questions, deliberately separate, and the bug they caused when they were
+conflated is worth keeping in view:
+
+1. **May this person change this session at all?** `assertMayMutate`. An
+   organiser always may. Anyone **credited on the session** may — that is the
+   whole test, independent of role, because the speaker role is minted by a
+   code an organiser has to remember to send and most speakers never hold one.
+   Otherwise it takes the `session.edit_own` capability, authorship, and an
+   open session.
+2. **May they move it?** Only an organiser, for an official session. Checked on
+   what actually *changed* — room, type, start, end — never on which keys the
+   request carried, because the session form posts the whole session on every
+   save and a presence check reads an untouched field as a move.
+3. **May they delete it?** The creator and the organisers. `assertMayMutate` is
+   called without `speaksHere` on the delete route: being billed on a session
+   is a claim on its words, not a mandate to take it off the programme.
+
+Editing is **not** gated on `session.create_open`. Creating and editing are
+different permissions, and an event that closes the first — a curated
+conference — must not close the second on its own speakers.
+
 ### Sessions that hold the floor
 
 `sessions.blocks_open_booking` marks a session as the only thing happening:

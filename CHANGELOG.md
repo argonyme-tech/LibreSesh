@@ -43,6 +43,34 @@ All notable changes to this project are documented here.
   organiser who never scrolled that far made everything official without
   ever being asked.
 
+### Fixed
+
+- **A speaker could not edit their own session.** An organiser schedules a talk
+  and types the speaker's name onto it; that person arrives at the gate as an
+  ordinary attendee — the role almost every speaker holds, since the speaker
+  role is only handed out by a code somebody has to remember to send — and the
+  session was read-only to them. Three separate rules had to agree before it
+  worked, and none of them did:
+
+  - the right to edit demanded the billing **and** the speaker role. Being
+    credited is the qualification now, whatever role the person holds, for one
+    of five co-hosts as much as for the only name, and on an official session
+    as much as an open one — the official one is precisely the session an
+    organiser typed their name onto;
+  - editing was gated on the capability to *create* sessions, so an event that
+    stops attendees adding their own — a curated conference, the ordinary case
+    — also stopped its speakers fixing a typo in the talk it had scheduled for
+    them;
+  - and every placement check asked which fields the request carried rather
+    than which had changed. The form posts the whole session on every save, so
+    a speaker correcting a description was told only organisers can move
+    official sessions, about a save that moved nothing.
+
+  What has not changed: a speaker still cannot move an official session or
+  delete it. The form now says so above the fields and disables them, rather
+  than refusing after Save. The Delete button is no longer offered to someone
+  who is billed on a session but did not create it.
+
 ### Changed
 
 - **"Open session" is gone from the schedule; the word meant the wrong thing.**

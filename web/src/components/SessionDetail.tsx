@@ -47,6 +47,9 @@ export interface SessionDetailProps {
   me: Me | null;
   timezone: string;
   canEdit: boolean;
+  /** Deleting is narrower than editing: a co-speaker may rewrite a session
+   *  they are billed on, but not take it off the programme. */
+  canDelete: boolean;
   archived: boolean;
   /** Whether this session is on the current identity's personal agenda. */
   starred: boolean;
@@ -80,6 +83,7 @@ export function SessionDetail({
   me,
   timezone,
   canEdit,
+  canDelete,
   archived,
   starred,
   userLabel,
@@ -289,14 +293,16 @@ export function SessionDetail({
           <EditIcon className="h-3.5 w-3.5" />
           Edit session
         </SecondaryButton>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
-        >
-          <RemoveIcon className="h-3.5 w-3.5" />
-          Delete
-        </button>
+        {canDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
+          >
+            <RemoveIcon className="h-3.5 w-3.5" />
+            Delete
+          </button>
+        )}
       </div>
     ) : null;
 

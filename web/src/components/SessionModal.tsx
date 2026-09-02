@@ -89,6 +89,10 @@ export interface SessionModalProps {
   dayStartMin: number;
   dayEndMin: number;
   saving: boolean;
+  /** False when this editor may change the session's words but not its slot —
+   *  a speaker on an official session. The fields are disabled rather than
+   *  left to be refused on save. */
+  canMove?: boolean;
   onCancel: () => void;
   /** `repeat` asks for the same session on every day of a run. What comes back
    *  is that many independent sessions — see `shared/repeat.ts`. */
@@ -112,6 +116,7 @@ export function SessionModal({
   dayStartMin,
   dayEndMin,
   saving,
+  canMove = true,
   onCancel,
   onSave,
   onDelete,
@@ -306,7 +311,7 @@ export function SessionModal({
       )}
 
       <div className="space-y-5">
-        <FieldGroup title="What it is">
+        <FieldGroup>
           {/* An organiser who defines none would otherwise see the row simply
               missing, which reads as "this app has no formats" rather than
               "this event has none yet" — the two are indistinguishable from
@@ -324,7 +329,7 @@ export function SessionModal({
           {/* First in the form, because it is what the thing is. It sets
               nothing else: the times below are the session's own. */}
           {formats.length > 0 && (
-            <Field label="Format" hint="What kind of session this is.">
+            <Field label="Format">
               <div className="flex flex-wrap gap-1.5">
                 {formats.map((f) => (
                   <Chip
@@ -490,11 +495,22 @@ export function SessionModal({
         </FieldGroup>
 
         <FieldGroup title="When and where">
+          {/* Said once, above the fields it applies to, rather than as a
+              refusal after Save. A speaker owns their talk's words; where and
+              when it runs is the programme, and the programme is the
+              organiser's. */}
+          {!canMove && (
+            <p className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-600 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300">
+              You are credited on this session, so you can edit what it says.
+              Moving it is the organisers&rsquo; — ask them if the slot is wrong.
+            </p>
+          )}
           <FormGrid>
             <Field label="Room">
               <select
                 value={roomId}
                 onChange={(e) => setRoomId(Number(e.target.value))}
+                disabled={!canMove}
                 className={inputClass}
               >
                 {allowedRooms.map((r) => (
@@ -534,7 +550,12 @@ export function SessionModal({
               "duration" under "day" and left a hole beside it. */}
           <FormGrid cols={3}>
             <Field label="Day">
-              <select value={day} onChange={(e) => setDay(e.target.value)} className={inputClass}>
+              <select
+                value={day}
+                onChange={(e) => setDay(e.target.value)}
+                disabled={!canMove}
+                className={inputClass}
+              >
                 {days.map((d) => (
                   <option key={d} value={d}>
                     {dayLabels[d] ?? d}
@@ -548,6 +569,7 @@ export function SessionModal({
                 step={300}
                 value={start}
                 onChange={(e) => setStart(e.target.value)}
+                disabled={!canMove}
                 className={inputClass}
               />
             </Field>
@@ -567,6 +589,7 @@ export function SessionModal({
                   setCustomDur(false);
                   setDurMin(Number(e.target.value));
                 }}
+                disabled={!canMove}
                 className={inputClass}
               >
                 {DURATION_CHOICES.map((d) => (
@@ -587,6 +610,7 @@ export function SessionModal({
                     step={SNAP_MINUTES}
                     aria-label="Duration in minutes"
                     autoFocus
+                    disabled={!canMove}
                     className={`${inputClass} w-24`}
                   />
                   <span className="text-xs text-stone-500 dark:text-stone-400">
