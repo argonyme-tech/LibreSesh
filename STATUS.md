@@ -8,9 +8,9 @@ Last updated: 2026-09-02
 ## In Progress
 
 Working on `dev`; `main` is the released line and only takes merges.
-**`dev` is seven commits ahead of `origin/dev`, which is still at
-`5142d10`** — the identity and People work from `79e5044` to `354fc6b` has
-not been pushed. That whole spec
+**`dev` is well ahead of `origin/dev`, which is still at `5142d10`** —
+everything from `79e5044` onwards is unpushed, including the 0.2.3
+release commit. That whole spec
 (`_planning/specs/self-as-speaker-and-merge-ux.md`, six steps, plan at
 `_planning/plans/2026-09-02-everyone-is-a-person.md`) is code-complete as
 of 2026-09-02 and written up in CHANGELOG `[Unreleased]`; 730 tests, lint
@@ -47,17 +47,20 @@ lives in `_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
 
 ## Blockers
 
-- **Nobody has opened the identity work in a browser.** Four screens changed
-  on 2026-09-02 and none has been looked at: the **gate** (a username is now
-  required, and arriving under the name of an unclaimed profile asks "is that
-  you?"), **Manage → People** (one dense list with segments, search, a role
-  select and Merge on every row), the **merge dialog** (suggestions, search,
-  a confirm step naming what this merge does), and the **profile page** (full
-  name with `@username` under it, and a back link that returns to the People
-  tab). Start at the gate: it is the only screen every attendee has to get
-  through, and it now refuses an empty name, so a mistake there locks
-  everyone out rather than merely looking wrong. Restart the dev stack
-  first — see the port note below.
+- **Most of 2026-09-02 has not been seen in a browser.** The People list,
+  the profile page and the merge dialog were looked at once and fixed from
+  what that showed (`c00fef5`, `4d8dbc0` — the role select was discarding
+  the role it had just set). Everything since is unseen: **asking for a
+  profile** (the "This is me" button on an unclaimed profile, and the
+  approval queue above the People list), **the next-day button** at the
+  end of a day's list, and **several stream links** on a session, which
+  changed the session form.
+
+  The **gate** is still the one nobody has opened, and it is the screen
+  every attendee must get through: it now refuses an empty username and
+  asks "is that you?" when the name matches an unclaimed profile. A
+  mistake there locks the room out rather than merely looking wrong.
+  Restart the dev stack before looking — see the port note below.
 
 - **Waiting on a decision: whether to purge the local dangling objects from
   the accidental commit.** Verified across every ref, both worktrees,
