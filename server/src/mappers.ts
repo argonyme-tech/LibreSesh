@@ -1,5 +1,6 @@
 import type {
   BreakDto,
+  CodeState,
   ContributionDto,
   Role,
   EventDto,
@@ -107,7 +108,7 @@ export interface PersonFacts {
   creditable: boolean;
   role: Role | null;
   holderUid: string | null;
-  codePending: boolean;
+  codeState: CodeState;
   lastSeenAt: string | null;
   joinedAt: string | null;
   sessionCount: number;
@@ -118,7 +119,7 @@ export const NOBODY: PersonFacts = {
   creditable: true,
   role: null,
   holderUid: null,
-  codePending: false,
+  codeState: 'none',
   lastSeenAt: null,
   joinedAt: null,
   sessionCount: 0,
@@ -142,7 +143,7 @@ export const toPersonDto = (
     ? {
         role: facts.role,
         holderUid: facts.holderUid,
-        codePending: facts.codePending,
+        codeState: facts.codeState,
         lastSeenAt: facts.lastSeenAt,
         joinedAt: facts.joinedAt,
         sessionCount: facts.sessionCount,
@@ -156,14 +157,17 @@ export const toPersonDto = (
  * they were sent has ever been used. One query for the whole People list,
  * which is why the counts are subqueries rather than a second round trip.
  *
- * `codePending` reads the code itself — a `link_codes` row for this person with
- * no `used_at`. The tempting signal, `identities.last_seen_at`, does not work:
- * the identity middleware throttles that write to once a minute, so a speaker
- * who redeems their code and starts reading straight away still looks as though
- * they never arrived.
+ * `codeState` reads the code itself — whether this person has a `link_codes`
+ * row at all, and whether it carries a `used_at`. The tempting signal for the
+ * used half, `identities.last_seen_at`, does not work: the identity middleware
+ * throttles that write to once a minute, so a speaker who redeems their code
+ * and starts reading straight away still looks as though they never arrived.
  *
- * Re-minting a code for someone who already has a device sets this again, and
- * that is right — the new phrase is outstanding until it is used.
+ * Re-minting a code for someone who already has a device drops back to
+ * `pending`, and that is right — the new phrase is outstanding until it is
+ * used. Revoking deletes the row, so the state is `none` again: an organiser
+ * is told there is nothing outstanding, not that a dead phrase is in the
+ * wild.
  */
 export function personFacts(db: Db, eventId: number, onlyId?: number): Map<number, PersonFacts> {
   const rows = db
@@ -172,7 +176,7 @@ export function personFacts(db: Db, eventId: number, onlyId?: number): Map<numbe
       username: string | null;
       role: Role | null;
       holder_uid: string | null;
-      code_pending: number;
+      code_state: CodeState;
       last_seen_at: string | null;
       joined_at: string | null;
       session_count: number;
@@ -183,7 +187,9 @@ export function personFacts(db: Db, eventId: number, onlyId?: number): Map<numbe
               ei.display_name AS username,
               r.role AS role,
               i.public_id AS holder_uid,
-              CASE WHEN lc.id IS NOT NULL AND lc.used_at IS NULL THEN 1 ELSE 0 END AS code_pending,
+              CASE WHEN lc.id IS NULL THEN 'none'
+                   WHEN lc.used_at IS NULL THEN 'pending'
+                   ELSE 'used' END AS code_state,
               i.last_seen_at AS last_seen_at,
               ei.claimed_at AS joined_at,
               (SELECT COUNT(*) FROM session_speakers ss
@@ -205,7 +211,7 @@ export function personFacts(db: Db, eventId: number, onlyId?: number): Map<numbe
         creditable: r.role !== 'viewer',
         role: r.role,
         holderUid: r.holder_uid,
-        codePending: r.code_pending === 1,
+        codeState: r.code_state,
         lastSeenAt: r.last_seen_at,
         joinedAt: r.joined_at,
         sessionCount: r.session_count,

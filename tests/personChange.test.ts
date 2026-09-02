@@ -26,7 +26,7 @@ const held = person({
   name: 'Ada Lovelace',
   role: 'user',
   holderUid: 'a1b2c',
-  codePending: false,
+  codeState: 'none',
   lastSeenAt: '2026-09-02T10:00:00.000Z',
   joinedAt: '2026-09-01T09:00:00.000Z',
   sessionCount: 2,

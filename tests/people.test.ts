@@ -354,21 +354,21 @@ describe('speaker profiles', () => {
         name: string;
         claimed: boolean;
         role?: string | null;
-        codePending?: boolean;
+        codeState?: string;
       }[];
 
     it('marks a profile nobody holds', async () => {
       await makeSession(admin, { speakers: ['Ada Lovelace'] }).expect(201);
       const [ada] = await peopleFor(admin);
       expect(ada).toMatchObject({ name: 'Ada Lovelace', claimed: false, role: null });
-      expect(ada?.codePending).toBe(false);
+      expect(ada?.codeState).toBe('none');
     });
 
     it('gives the role of whoever holds it', async () => {
       await user.patch('/api/e/testconf/me/profile').send({ name: 'Grace' });
       const [grace] = await peopleFor(admin);
       expect(grace).toMatchObject({ name: 'Grace', claimed: true, role: 'user' });
-      expect(grace?.codePending).toBe(false);
+      expect(grace?.codeState).toBe('none');
     });
 
     it('flags a speaker code that nobody has redeemed yet', async () => {
@@ -380,14 +380,29 @@ describe('speaker profiles', () => {
 
       // Claimed on paper — an identity exists — but nobody has turned up.
       const before = await peopleFor(admin);
-      expect(before[0]).toMatchObject({ claimed: true, role: 'speaker', codePending: true });
+      expect(before[0]).toMatchObject({ claimed: true, role: 'speaker', codeState: 'pending' });
 
       const phone = await actorWithRole(harness, 'testconf', 'viewer-pw');
       await phone.post('/api/me/link').send({ phrase: code.body.phrase }).expect(200);
       await phone.get('/api/e/testconf/bundle').expect(200);
 
       const after = await peopleFor(admin);
-      expect(after[0]).toMatchObject({ claimed: true, role: 'speaker', codePending: false });
+      // Used, not gone: an organiser asking "did I ever send them a phrase?"
+      // is asking a different question from "are they still waiting to use it".
+      expect(after[0]).toMatchObject({ claimed: true, role: 'speaker', codeState: 'used' });
+    });
+
+    it('forgets the code once it is revoked', async () => {
+      const res = await makeSession(admin, { speakers: ['Ada Lovelace'] }).expect(201);
+      const personId = res.body.speakers[0].id as number;
+      await admin.post(`/api/e/testconf/people/${personId}/speaker-code`).expect(200);
+      await admin.delete(`/api/e/testconf/people/${personId}/speaker-code`).expect(204);
+
+      // Back to `none`, not a third "revoked" state: the row is gone, and an
+      // organiser is being told there is nothing outstanding — not that a
+      // dead phrase is still in the wild.
+      const [ada] = await peopleFor(admin);
+      expect(ada?.codeState).toBe('none');
     });
 
     it('tells nobody else who runs the event', async () => {
@@ -396,7 +411,7 @@ describe('speaker profiles', () => {
         const [grace] = await peopleFor(agent);
         // Absent, not null: "not disclosed to you" rather than "unclaimed".
         expect(grace).not.toHaveProperty('role');
-        expect(grace).not.toHaveProperty('codePending');
+        expect(grace).not.toHaveProperty('codeState');
         expect(grace).not.toHaveProperty('lastSeenAt');
         expect(grace).not.toHaveProperty('sessionCount');
         expect(grace?.claimed).toBe(true);

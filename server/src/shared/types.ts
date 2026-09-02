@@ -3,6 +3,9 @@
 export type Role = 'viewer' | 'user' | 'speaker' | 'admin';
 export type SessionType = 'official' | 'open';
 export type ContributionKind = 'note' | 'link' | 'question';
+/** Where a profile's speaker code stands: never minted (or revoked), minted
+ *  and still unused, or redeemed at the gate. */
+export type CodeState = 'none' | 'pending' | 'used';
 
 /** What the gate needs before anyone is in: the username this device already
  *  holds here, if it has entered before. */
@@ -170,12 +173,18 @@ export interface PersonDto {
    */
   holderUid?: string | null;
   /**
-   * Organisers only. True when a speaker code minted for this profile has
-   * never been redeemed — the phrase is still sitting in an unread email.
-   * `claimed` cannot tell an organiser that, because minting attaches an
-   * identity at mint time and so claims the profile immediately.
+   * Organisers only. Whether a speaker code exists for this profile and, if
+   * so, whether it has been used: `pending` is a phrase still sitting in an
+   * unread email, `used` one that has been typed at the gate at least once,
+   * `none` a profile that was never sent one (or whose code was revoked).
+   *
+   * Three states rather than a `codePending` boolean because an organiser
+   * looking at a profile asks two different questions — "did I ever send
+   * this person a phrase?" and "are they still waiting to use it?" — and a
+   * boolean answers only the second. `claimed` answers neither: minting
+   * attaches an identity at mint time, so it claims the profile immediately.
    */
-  codePending?: boolean;
+  codeState?: CodeState;
   /** Organisers only. Last request from this person's device anywhere on the
    *  instance, minute-coarse; null for a profile nobody holds. */
   lastSeenAt?: string | null;

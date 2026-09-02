@@ -166,16 +166,38 @@ export function NumberField({
 }
 
 /** `userLabel` is the event's own word for the middle role, e.g. "attendee". */
+/**
+ * The colour each role wears, and the pill it wears it in.
+ *
+ * Split out from `RoleBadge` so the editable tag in the People list can be the
+ * same object as the badge everywhere else. A role that is a plain select in
+ * one place and a coloured pill in another reads as two different facts; an
+ * organiser scanning the list should recognise "organiser" by colour before
+ * they have read the word.
+ */
+export const roleTagColor: Record<Role, string> = {
+  admin: 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900',
+  speaker: 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300',
+  user: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
+  viewer: 'bg-stone-200 text-stone-600 dark:bg-stone-700 dark:text-stone-300',
+};
+
+/** The pill itself, without the colour — shared with the "signed out" tag,
+ *  which is not a role and so has no entry above. The `capitalize` that used
+ *  to live here does not: "signed out" is a sentence about somebody, not a
+ *  role's name, and "Signed Out" beside a lowercase "speaker" reads as a
+ *  different kind of thing. Whoever renders a role word adds it. */
+export const roleTagShape = 'rounded-full px-2 py-0.5 text-xs font-semibold';
+
+/** What this event calls the role. `user` is the one an organiser may rename,
+ *  which is why nothing hard-codes "attendee" but this. */
+export const roleWord = (role: Role, userLabel?: string): string =>
+  role === 'user' ? (userLabel ?? 'attendee') : role;
+
 export function RoleBadge({ role, userLabel }: { role: Role; userLabel?: string }) {
-  const style = {
-    admin: 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900',
-    speaker: 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300',
-    user: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
-    viewer: 'bg-stone-200 text-stone-600 dark:bg-stone-700 dark:text-stone-300',
-  }[role];
   return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${style}`}>
-      {role === 'user' ? (userLabel ?? 'attendee') : role}
+    <span className={`${roleTagShape} ${roleTagColor[role]} capitalize`}>
+      {roleWord(role, userLabel)}
     </span>
   );
 }

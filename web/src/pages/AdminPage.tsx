@@ -26,6 +26,7 @@ import {
   type PeopleSort,
 } from '../lib/people';
 import { PersonStatusBadge } from '../components/PersonLine';
+import { RoleControl } from '../components/RoleControl';
 
 /**
  * The People table's columns, shared by the header and every row so the two
@@ -470,10 +471,9 @@ export function AdminPage() {
    * organiser — an event nobody can administer has no way back — so that
    * refusal arrives as a toast rather than being predicted here.
    */
-  const changeRole = async (person: PersonDto, role: string) => {
-    if (role === '') return;
+  const changeRole = async (person: PersonDto, role: Role) => {
     try {
-      const updated = await api.setPersonRole(slug, person.id, role as Role);
+      const updated = await api.setPersonRole(slug, person.id, role);
       data.apply({ type: 'person.updated', entity: updated });
     } catch (err) {
       fail(err);
@@ -1063,7 +1063,7 @@ export function AdminPage() {
                         you
                       </span>
                     )}
-                    {person.codePending === true && (
+                    {person.codeState === 'pending' && (
                       <span
                         title="A speaker code was minted for them and has never been redeemed."
                         className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[0.65rem] font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
@@ -1091,31 +1091,17 @@ export function AdminPage() {
                     {person.holderUid == null ? '—' : person.holderUid.toUpperCase()}
                   </span>
 
-                  {/* The role *is* the status: a select for anyone who holds
-                      the profile, a badge for a profile nobody holds. */}
+                  {/* The role *is* the status: the badge everyone else sees,
+                      with a pencil in it for anyone who holds the profile, and
+                      a plain badge for a profile nobody holds. */}
                   <span className={PEOPLE_COL.role}>
                     {person.claimed ? (
-                      <select
-                        value={person.role ?? ''}
-                        onChange={(e) => void changeRole(person, e.target.value)}
-                        aria-label={`Role for ${person.name}`}
-                        title={
-                          person.role == null
-                            ? 'They hold no role here now, so they cannot see the event. Pick one to let them back in.'
-                            : 'What they may do here. Changing it takes effect at once.'
-                        }
-                        className="w-full rounded-lg border border-stone-300 bg-white px-1.5 py-1 text-xs font-medium text-stone-700 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-200"
-                      >
-                        {person.role == null && (
-                          <option value="" disabled>
-                            signed out
-                          </option>
-                        )}
-                        <option value="viewer">Viewer</option>
-                        <option value="user">{event.userRoleLabel || 'Attendee'}</option>
-                        <option value="speaker">Speaker</option>
-                        <option value="admin">Organiser</option>
-                      </select>
+                      <RoleControl
+                        role={person.role ?? null}
+                        userLabel={event.userRoleLabel}
+                        personName={person.name}
+                        onChange={(role) => void changeRole(person, role)}
+                      />
                     ) : (
                       <PersonStatusBadge person={person} userLabel={event.userRoleLabel} />
                     )}

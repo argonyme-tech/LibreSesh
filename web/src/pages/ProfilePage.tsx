@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import type { PersonDetailDto, PersonDto, LabelledLink } from '@shared/types';
+import type { PersonDetailDto, PersonDto, LabelledLink, Role } from '@shared/types';
 import { ApiError, api, type PersonWrite } from '../lib/api';
 import { dayLabel, fmtMin, place, todayInZone } from '../lib/format';
 import { renderMarkdown } from '../lib/markdown';
 import { useEventData } from '../lib/useEventData';
 import { EditIcon } from '../components/icons';
 import { MergeModal } from '../components/MergeModal';
+import { PersonStatusBadge } from '../components/PersonLine';
+import { RoleControl } from '../components/RoleControl';
 import {
   EmptyState,
   FormError,
@@ -44,6 +46,7 @@ export function ProfilePage() {
   const from = (useLocation().state as { back?: { to: string; label: string } } | null)?.back;
   // The bundle gives us the viewer's role, the timezone and live edits.
   const data = useEventData(slug);
+  const toast = useToast();
 
   const [detail, setDetail] = useState<PersonDetailDto | null>(null);
   const [status, setStatus] = useState<Status>('loading');
@@ -180,6 +183,21 @@ export function ProfilePage() {
     data.apply({ type: 'person.updated', entity: updated });
   };
 
+  /**
+   * Hand them a different role. The server refuses to demote the last
+   * organiser — an event nobody can administer has no way back — so that
+   * refusal arrives as a toast rather than being predicted here.
+   */
+  const changeRole = async (role: Role) => {
+    try {
+      const updated = await api.setPersonRole(slug, person.id, role);
+      setDetail((d) => (d ? { ...d, person: updated } : d));
+      data.apply({ type: 'person.updated', entity: updated });
+    } catch (err) {
+      toast.show((err as Error).message);
+    }
+  };
+
   const setLink = (i: number, patch: Partial<LabelledLink>) =>
     setDraftLinks((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
 
@@ -258,6 +276,25 @@ export function ProfilePage() {
                   ? 'Nobody holds this profile yet'
                   : `@${person.username}`}
               </p>
+              {/* What this person is here, for organisers only — the same
+                  badge the People list shows, changeable in the same way.
+                  An organiser who opens a profile to read a bio is one click
+                  from the reason they usually came: the role is wrong. Before
+                  this, the only place to change it was the row they left. */}
+              {isAdmin && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {person.claimed ? (
+                    <RoleControl
+                      role={person.role ?? null}
+                      userLabel={bundle?.event.userRoleLabel}
+                      personName={person.name}
+                      onChange={(role) => void changeRole(role)}
+                    />
+                  ) : (
+                    <PersonStatusBadge person={person} userLabel={bundle?.event.userRoleLabel} />
+                  )}
+                </div>
+              )}
             </div>
             {isAdmin && (
               <SecondaryButton className="shrink-0 py-1.5" onClick={() => setMerging(true)}>
@@ -715,6 +752,9 @@ function SpeakerAccess({
     try {
       await api.revokeSpeakerCode(slug, person.id);
       setPhrase(null);
+      // Reload as minting does: the badge above is read off the person, and
+      // a revoked code that still shows "code unused" is worse than no badge.
+      onChanged();
       toast.show('Speaker phrase revoked');
     } catch (err) {
       toast.show((err as Error).message);
@@ -723,16 +763,49 @@ function SpeakerAccess({
     }
   };
 
+  /**
+   * Whether a phrase is out there, which this section could not say before.
+   * It knew only about a phrase minted in this page's own lifetime, so an
+   * organiser returning the next day was shown "Generate phrase" whether they
+   * had sent one or not — and the only way to find out was to mint a second,
+   * which silently invalidates the first.
+   */
+  const state = person.codeState ?? 'none';
+
   return (
     <div className="mt-4 border-t border-stone-100 pt-3 dark:border-stone-800">
-      <div className="flex items-center gap-2">
-        <span className="flex-1 text-xs font-semibold text-stone-500 dark:text-stone-400">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold text-stone-500 dark:text-stone-400">
           Speaker access
         </span>
+        {state === 'pending' && (
+          <span
+            title="The phrase has been generated and never typed at the gate — it is still sitting in an unread message."
+            className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+          >
+            code unused
+          </span>
+        )}
+        {state === 'used' && (
+          <span
+            title="The phrase has been typed at the gate at least once, so a device is signed in as this profile."
+            className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+          >
+            code used
+          </span>
+        )}
+        <span className="flex-1" />
         <SecondaryButton className="py-1 text-xs" onClick={() => void mint()} disabled={busy}>
-          {phrase ? 'New phrase' : 'Generate phrase'}
+          {state === 'none' ? 'Generate phrase' : 'New phrase'}
         </SecondaryButton>
-        <SecondaryButton className="py-1 text-xs" onClick={() => void revoke()} disabled={busy}>
+        {/* Off when there is nothing to revoke, rather than hidden: the button
+            disappearing would read as "you may not do this". */}
+        <SecondaryButton
+          className="py-1 text-xs"
+          onClick={() => void revoke()}
+          disabled={busy || state === 'none'}
+          title={state === 'none' ? 'No phrase to revoke.' : undefined}
+        >
           Revoke
         </SecondaryButton>
       </div>
@@ -748,8 +821,11 @@ function SpeakerAccess({
         </>
       ) : (
         <p className="mt-1.5 text-xs text-stone-500 dark:text-stone-400">
-          A phrase {person.name} can type at the gate to become this profile, with the speaker
-          role. Generating a new one replaces the old.
+          {state === 'none'
+            ? `No phrase exists for ${person.name}. Generate one and they can type it at the gate to become this profile, with the speaker role.`
+            : state === 'pending'
+              ? `A phrase exists and has not been used. It is shown only once, so if it did not reach ${person.name}, generate a new one — which replaces the old.`
+              : `${person.name} has used their phrase. It still works on further devices; generating a new one replaces it, revoking cancels it without signing out the devices already in.`}
         </p>
       )}
     </div>

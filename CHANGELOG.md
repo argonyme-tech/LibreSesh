@@ -51,6 +51,34 @@ All notable changes to this project are documented here.
   empty day the page already says so, and a lone button under nothing
   reads as the day's entire content.
 
+- **A role is the badge everyone already knows, with a pencil in it.** In
+  the People list the role was the one thing on the row rendered as a bare
+  `<select>`, so the column an organiser scans to answer "who runs this
+  event" was four identical grey boxes whose text had to be read one at a
+  time — while the header chip, the merge dialog and the invite page all
+  showed the same fact as a coloured badge. It is that badge now, in the
+  same colours, with a small pencil inside the pill and a menu that spells
+  out what each role may do rather than listing four bare words. The colour
+  map lives in one place, so the badge and the control cannot drift apart.
+
+- **A role can be changed from the profile page.** An organiser who opened
+  a profile usually came for the reason the profile was worth opening —
+  the role is wrong — and the only place to change it was the row they had
+  just left. The role now sits under the name, organisers only, as the same
+  editable badge; a profile nobody holds shows why it has none instead.
+
+- **The profile page says whether a speaker code was ever generated.**
+  Speaker access knew only about a phrase minted in that page's own
+  lifetime, so an organiser returning the next day was offered "Generate
+  phrase" whether they had already sent one or not — and the only way to
+  find out was to mint a second, which silently invalidates the first. The
+  section now reads the code's state off the person: **code unused** for a
+  phrase still sitting in an unread message, **code used** once it has been
+  typed at the gate, and nothing when none exists, with Revoke switched off
+  rather than hidden. `PersonDto.codePending` became `codeState`, three
+  states, because the boolean could answer "are they still waiting?" but
+  never "did I ever send them one?".
+
 ## [0.2.3] — 2026-09-02
 
 ### Added
