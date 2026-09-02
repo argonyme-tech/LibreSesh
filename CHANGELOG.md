@@ -547,7 +547,30 @@ All notable changes to this project are documented here.
   duplicate, a claim on the duplicate moves to the survivor, and the duplicate
   is soft-deleted. Audited; not undoable via /trash, hence admin-only.
 
+- **A landing page at `/`.** The root said nothing about what LibreSesh is —
+  that copy lived in the About dialog, behind the "?" you cannot reach until
+  you are inside an event and past its password, so the one page a stranger is
+  guaranteed to see was the one page that explained nothing. `/` now answers
+  what this is, the licence, and what to do if you are holding an event link.
+  The list of every event moved to `/events`, which also stops a public
+  instance enumerating every event on the box to anyone who loads the root.
+
+  Its hero is markup rather than the design draft's screenshot: the app has a
+  light theme and a dark one, so a single PNG is wrong half the time, and a
+  pair goes stale the first time a card changes because nothing renders it.
+  `BoardPreview` is built from the classes `ListView` uses, and is
+  `aria-hidden` behind a real caption — the sessions in it are not real.
+
 ### Changed
+
+- **The star is an icon in the corner, not a row of text.** Opening a session
+  put "Add to my agenda" across the top of the panel, above the description and
+  the notes that are what somebody opened it for — a full-width button spelling
+  out what a hollow star already says. It is now a 36px star under the sheet's
+  close button, in the same column and the same shape as the expand and close
+  controls, with the words kept in the tooltip and the accessible label. The
+  full-page view drops it from the sticky rail and puts it in the same
+  top-right corner, so it is in one place wherever you meet a session.
 
 - **One colour control, and it is a circle.** Tags, tracks and rooms each drew
   the browser's own `<input type="color">` — a rectangle every browser paints
@@ -668,6 +691,13 @@ All notable changes to this project are documented here.
   instance one; the README gained a section on the same distinction.
 
 ### Fixed
+
+- **Arrange is gone from the list view.** `arrange` is read by the calendar
+  grid and by nothing else, so in the list the button toggled a mode with no
+  effect — it lit up, said "Done arranging", and changed nothing under it.
+  Switching away from the grid now also turns the mode off, rather than leaving
+  it open behind a button that is no longer on screen. Editing from the list is
+  unaffected: it never went through Arrange.
 
 - **Number fields no longer accept nonsense.** Every typed number in the app
   was a `type="number"` input, which enforces `min` and `max` on the spinner
@@ -1061,6 +1091,15 @@ All notable changes to this project are documented here.
   treatment was already avoiding. The move also puts them outside the part of
   the header that folds away as you scroll into a day — Arrange in particular
   is a thing you reach for mid-scroll, and it used to fold out from under you.
+
+- **The logo means home, and home is `/`.** The logo in the schedule, agenda,
+  search and event-list headers used to be labelled "All events" and open the
+  list; it goes to the landing page now, as does the catch-all for a URL that
+  no longer resolves — most often a stale or mistyped event link, which the
+  page explaining what to do with an event link answers better than a list of
+  events that are not yours. The "back to all events" links in the error
+  states and the back links on Import and New event are about the list, not
+  about home, and still point at `/events`.
 
 
 ## [0.2.0] — 2026-08-30
