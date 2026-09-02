@@ -30,4 +30,15 @@ describe('id formatting', () => {
     expect(rowId(12)).toBe('ID: 00012');
     expect(rowId(123456)).toBe('ID: 123456');
   });
+
+  /** The button at the end of a day's list. The last day has nothing after
+   *  it, and a day outside the event's range is not a place to count from. */
+  it('knows which day comes next, and when there is none', async () => {
+    const { dayAfter } = await import('../web/src/lib/format.js');
+    const days = ['2026-06-01', '2026-06-02', '2026-06-03'];
+    expect(dayAfter(days, '2026-06-01')).toBe('2026-06-02');
+    expect(dayAfter(days, '2026-06-03')).toBeNull();
+    expect(dayAfter(days, '2026-07-01')).toBeNull();
+    expect(dayAfter([], '2026-06-01')).toBeNull();
+  });
 });

@@ -6,6 +6,45 @@ All notable changes to this project are documented here.
 
 ### Added
 
+### Changed
+
+- **A link no longer has to be on the web.** The rule was an allow-list of
+  two schemes, http and https, which refused a session streamed over IPFS
+  or Swarm, a magnet link, an RTMP feed from a room's own camera, and
+  everything anyone might invent next. It is a deny-list now: anything that
+  parses as a URI is a link, except the handful of schemes that run
+  something on the reader's machine rather than fetching something —
+  `javascript:`, `data:`, `vbscript:`, `blob:`, `file:` and friends.
+
+  One rule, in `shared/links.ts`, used by the stream links, profile links,
+  contribution links and the markdown in descriptions and bios, so a link
+  written in a bio and a link typed into a field cannot disagree about what
+  is allowed. It leans on the URL parser rather than matching text, which
+  is what keeps `JavaScript:` and a leading space from getting through.
+
+### Added
+
+- **A session can carry more than one stream link.** One column held one
+  link, so the main camera fitted and the room's own feed, the interpreted
+  channel or a mirror somebody set up went into the description or nowhere.
+  A session now holds up to six labelled links, in the shape profiles have
+  used for theirs, and the session sheet lists them by name. A single
+  unlabelled one still reads "Watch the livestream", as it always did.
+
+  Migration 012 moves the existing link into the list and drops the old
+  column. `SessionDto.livestreamUrl` is gone, replaced by `livestreams`.
+
+- **The end of a day's list offers the next one.** Reaching the bottom is
+  the moment a reader asks what happens tomorrow, and the answer was a day
+  picker back at the top of the page. There is a button there now, naming
+  the day it goes to. Only under a day that had something in it: on an
+  empty day the page already says so, and a lone button under nothing
+  reads as the day's entire content.
+
+## [0.2.3] — 2026-09-02
+
+### Added
+
 - **Everyone who enters an event is a person there.** A `people` row used
   to appear only when someone edited their profile, was typed onto a
   session, or was added by an organiser — so a newcomer who had passed the
@@ -34,6 +73,25 @@ All notable changes to this project are documented here.
   visible like anyone's — they star and post — but is not on offer as a
   speaker (`PersonDto.creditable`), and the server refuses a non-organiser
   crediting one. Organisers may still credit anyone.
+
+- **You can ask for the profile an organiser left for you.** An organiser
+  adds *Marcel Jackisch* as a speaker before he arrives; Marcel enters as
+  `marcel`, gets a profile of his own, and the shell sits there with his
+  talks on it. Joining the two took a minted speaker phrase, an organiser
+  merging by hand, or the gate happening to offer the shell because the
+  username typed matched its full name — every route needing somebody else
+  to act first, or a coincidence.
+
+  Now the person asks. An unclaimed profile carries a "This is me" button,
+  and the request waits in a queue above the People list until an organiser
+  agrees. **It stops at asking on purpose**: a shell is usually credited on
+  sessions, and holding the profile a session credits is the right to
+  rewrite that talk, so left unguarded this would have been the cheapest
+  way into somebody else's keynote. Approving runs exactly the merge an
+  organiser would have run by hand, with the shell surviving so it keeps
+  its name and its sessions, and everyone else waiting on that profile is
+  told they were not chosen. Declining says so rather than letting the
+  request vanish. Both are audited.
 
 - **A profile page goes back where you opened it from.** Every profile sent
   you to the schedule, so an organiser working through Manage → People had

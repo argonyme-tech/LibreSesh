@@ -5,7 +5,7 @@ import type {
   EventDto,
   EventSummary,
   PersonDto,
-  PersonLink,
+  LabelledLink,
   PersonRef,
   ProposalDto,
   RoomDto,
@@ -81,16 +81,16 @@ export const toBreakDto = (b: BreakRow): BreakDto => ({
 export const toTagDto = (t: TagRow): TagDto => ({ id: t.id, name: t.name, color: t.color });
 
 /** Links are stored as a JSON string; a malformed row must not break the page. */
-export function parseLinks(raw: string): PersonLink[] {
+export function parseLinks(raw: string): LabelledLink[] {
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(
-      (l): l is PersonLink =>
+      (l): l is LabelledLink =>
         typeof l === 'object' &&
         l !== null &&
-        typeof (l as PersonLink).label === 'string' &&
-        typeof (l as PersonLink).url === 'string',
+        typeof (l as LabelledLink).label === 'string' &&
+        typeof (l as LabelledLink).url === 'string',
     );
   } catch {
     return [];
@@ -250,7 +250,7 @@ export function toSessionDto(
     title: row.title,
     description: row.description,
     speakers,
-    livestreamUrl: row.livestream_url,
+    livestreams: parseLinks(row.livestreams),
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     tagIds,

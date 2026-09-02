@@ -1,4 +1,5 @@
 import { marked } from 'marked';
+import { safeLink } from '@shared/links';
 
 /**
  * Render session descriptions. Raw HTML is escaped before parsing rather than
@@ -8,16 +9,11 @@ import { marked } from 'marked';
 const escapeHtml = (raw: string): string =>
   raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-const SAFE_PROTOCOLS = ['http:', 'https:', 'mailto:'];
-
-function safeHref(href: string): string | undefined {
-  try {
-    const url = new URL(href, window.location.origin);
-    return SAFE_PROTOCOLS.includes(url.protocol) ? url.href : undefined;
-  } catch {
-    return undefined;
-  }
-}
+/** The same rule the link fields are held to, so a link written in a bio and
+ *  a link typed into a field cannot disagree about what is allowed. Relative
+ *  links resolve against the page, which is why markdown passes a base. */
+const safeHref = (href: string): string | undefined =>
+  safeLink(href, window.location.origin) ?? undefined;
 
 const renderer = new marked.Renderer();
 renderer.link = ({ href, title, tokens }) => {

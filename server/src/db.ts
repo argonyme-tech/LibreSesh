@@ -97,7 +97,8 @@ export interface SessionRow {
   /** Free text from before profiles existed. A historical record: nothing
    *  reads it for display — the speakers are `session_speakers`. */
   speaker: string;
-  livestream_url: string;
+  /** JSON array of { label, url }; see migration 012. */
+  livestreams: string;
   starts_at: string;
   ends_at: string;
   created_by: number;

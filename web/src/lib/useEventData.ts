@@ -380,6 +380,11 @@ export function useEventData(slug: string): EventData {
     navigate(`${to}${search}`, { replace: true });
   }, [canonicalSlug, slug, pathname, search, navigate]);
 
+  /** The profile this viewer holds, watched so a deletion of it can be
+   *  noticed without making the reducer impure. */
+  const mine = useRef<number | null>(null);
+  mine.current = state.bundle?.people.find((p) => p.isMine)?.id ?? null;
+
   const reload = useCallback(async () => {
     dispatch({ kind: 'loading' });
     try {
@@ -406,7 +411,17 @@ export function useEventData(slug: string): EventData {
       }
     });
     source.addEventListener('change', (ev) => {
-      dispatch({ kind: 'change', change: JSON.parse((ev as MessageEvent<string>).data) });
+      const change = JSON.parse((ev as MessageEvent<string>).data) as ChangeEvent;
+      dispatch({ kind: 'change', change });
+      // Your own profile disappearing is the one frame that means more than
+      // it says: an organiser approved your request to hold another one, or
+      // merged you into it, and where you went is not in the frame. Nothing
+      // on the wire can carry that — it is a fact about you, and the wire is
+      // read by everyone — so fetch the answer instead of guessing.
+      if (change.type === 'person.deleted') {
+        const gone = (change.entity as { id: number }).id;
+        if (mine.current === gone) void reload();
+      }
     });
     source.addEventListener('error', () => {
       hadError.current = true;

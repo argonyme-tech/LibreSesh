@@ -98,7 +98,7 @@ export function sessionRoutes(ctx: Ctx): Router {
         .prepare(
           `INSERT INTO sessions
             (event_id, room_id, track_id, type, blocks_open_booking, title,
-             description, speaker, livestream_url, starts_at, ends_at,
+             description, speaker, livestreams, starts_at, ends_at,
              created_by, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?)`,
         )
@@ -110,7 +110,7 @@ export function sessionRoutes(ctx: Ctx): Router {
           blocks ? 1 : 0,
           body.title,
           body.description ?? '',
-          body.livestreamUrl ?? '',
+          JSON.stringify(body.livestreams ?? []),
           window.startsAt.toISOString(),
           window.endsAt.toISOString(),
           req.identity.id,
@@ -211,7 +211,7 @@ export function sessionRoutes(ctx: Ctx): Router {
         const insert = ctx.db.prepare(
           `INSERT INTO sessions
             (event_id, room_id, track_id, type, blocks_open_booking, title,
-             description, speaker, livestream_url, starts_at, ends_at,
+             description, speaker, livestreams, starts_at, ends_at,
              created_by, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?)`,
         );
@@ -225,7 +225,7 @@ export function sessionRoutes(ctx: Ctx): Router {
               blocks ? 1 : 0,
               body.title,
               body.description ?? '',
-              body.livestreamUrl ?? '',
+              JSON.stringify(body.livestreams ?? []),
               window.startsAt.toISOString(),
               window.endsAt.toISOString(),
               req.identity.id,
@@ -332,7 +332,7 @@ export function sessionRoutes(ctx: Ctx): Router {
         .prepare(
           `UPDATE sessions SET room_id = ?, track_id = ?, type = ?, blocks_open_booking = ?,
                   title = ?, description = ?,
-                  livestream_url = ?, starts_at = ?, ends_at = ?, updated_at = ?
+                  livestreams = ?, starts_at = ?, ends_at = ?, updated_at = ?
             WHERE id = ?`,
         )
         .run(
@@ -342,7 +342,7 @@ export function sessionRoutes(ctx: Ctx): Router {
           blocks ? 1 : 0,
           body.title ?? existing.title,
           body.description ?? existing.description,
-          body.livestreamUrl ?? existing.livestream_url,
+          body.livestreams === undefined ? existing.livestreams : JSON.stringify(body.livestreams),
           window.startsAt.toISOString(),
           window.endsAt.toISOString(),
           now,

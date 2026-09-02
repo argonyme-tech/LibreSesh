@@ -1,5 +1,14 @@
 import { useMemo, useState } from 'react';
-import type { PersonDto, RoomDto, Role, SessionDto, TagDto, TrackDto } from '@shared/types';
+import type {
+  LabelledLink,
+  PersonDto,
+  RoomDto,
+  Role,
+  SessionDto,
+  TagDto,
+  TrackDto,
+} from '@shared/types';
+import { LINK_RULE, safeLink } from '@shared/links';
 import { windowLabel, windowOn } from '@shared/trackHours';
 import type { SessionWrite } from '../lib/api';
 import { fmtMin, place } from '../lib/format';
@@ -25,6 +34,7 @@ import {
   FormGrid,
   HelpButton,
   HelpNote,
+  IconButton,
   Modal,
   PrimaryButton,
   SecondaryButton,
@@ -97,7 +107,12 @@ export function SessionModal({
     return !isAdmin && mine ? [mine.id] : [];
   });
   const [description, setDescription] = useState(session?.description ?? '');
-  const [livestreamUrl, setLivestreamUrl] = useState(session?.livestreamUrl ?? '');
+  // A session can be streamed more than once. Kept as a draft list with a
+  // blank row at the end, the way the profile's links are edited: adding the
+  // second one should not need a button pressed before there is a field.
+  const [livestreams, setLivestreams] = useState<LabelledLink[]>(
+    () => session?.livestreams ?? [],
+  );
   const [roomId, setRoomId] = useState<number>(session?.roomId ?? allowedRooms[0]?.id ?? 0);
   const [day, setDay] = useState(existing?.date ?? defaultDay);
   const [start, setStart] = useState(fmtMin(existing?.startMin ?? Math.max(dayStartMin, 14 * 60)));
@@ -164,9 +179,15 @@ export function SessionModal({
       setError(`Open sessions must sit between ${fmtMin(dayStartMin)} and ${fmtMin(dayEndMin)}`);
       return;
     }
-    const stream = livestreamUrl.trim();
-    if (stream && !/^https?:\/\//i.test(stream)) {
-      setError('A livestream link must start with http:// or https://');
+    const streams = livestreams
+      .map((l) => ({ label: l.label.trim(), url: l.url.trim() }))
+      .filter((l) => l.url !== '' || l.label !== '');
+    if (streams.some((l) => safeLink(l.url) === null)) {
+      setError(LINK_RULE);
+      return;
+    }
+    if (streams.some((l) => l.label === '')) {
+      setError('Give each stream a name, so a reader knows which is which');
       return;
     }
     if (repeatProblem) {
@@ -180,7 +201,7 @@ export function SessionModal({
       title: title.trim(),
       speakers,
       description: description.trim(),
-      livestreamUrl: livestreamUrl.trim(),
+      livestreams: streams,
       startsAt: zonedTimeToUtc(day, startMin, timezone).toISOString(),
       endsAt: zonedTimeToUtc(day, startMin + durMin, timezone).toISOString(),
       tagIds,
@@ -418,14 +439,54 @@ export function SessionModal({
         </FieldGroup>
 
         <FieldGroup title="Extras">
-          <Field label="Livestream link" hint="Optional. Attendees only see this if you set it.">
-            <input
-              value={livestreamUrl}
-              onChange={(e) => setLivestreamUrl(e.target.value)}
-              placeholder="https://…"
-              maxLength={2000}
-              className={inputClass}
-            />
+          <Field
+            label="Livestream links"
+            hint="Optional, and as many as the session has — a main camera, a room feed, an interpreted channel. Attendees only see what you add."
+          >
+            <div className="flex flex-col gap-1.5">
+              {livestreams.map((stream, i) => (
+                <div key={i} className="flex gap-1.5">
+                  <input
+                    value={stream.label}
+                    onChange={(e) =>
+                      setLivestreams((ls) =>
+                        ls.map((l, j) => (j === i ? { ...l, label: e.target.value } : l)),
+                      )
+                    }
+                    aria-label={`Name of stream ${i + 1}`}
+                    placeholder="YouTube"
+                    maxLength={60}
+                    className={`${inputClass} w-32 shrink-0`}
+                  />
+                  <input
+                    value={stream.url}
+                    onChange={(e) =>
+                      setLivestreams((ls) =>
+                        ls.map((l, j) => (j === i ? { ...l, url: e.target.value } : l)),
+                      )
+                    }
+                    aria-label={`Link for stream ${i + 1}`}
+                    placeholder="https:// or ipfs://…"
+                    maxLength={2000}
+                    className={inputClass}
+                  />
+                  <IconButton
+                    aria-label={`Remove stream ${i + 1}`}
+                    onClick={() => setLivestreams((ls) => ls.filter((_, j) => j !== i))}
+                  >
+                    <RemoveIcon className="h-3.5 w-3.5" />
+                  </IconButton>
+                </div>
+              ))}
+              {livestreams.length < 6 && (
+                <SecondaryButton
+                  className="self-start py-1 text-xs"
+                  onClick={() => setLivestreams((ls) => [...ls, { label: '', url: '' }])}
+                >
+                  {livestreams.length === 0 ? 'Add a stream' : 'Add another'}
+                </SecondaryButton>
+              )}
+            </div>
           </Field>
 
           {isAdmin && (

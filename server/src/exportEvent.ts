@@ -201,7 +201,7 @@ export function exportEvent(db: Db, event: EventRow): EventExport {
       description: s.description,
       speakers: (sessionSpeakers.get(s.id) ?? []).map((p) => p.name),
       speaker: (sessionSpeakers.get(s.id) ?? [])[0]?.name ?? '',
-      livestreamUrl: s.livestream_url,
+      livestreams: parseLinks(s.livestreams),
       startsAt: s.starts_at,
       endsAt: s.ends_at,
       tagIds: sessionTags.get(s.id) ?? [],

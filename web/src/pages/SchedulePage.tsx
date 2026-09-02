@@ -13,6 +13,7 @@ import { dateRange, zonedTimeToUtc } from "@shared/time";
 import { windowLabel, windowOn } from "@shared/trackHours";
 import { ApiError, api, type SessionWrite } from "../lib/api";
 import {
+  dayAfter,
   dayLabel,
   dayRangeLabel,
   fmtMin,
@@ -211,6 +212,15 @@ export function SchedulePage() {
      that survives every shape of event. The switch still works either way, and
      a chosen view goes in the URL, which is what a shared link reproduces. */
   const view = filters.view ?? event?.defaultView ?? "list";
+
+  /** The day after the one being read, for the button at the end of the
+   *  list. Absent on the last day, which has nothing after it. */
+  const nextDay = useMemo(() => {
+    const date = dayAfter(days, day);
+    if (date === null) return undefined;
+    const label = dayLabel(date, today);
+    return { date, label: `${label.top} ${label.sub}`.trim() };
+  }, [days, day, today]);
 
   const dayLabels = useMemo(
     () =>
@@ -1508,8 +1518,13 @@ export function SchedulePage() {
             clashingIds={clashIds}
             timezone={timezone}
             day={day}
+            nextDay={nextDay}
             nowMin={nowMin}
             onOpen={openSession}
+            onGoToDay={(d) => {
+              filters.set({ day: d });
+              window.scrollTo({ top: 0 });
+            }}
             onToggleStar={(s) => void toggleStar(s)}
           />
         )}

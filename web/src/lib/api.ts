@@ -13,7 +13,8 @@ import type {
   Me,
   PersonDetailDto,
   PersonDto,
-  PersonLink,
+  LabelledLink,
+  ProfileClaimDto,
   ProposalDto,
   Role,
   RoomDto,
@@ -214,6 +215,17 @@ export const api = {
   revokeSpeakerCode: (slug: string, id: number) =>
     request<void>('DELETE', `/e/${encode(slug)}/people/${id}/speaker-code`),
   /** Fold profile `from` into `id`: sessions/pitches repoint, `from` disappears. */
+  /** "That profile is me." Returns the claims the caller may see. */
+  claimPerson: (slug: string, id: number) =>
+    request<ProfileClaimDto[]>('POST', `/e/${encode(slug)}/people/${id}/claim`),
+  approveClaim: (slug: string, id: number) =>
+    request<ProfileClaimDto[]>('POST', `/e/${encode(slug)}/claims/${id}/approve`),
+  declineClaim: (slug: string, id: number) =>
+    request<ProfileClaimDto[]>('POST', `/e/${encode(slug)}/claims/${id}/decline`),
+  /** Withdraw your own request, or clear one you were refused. */
+  withdrawClaim: (slug: string, id: number) =>
+    request<ProfileClaimDto[]>('DELETE', `/e/${encode(slug)}/claims/${id}`),
+
   /** Hand the holder of a profile a different role at this event. */
   setPersonRole: (slug: string, id: number, role: Role) =>
     request<PersonDto>('PUT', `/e/${encode(slug)}/people/${id}/role`, { role }),
@@ -347,8 +359,8 @@ export interface SessionWrite {
    * person. Omit to leave the billing alone; `[]` clears it.
    */
   speakers?: (number | string)[];
-  /** Watch-along link, http(s). '' clears it. */
-  livestreamUrl?: string;
+  /** Watch-along links, http(s). `[]` clears them. */
+  livestreams?: LabelledLink[];
   startsAt: string;
   endsAt: string;
   tagIds?: number[];
@@ -416,7 +428,7 @@ export interface TrashDto {
 export interface PersonWrite {
   name: string;
   bio?: string;
-  links?: PersonLink[];
+  links?: LabelledLink[];
 }
 
 export interface SettingsWrite {
