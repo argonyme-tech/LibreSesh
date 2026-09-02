@@ -59,7 +59,6 @@ import { AdminAudit } from './AdminAudit';
 import { AdminInvite } from './AdminInvite';
 import {
   DangerButton,
-  Modal,
   EmptyState,
   Field,
   FormError,
@@ -67,6 +66,7 @@ import {
   FormRow,
   FormStack,
   IconButton,
+  Modal,
   NumberField,
   PrimaryButton,
   SecondaryButton,
@@ -75,6 +75,7 @@ import {
   Toggle,
   inputClass,
   linkClass,
+  useConfirm,
   useToast,
 } from '../components/ui';
 
@@ -106,6 +107,7 @@ export function AdminPage() {
   const { slug = '' } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const confirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
   const data = useEventData(slug);
 
@@ -307,7 +309,11 @@ export function AdminPage() {
   };
 
   const removeRoom = async (room: RoomDto) => {
-    if (!window.confirm(`Delete “${room.name}”?`)) return;
+    const ok = await confirm({
+      title: `Delete the room “${room.name}”?`,
+      body: 'A room with sessions still in it cannot be deleted — move those first. The bin does not hold rooms, so this cannot be undone.',
+    });
+    if (!ok) return;
     try {
       await api.deleteRoom(slug, room.id);
       data.apply({ type: 'room.deleted', entity: { id: room.id } });
@@ -384,13 +390,11 @@ export function AdminPage() {
   };
 
   const removeTrack = async (track: TrackDto): Promise<boolean> => {
-    if (
-      !window.confirm(
-        `Delete the “${track.name}” track? Its sessions keep their room and lose the track.`,
-      )
-    ) {
-      return false;
-    }
+    const ok = await confirm({
+      title: `Delete the “${track.name}” track?`,
+      body: 'Its sessions keep their room and their time, and lose the track. The bin does not hold tracks, so this cannot be undone.',
+    });
+    if (!ok) return false;
     try {
       await api.deleteTrack(slug, track.id);
       data.apply({ type: 'track.deleted', entity: { id: track.id } });
@@ -435,9 +439,11 @@ export function AdminPage() {
   };
 
   const removeTag = async (tag: TagDto): Promise<boolean> => {
-    if (!window.confirm(`Delete the “${tag.name}” tag? It will be removed from every session.`)) {
-      return false;
-    }
+    const ok = await confirm({
+      title: `Delete the “${tag.name}” tag?`,
+      body: 'It comes off every session and pitch that wears it. The bin does not hold tags, so this cannot be undone.',
+    });
+    if (!ok) return false;
     try {
       await api.deleteTag(slug, tag.id);
       data.apply({ type: 'tag.deleted', entity: { id: tag.id } });
@@ -475,13 +481,11 @@ export function AdminPage() {
   };
 
   const removePerson = async (person: PersonDto) => {
-    if (
-      !window.confirm(
-        `Delete ${person.name}? Their sessions keep their slot but lose the speaker.`,
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: `Delete ${person.name}?`,
+      body: 'Their sessions keep their slot and lose the speaker. The bin does not hold profiles, so this cannot be undone — to fold a duplicate into another profile, use Merge instead.',
+    });
+    if (!ok) return;
     try {
       await api.deletePerson(slug, person.id);
       data.apply({ type: 'person.deleted', entity: { id: person.id } });
@@ -639,7 +643,15 @@ export function AdminPage() {
   };
 
   const setArchived = async (archived: boolean) => {
-    if (archived && !window.confirm('Archive this event? It becomes read-only for everyone.')) {
+    if (
+      archived &&
+      !(await confirm({
+        title: 'Archive this event?',
+        body: 'It becomes read-only for everyone: nobody can add, edit or delete anything until it is un-archived here. Nothing is deleted, and it can be turned off again.',
+        confirmLabel: 'Archive',
+        danger: false,
+      }))
+    ) {
       return;
     }
     try {

@@ -655,6 +655,84 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 }
 
+export interface ConfirmRequest {
+  title: string;
+  /** What will actually happen. Where the thing goes, and whether it can be
+   *  brought back — those are the two questions, and a browser alert could
+   *  answer neither because it cannot hold a sentence worth reading. */
+  body: ReactNode;
+  confirmLabel?: string;
+  /** Red button. Default true: nearly everything that asks is a removal. */
+  danger?: boolean;
+}
+
+const ConfirmContext = createContext<(request: ConfirmRequest) => Promise<boolean>>(() =>
+  Promise.resolve(false),
+);
+
+/**
+ * Ask before doing something that cannot be taken back, in the app's own
+ * voice rather than the browser's.
+ *
+ * `window.confirm` was doing this job and doing it badly: it renders as an
+ * alert from the *browser*, unstyled, untranslatable, one line, and it says
+ * "Delete X?" without ever saying what deleting means here — that a session
+ * goes to the bin and can be restored, while a room or a tag simply goes. It
+ * also freezes the page's JavaScript, which on a phone at a conference is
+ * indistinguishable from a hang.
+ *
+ * Shaped as a promise so it drops straight into the place a `confirm()` call
+ * used to sit, rather than turning every caller into a state machine.
+ */
+export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const [pending, setPending] = useState<{
+    request: ConfirmRequest;
+    settle: (ok: boolean) => void;
+  } | null>(null);
+
+  const ask = useCallback(
+    (request: ConfirmRequest) =>
+      new Promise<boolean>((settle) => setPending({ request, settle })),
+    [],
+  );
+
+  const close = (ok: boolean) => {
+    pending?.settle(ok);
+    setPending(null);
+  };
+
+  const danger = pending?.request.danger !== false;
+  const label = pending?.request.confirmLabel ?? 'Delete';
+
+  return (
+    <ConfirmContext.Provider value={ask}>
+      {children}
+      {pending && (
+        <Modal
+          title={pending.request.title}
+          onClose={() => close(false)}
+          onSubmit={() => close(true)}
+          footer={
+            <>
+              <SecondaryButton onClick={() => close(false)}>Cancel</SecondaryButton>
+              {danger ? (
+                <DangerButton type="submit">{label}</DangerButton>
+              ) : (
+                <PrimaryButton type="submit">{label}</PrimaryButton>
+              )}
+            </>
+          }
+        >
+          <p className="text-sm text-stone-600 dark:text-stone-300">{pending.request.body}</p>
+        </Modal>
+      )}
+    </ConfirmContext.Provider>
+  );
+}
+
+export const useConfirm = (): ((request: ConfirmRequest) => Promise<boolean>) =>
+  useContext(ConfirmContext);
+
 export function EmptyState({ children }: { children: ReactNode }) {
   return <div className="py-16 text-center text-sm text-stone-500 dark:text-stone-400">{children}</div>;
 }

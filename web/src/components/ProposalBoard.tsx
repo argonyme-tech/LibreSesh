@@ -10,7 +10,7 @@ import { renderMarkdown } from '../lib/markdown';
 import { useMe } from '../lib/useMe';
 import { PlaceProposalModal } from './PlaceProposalModal';
 import { ProposalModal } from './ProposalModal';
-import { EmptyState, PrimaryButton, SecondaryButton, Spinner, useToast } from './ui';
+import { EmptyState, PrimaryButton, SecondaryButton, Spinner, useConfirm, useToast } from './ui';
 
 type Status = 'loading' | 'gate' | 'error' | 'ready';
 
@@ -20,6 +20,7 @@ export function ProposalBoard() {
   const { slug = '' } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const confirm = useConfirm();
   const { me } = useMe();
 
   const [bundle, setBundle] = useState<BundleDto | null>(null);
@@ -139,7 +140,12 @@ export function ProposalBoard() {
 
   const withdrawProposal = useCallback(
     async (proposal: ProposalDto) => {
-      if (!window.confirm(`Withdraw “${proposal.title}”?`)) return;
+      const ok = await confirm({
+        title: `Withdraw “${proposal.title}”?`,
+        body: 'The pitch and the interest people registered in it go together, and the bin does not hold pitches. This cannot be undone.',
+        confirmLabel: 'Withdraw',
+      });
+      if (!ok) return;
       try {
         await api.deleteProposal(slug, proposal.id);
         setBundle((prev) =>
@@ -153,7 +159,7 @@ export function ProposalBoard() {
         toast.show((err as Error).message);
       }
     },
-    [slug, toast],
+    [confirm, slug, toast],
   );
 
   const placeProposal = useCallback(

@@ -8,6 +8,16 @@ All notable changes to this project are documented here.
 
 ### Changed
 
+- **Deleting asks in the app's own voice, and says where things go.** Every
+  confirmation was a `window.confirm`: an alert drawn by the browser rather
+  than the app, one line, unstyled, and it freezes the page while it is up,
+  which on a phone in a hallway is indistinguishable from a hang. Worse, it
+  could not answer the question a person deleting something actually has.
+  "Delete X?" never said that a session goes to the bin and an organiser can
+  put it back, while a room, a tag, a track, a profile or a pitch simply
+  goes. Each dialog now says which of those two it is, and the archive
+  prompt no longer wears a red button for something that deletes nothing.
+
 - **A link no longer has to be on the web.** The rule was an allow-list of
   two schemes, http and https, which refused a session streamed over IPFS
   or Swarm, a magnet link, an RTMP feed from a room's own camera, and
