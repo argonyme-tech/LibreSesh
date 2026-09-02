@@ -4,6 +4,10 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.2.3] — 2026-09-02
+
 ### Added
 
 - **Everyone who enters an event is a person there.** A `people` row used
