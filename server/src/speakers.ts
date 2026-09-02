@@ -2,17 +2,27 @@ import type { Db } from './db.js';
 import { badRequest, forbidden } from './errors.js';
 import type { Role } from './shared/types.js';
 
-/** Who is doing the crediting. Organisers may credit anyone; everyone else
- *  is held to `creditable` (see `PersonDto`). */
+/**
+ * Who is doing the crediting. Organisers may credit anyone; everyone else is
+ * held to `creditable` (see `PersonDto`) and, without the
+ * `session.credit_others` capability, to themselves — plus whoever is
+ * already on the session, so an attendee editing their own talk does not
+ * lose the co-host an organiser added.
+ */
 export interface Actor {
   identityId: number;
   role: Role;
+  creditOthers: boolean;
+  alreadyCredited?: readonly number[];
 }
 
+const onlySelf = () => forbidden('You can only credit yourself as a speaker here');
+
 /**
- * May a non-organiser put this person on a session? Not when the person is
- * a viewer's: a livestream audience did not come to give a talk, and the
- * picker never offers them — this is the server saying the same thing.
+ * May this actor put this person on a session? Not a viewer's person: a
+ * livestream audience did not come to give a talk, and the picker never
+ * offers them — this is the server saying the same thing. And not anyone
+ * but themselves when the matrix says so.
  */
 function assertCreditable(db: Db, eventId: number, personId: number, actor?: Actor): void {
   if (!actor || actor.role === 'admin') return;
@@ -25,6 +35,8 @@ function assertCreditable(db: Db, eventId: number, personId: number, actor?: Act
     )
     .get(personId, eventId);
   if (row?.identity_id === actor.identityId) return;
+  if (actor.alreadyCredited?.includes(personId)) return;
+  if (!actor.creditOthers) throw onlySelf();
   if (row?.role === 'viewer') throw forbidden('That person is here to watch, not to speak');
 }
 
@@ -76,6 +88,8 @@ export function resolveSpeaker(
     return existing.id;
   }
 
+  // A name nobody has is somebody else by definition.
+  if (actor && actor.role !== 'admin' && !actor.creditOthers) throw onlySelf();
   const now = new Date().toISOString();
   return Number(
     db

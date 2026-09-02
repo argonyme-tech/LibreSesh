@@ -7,6 +7,7 @@ import type {
   SessionDto,
   TrackDto,
 } from "@shared/types";
+import { can } from '@shared/capabilities';
 import type { Repeat } from "@shared/repeat";
 import { dateRange, zonedTimeToUtc } from "@shared/time";
 import { windowLabel, windowOn } from "@shared/trackHours";
@@ -1605,6 +1606,7 @@ export function SchedulePage() {
           tracks={bundle.tracks}
           people={bundle.people}
           role={role}
+          canCreditOthers={can(bundle.permissions, role, 'session.credit_others')}
           timezone={timezone}
           days={days}
           dayLabels={dayLabels}

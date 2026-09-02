@@ -29,6 +29,7 @@ export function SpeakerCombobox({
   onChange,
   max,
   isAdmin = false,
+  onlySelf = false,
 }: {
   people: PersonDto[];
   value: SpeakerChoice[];
@@ -41,6 +42,9 @@ export function SpeakerCombobox({
    *  may be credited (`PersonDto.creditable`) — a viewer's person is not on
    *  offer, though a viewer still sees themselves. */
   isAdmin?: boolean;
+  /** The matrix has `session.credit_others` off for this role: the field
+   *  offers you and nobody else, and no free text. */
+  onlySelf?: boolean;
 }) {
   // null = not searching. The input is always empty otherwise: what has been
   // chosen lives in the chips, not in the field.
@@ -65,9 +69,9 @@ export function SpeakerCombobox({
    * exists for should not have to search for their own name.
    */
   const offered = useMemo(() => {
-    const rows = people.filter((p) => isAdmin || p.creditable || p.isMine);
+    const rows = people.filter((p) => p.isMine || (!onlySelf && (isAdmin || p.creditable)));
     return [...rows.filter((p) => p.isMine), ...rows.filter((p) => !p.isMine)];
-  }, [people, isAdmin]);
+  }, [people, isAdmin, onlySelf]);
 
   const matches = useMemo(() => {
     const q = normalize(query ?? '');
@@ -82,7 +86,7 @@ export function SpeakerCombobox({
   // Offer creation only for a name nobody already has, and nobody on the bill.
   const q = normalize(query ?? '');
   const creatable =
-    q !== '' && !people.some((p) => normalize(p.name) === q) && !taken.has(q)
+    !onlySelf && q !== '' && !people.some((p) => normalize(p.name) === q) && !taken.has(q)
       ? (query ?? '').trim().replace(/\s+/g, ' ')
       : null;
   const rowCount = matches.length + (creatable ? 1 : 0);
@@ -166,7 +170,13 @@ export function SpeakerCombobox({
         aria-expanded={open}
         aria-autocomplete="list"
         maxLength={120}
-        placeholder={value.length === 0 ? 'Search people or type a new name' : 'Add another'}
+        placeholder={
+          onlySelf
+            ? 'Only you can be credited here'
+            : value.length === 0
+              ? 'Search people or type a new name'
+              : 'Add another'
+        }
         className={inputClass}
       />
       )}

@@ -6,7 +6,7 @@ import type { Role } from '../shared/types.js';
 import type { SessionRow } from '../db.js';
 import { badRequest, forbidden } from '../errors.js';
 import { loadSessionDto } from '../mappers.js';
-import { getPermissions, requireCapability } from '../permissions.js';
+import { can, getPermissions, requireCapability } from '../permissions.js';
 import { limit } from '../ratelimit.js';
 import {
     assertMayBlock,
@@ -28,12 +28,7 @@ import { addDays, dateToUtcMs, DAY_MS } from '../shared/repeat.js';
 import { localDate, localMinuteOfDay, zonedTimeToUtc } from '../shared/time.js';
 import { resolveSpeakers, setSessionSpeakers, speaksFor, type Actor } from '../speakers.js';
 
-/** Who is crediting: organisers may name anyone, everyone else is held to
- *  who may be credited. */
-const actor = (req: { identity: { id: number }; role: Role }): Actor => ({
-  identityId: req.identity.id,
-  role: req.role,
-});
+
 import { parse, sessionPatchSchema, sessionSchema } from '../validation.js';
 
 /** The session form's fields, plus the run of days to put them on. */
@@ -49,6 +44,26 @@ function setTags(ctx: Ctx, sessionId: number, tagIds: number[]): void {
 
 export function sessionRoutes(ctx: Ctx): Router {
   const router = Router({ mergeParams: true });
+
+  /** Who is crediting: organisers may name anyone; everyone else is held to
+   *  who may be credited, and — without `session.credit_others` — to
+   *  themselves plus whoever is already on the session being edited. */
+  const actor = (
+    req: { event: { id: number }; identity: { id: number }; role: Role },
+    existing?: SessionRow,
+  ): Actor => ({
+    identityId: req.identity.id,
+    role: req.role,
+    creditOthers: can(getPermissions(ctx.db, req.event.id), req.role, 'session.credit_others'),
+    alreadyCredited: existing
+      ? ctx.db
+          .prepare<[number], { person_id: number }>(
+            'SELECT person_id FROM session_speakers WHERE session_id = ?',
+          )
+          .all(existing.id)
+          .map((r) => r.person_id)
+      : [],
+  });
   const userWrite = [
     requireCapability(ctx.db, 'session.create_open'),
     requireWritable,
@@ -340,7 +355,7 @@ export function sessionRoutes(ctx: Ctx): Router {
         setSessionSpeakers(
           ctx.db,
           existing.id,
-          resolveSpeakers(ctx.db, req.event.id, body.speakers, actor(req)),
+          resolveSpeakers(ctx.db, req.event.id, body.speakers, actor(req, existing)),
         );
       }
     })();

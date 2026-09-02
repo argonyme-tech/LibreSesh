@@ -35,6 +35,14 @@ All notable changes to this project are documented here.
   speaker (`PersonDto.creditable`), and the server refuses a non-organiser
   crediting one. Organisers may still credit anyone.
 
+- **A capability for crediting other people.** `session.credit_others`
+  joins the permission matrix, open by default for attendees and speakers:
+  the app leans towards rooms where people trust each other and invite
+  co-hosts. Switched off, the speaker field is a toggle between you and
+  nobody, no free text, and the server holds you to it on sessions and
+  pitches alike — except that editing your own talk keeps the co-host an
+  organiser added. Organisers are never held to it.
+
 - **A session can be given by more than one person.** `sessions.speaker_id`
   held exactly one, which is wrong for most of what an unconference actually
   runs: a panel, a pair, a workshop with two facilitators, a talk and its

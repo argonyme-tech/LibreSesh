@@ -42,6 +42,9 @@ export interface SessionModalProps {
   tracks: TrackDto[];
   people: PersonDto[];
   role: Role;
+  /** `session.credit_others` for this role — off means the speaker field is
+   *  a toggle between you and nobody. */
+  canCreditOthers: boolean;
   timezone: string;
   days: string[];
   dayLabels: Record<string, string>;
@@ -63,6 +66,7 @@ export function SessionModal({
   tracks,
   people,
   role,
+  canCreditOthers,
   timezone,
   days,
   dayLabels,
@@ -244,6 +248,7 @@ export function SessionModal({
               value={speakers}
               onChange={setSpeakers}
               isAdmin={isAdmin}
+              onlySelf={!isAdmin && !canCreditOthers}
             />
           </Field>
           <Field label="Description" hint="Markdown is supported.">

@@ -38,10 +38,10 @@ One commit per step, tests with each. Steps 0–2 in the main session on
 
 ## Step 2 — `session.credit_others` capability
 
-- [ ] Capability entry, defaults open.
-- [ ] `resolveSpeakers` rule: self or already-credited only, when lacking.
-- [ ] Combobox offers only self when lacking.
-- [ ] Tests.
+- [x] Capability entry, defaults open.
+- [x] `resolveSpeakers` rule: self or already-credited only, when lacking.
+- [x] Combobox offers only self when lacking.
+- [x] Tests.
 
 ## Step 3 — one People list with a role control (hand-off)
 

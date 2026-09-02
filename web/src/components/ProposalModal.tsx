@@ -18,6 +18,8 @@ export interface ProposalModalProps {
   proposal?: ProposalDto;
   people: PersonDto[];
   role: Role;
+  /** `session.credit_others` for this role — see SessionModal. */
+  canCreditOthers: boolean;
   tags: TagDto[];
   saving: boolean;
   onCancel: () => void;
@@ -31,6 +33,7 @@ export function ProposalModal({
   proposal,
   people,
   role,
+  canCreditOthers,
   tags,
   saving,
   onCancel,
@@ -107,6 +110,7 @@ export function ProposalModal({
           onChange={setSpeaker}
           max={1}
           isAdmin={isAdmin}
+          onlySelf={!isAdmin && !canCreditOthers}
         />
       </Field>
       <Field label="Description" hint="Markdown is supported.">
