@@ -1,5 +1,44 @@
 import type { Db } from './db.js';
-import { badRequest } from './errors.js';
+import { badRequest, forbidden } from './errors.js';
+import type { Role } from './shared/types.js';
+
+/**
+ * Who is doing the crediting. Organisers may credit anyone; everyone else is
+ * held to `creditable` (see `PersonDto`) and, without the
+ * `session.credit_others` capability, to themselves — plus whoever is
+ * already on the session, so an attendee editing their own talk does not
+ * lose the co-host an organiser added.
+ */
+export interface Actor {
+  identityId: number;
+  role: Role;
+  creditOthers: boolean;
+  alreadyCredited?: readonly number[];
+}
+
+const onlySelf = () => forbidden('You can only credit yourself as a speaker here');
+
+/**
+ * May this actor put this person on a session? Not a viewer's person: a
+ * livestream audience did not come to give a talk, and the picker never
+ * offers them — this is the server saying the same thing. And not anyone
+ * but themselves when the matrix says so.
+ */
+function assertCreditable(db: Db, eventId: number, personId: number, actor?: Actor): void {
+  if (!actor || actor.role === 'admin') return;
+  const row = db
+    .prepare<[number, number], { identity_id: number | null; role: Role | null }>(
+      `SELECT p.identity_id, r.role
+         FROM people p
+    LEFT JOIN roles r ON r.identity_id = p.identity_id AND r.event_id = p.event_id
+        WHERE p.id = ? AND p.event_id = ?`,
+    )
+    .get(personId, eventId);
+  if (row?.identity_id === actor.identityId) return;
+  if (actor.alreadyCredited?.includes(personId)) return;
+  if (!actor.creditOthers) throw onlySelf();
+  if (row?.role === 'viewer') throw forbidden('That person is here to watch, not to speak');
+}
 
 /** Collapse the whitespace people paste in: `" ada   lovelace "` → `"ada lovelace"`. */
 export const normalizeSpeakerName = (raw: string): string => raw.trim().replace(/\s+/g, ' ');
@@ -19,6 +58,7 @@ export function resolveSpeaker(
   eventId: number,
   body: { speakerId?: number | null; speakerName?: string },
   current: number | null,
+  actor?: Actor,
 ): number | null {
   if (body.speakerId !== undefined) {
     if (body.speakerId === null) return null;
@@ -28,6 +68,7 @@ export function resolveSpeaker(
       )
       .get(body.speakerId, eventId);
     if (!found) throw badRequest('Unknown speaker');
+    assertCreditable(db, eventId, found.id, actor);
     return found.id;
   }
 
@@ -42,8 +83,13 @@ export function resolveSpeaker(
         ORDER BY (identity_id IS NULL), id LIMIT 1`,
     )
     .get(eventId, name);
-  if (existing) return existing.id;
+  if (existing) {
+    assertCreditable(db, eventId, existing.id, actor);
+    return existing.id;
+  }
 
+  // A name nobody has is somebody else by definition.
+  if (actor && actor.role !== 'admin' && !actor.creditOthers) throw onlySelf();
   const now = new Date().toISOString();
   return Number(
     db
@@ -68,13 +114,14 @@ export function resolveSpeakers(
   db: Db,
   eventId: number,
   entries: readonly (number | string)[],
+  actor?: Actor,
 ): number[] {
   const out: number[] = [];
   for (const entry of entries) {
     const id =
       typeof entry === 'number'
-        ? resolveSpeaker(db, eventId, { speakerId: entry }, null)
-        : resolveSpeaker(db, eventId, { speakerName: entry }, null);
+        ? resolveSpeaker(db, eventId, { speakerId: entry }, null, actor)
+        : resolveSpeaker(db, eventId, { speakerName: entry }, null, actor);
     if (id !== null && !out.includes(id)) out.push(id);
   }
   return out;

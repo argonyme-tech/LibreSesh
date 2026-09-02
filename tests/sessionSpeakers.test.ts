@@ -6,8 +6,7 @@ import {
   makeHarness,
   seedEvent,
   seedRoom,
-  type Harness,
-} from './helpers.js';
+  type Harness, agentFor } from './helpers.js';
 
 /**
  * A session can be given by more than one person.
@@ -74,7 +73,7 @@ describe('a session bills everyone giving it', () => {
     // One profile for Ada, one for Grace — the second session reused her.
     const admin = await actorWithRole(harness, 'testconf', 'admin-pw');
     const bundle = await admin.get('/api/e/testconf/bundle').expect(200);
-    expect(bundle.body.people).toHaveLength(2);
+    expect(bundle.body.people.filter((p: { claimed: boolean }) => !p.claimed)).toHaveLength(2);
   });
 
   it('drops a person named twice on the same session', async () => {
@@ -167,16 +166,22 @@ describe('every speaker on the bill may edit the session', () => {
       .expect(201);
     const graceId = session.body.speakers[1].id as number;
 
-    // Grace signs in, is given the speaker role, and claims her profile — what
-    // redeeming a speaker code amounts to.
-    const grace = await actorWithRole(harness, 'testconf', 'user-pw');
+    // Grace arrives under her name — the gate offers the profile typed onto
+    // the panel and she takes it — and is given the speaker role.
+    const grace = agentFor(harness);
     const me = await grace.get('/api/me').expect(200);
+    await grace
+      .post('/api/e/testconf/auth')
+      .send({ password: 'user-pw', displayName: 'Grace Hopper', claimProfile: true })
+      .expect(200);
     harness.db
       .prepare('UPDATE roles SET role = ? WHERE identity_id = ? AND event_id = ?')
       .run('speaker', me.body.id, eventId);
-    harness.db
-      .prepare('UPDATE people SET identity_id = ? WHERE id = ?')
-      .run(me.body.id, graceId);
+    expect(
+      harness.db
+        .prepare<[number], { identity_id: number | null }>('SELECT identity_id FROM people WHERE id = ?')
+        .get(graceId)?.identity_id,
+    ).toBe(me.body.id);
 
     const patched = await grace
       .patch(`/api/e/testconf/sessions/${session.body.id}`)

@@ -112,15 +112,21 @@ export type Agent = ReturnType<typeof request.agent>;
 
 export const agentFor = (harness: Harness): Agent => request.agent(harness.app.express);
 
-/** Mint an identity and grant it a role on `slug`. */
+let actorSeq = 0;
+/** A username no other test actor has used: entering an event requires one,
+ *  and it must be unique there. */
+export const nextUsername = (): string => `tester_${(actorSeq += 1)}`;
+
+/** Mint an identity, give it a username and grant it a role on `slug`. */
 export async function actorWithRole(
   harness: Harness,
   slug: string,
   password: string,
+  displayName: string = nextUsername(),
 ): Promise<Agent> {
   const agent = agentFor(harness);
   await agent.get('/api/me').expect(200);
-  await agent.post(`/api/e/${slug}/auth`).send({ password }).expect(200);
+  await agent.post(`/api/e/${slug}/auth`).send({ password, displayName }).expect(200);
   return agent;
 }
 

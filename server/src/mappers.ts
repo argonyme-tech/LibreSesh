@@ -97,17 +97,38 @@ export function parseLinks(raw: string): PersonLink[] {
   }
 }
 
-/** Extra columns only organisers are shown; see `PersonDto`. */
-export interface PersonRosterFacts {
+/**
+ * What the `people` row does not carry itself. The first two are public and
+ * on every DTO; the rest only organisers are shown (`disclose`), see
+ * `PersonDto`.
+ */
+export interface PersonFacts {
+  username: string | null;
+  creditable: boolean;
   role: Role | null;
   holderUid: string | null;
   codePending: boolean;
+  lastSeenAt: string | null;
+  joinedAt: string | null;
+  sessionCount: number;
 }
+
+export const NOBODY: PersonFacts = {
+  username: null,
+  creditable: true,
+  role: null,
+  holderUid: null,
+  codePending: false,
+  lastSeenAt: null,
+  joinedAt: null,
+  sessionCount: 0,
+};
 
 export const toPersonDto = (
   row: PersonRow,
   viewerIdentityId: number,
-  facts?: PersonRosterFacts,
+  facts: PersonFacts,
+  disclose = false,
 ): PersonDto => ({
   id: row.id,
   name: row.name,
@@ -115,15 +136,25 @@ export const toPersonDto = (
   links: parseLinks(row.links),
   isMine: row.identity_id !== null && row.identity_id === viewerIdentityId,
   claimed: row.identity_id !== null,
-  ...(facts === undefined
-    ? {}
-    : { role: facts.role, holderUid: facts.holderUid, codePending: facts.codePending }),
+  username: facts.username,
+  creditable: facts.creditable,
+  ...(disclose
+    ? {
+        role: facts.role,
+        holderUid: facts.holderUid,
+        codePending: facts.codePending,
+        lastSeenAt: facts.lastSeenAt,
+        joinedAt: facts.joinedAt,
+        sessionCount: facts.sessionCount,
+      }
+    : {}),
   updatedAt: row.updated_at,
 });
 
 /**
- * Who holds each profile, and whether the phrase they were sent has ever been
- * used.
+ * Who holds each profile, what they have done here, and whether the phrase
+ * they were sent has ever been used. One query for the whole People list,
+ * which is why the counts are subqueries rather than a second round trip.
  *
  * `codePending` reads the code itself — a `link_codes` row for this person with
  * no `used_at`. The tempting signal, `identities.last_seen_at`, does not work:
@@ -134,34 +165,58 @@ export const toPersonDto = (
  * Re-minting a code for someone who already has a device sets this again, and
  * that is right — the new phrase is outstanding until it is used.
  */
-export function personRosterFacts(db: Db, eventId: number): Map<number, PersonRosterFacts> {
+export function personFacts(db: Db, eventId: number, onlyId?: number): Map<number, PersonFacts> {
   const rows = db
-    .prepare<[number, number], {
+    .prepare<[number, number, number, number, number], {
       id: number;
+      username: string | null;
       role: Role | null;
       holder_uid: string | null;
       code_pending: number;
+      last_seen_at: string | null;
+      joined_at: string | null;
+      session_count: number;
     }>(
       // `link_codes.person_id` is unique where set, so this joins at most one
       // code per person.
       `SELECT p.id AS id,
+              ei.display_name AS username,
               r.role AS role,
               i.public_id AS holder_uid,
-              CASE WHEN lc.id IS NOT NULL AND lc.used_at IS NULL THEN 1 ELSE 0 END AS code_pending
+              CASE WHEN lc.id IS NOT NULL AND lc.used_at IS NULL THEN 1 ELSE 0 END AS code_pending,
+              i.last_seen_at AS last_seen_at,
+              ei.claimed_at AS joined_at,
+              (SELECT COUNT(*) FROM session_speakers ss
+                 JOIN sessions s ON s.id = ss.session_id
+                WHERE ss.person_id = p.id AND s.deleted_at IS NULL) AS session_count
          FROM people p
     LEFT JOIN identities i ON i.id = p.identity_id
+    LEFT JOIN event_identities ei ON ei.identity_id = p.identity_id AND ei.event_id = ?
     LEFT JOIN roles r ON r.identity_id = p.identity_id AND r.event_id = ?
     LEFT JOIN link_codes lc ON lc.person_id = p.id
-        WHERE p.event_id = ? AND p.deleted_at IS NULL`,
+        WHERE p.event_id = ? AND p.deleted_at IS NULL AND (? = 0 OR p.id = ?)`,
     )
-    .all(eventId, eventId);
+    .all(eventId, eventId, eventId, onlyId ?? 0, onlyId ?? 0);
   return new Map(
     rows.map((r) => [
       r.id,
-      { role: r.role, holderUid: r.holder_uid, codePending: r.code_pending === 1 },
+      {
+        username: r.username,
+        creditable: r.role !== 'viewer',
+        role: r.role,
+        holderUid: r.holder_uid,
+        codePending: r.code_pending === 1,
+        lastSeenAt: r.last_seen_at,
+        joinedAt: r.joined_at,
+        sessionCount: r.session_count,
+      },
     ]),
   );
 }
+
+/** One person's facts, for a route that answers about one row. */
+export const factsFor = (db: Db, eventId: number, personId: number): PersonFacts =>
+  personFacts(db, eventId, personId).get(personId) ?? NOBODY;
 
 export function tagIdsBySession(db: Db, sessionIds: number[]): Map<number, number[]> {
   const out = new Map<number, number[]>();

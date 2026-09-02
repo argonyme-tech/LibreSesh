@@ -7,6 +7,24 @@ Last updated: 2026-09-02
 
 ## In Progress
 
+- **Everyone who enters is a person — all six steps landed, none seen in a
+  browser.** Spec `_planning/specs/self-as-speaker-and-merge-ux.md`, plan
+  `_planning/plans/2026-09-02-everyone-is-a-person.md`, all of it written up
+  in CHANGELOG `[Unreleased]`. On `dev` 2026-09-02: `5142d10` (a `people`
+  row for every identity at the gate, required username, non-unique full
+  name, the "is that you?" prompt, migration 010), `79e5044` (the picker
+  offers you first; viewers are not creditable), `39003b5`
+  (`session.credit_others`, open by default), `2c913e3` (one People list
+  with a role control; `/attendees` removed), `3f353a0` (the merge dialog),
+  `3d19d74` (the way back from a profile). 730 tests, lint clean.
+
+  **What is left is looking at it.** Four screens changed and none has been
+  opened: the gate (required username, the "is that you?" prompt), Manage →
+  People (one dense list, segments, search, role select), the merge dialog
+  (suggestions, search, confirm step), and the profile page (two names, the
+  back link). The gate is the one to check first — it is the only screen
+  every attendee must get through, and it now refuses an empty name.
+
 Working on `dev`; `main` is the released line and only takes merges. The
 breaks rework has landed — `feat/event-level-breaks` (`5e53811`) is an
 ancestor of `dev` — so its code half is done and written up in CHANGELOG
@@ -60,6 +78,59 @@ holding 3000 with its API half no longer listening on 3001.
 _The only queue of future work, priority-ordered. Top High-Priority item = next up._
 
 ## High Priority
+
+- **A production event export is sitting untracked in a directory git will
+  happily commit.** Noticed 2026-09-02 when a `git add -A` swept
+  `_planning/valley-2026-09-02.json` (72 KB, 2447 lines), its `.import.json`
+  twin and `export-to-import.py` into a commit; they were taken back out
+  before it was pushed, but nothing stops it happening again. `.gitignore`
+  covers only `_planning/transcripts-backup/` and
+  `_planning/deployment-guide.md`, so every other working file there is
+  fair game — and this one is a real event's export, carrying real
+  attendees' names, in a repo whose upstream is public
+  (`Valley-of-the-Commons/LibreSesh`).
+
+  The fix is a line or two: ignore `_planning/*.json` and
+  `_planning/*.import.json` (or invert it — ignore `_planning/` and
+  un-ignore `specs/`, `plans/` and the files meant to be shared). Decide
+  which way round, because the inverted form is the one that stays safe as
+  new working files appear. Nothing has leaked: the files have never been
+  committed, on any ref.
+
+- **An event this app exported cannot be imported back.** Found 2026-09-02
+  restoring a production event onto a fresh staging box: the export downloads,
+  the import rejects it. The first error reads `breaks.0.start: Required`, but
+  that is one of **103** — every one of the 96 sessions fails too, and the real
+  answer is that these are two different formats wearing one name.
+
+  `exportEvent.ts` writes a dump keyed by database id: `startMin`/`endMin`
+  integers on breaks and tracks, `roomId`/`trackId`/`tagIds` on sessions,
+  `date: null` where there is no date. `eventImportSchema` takes the authoring
+  document: `start`/`end` as `HH:MM`, rooms/tracks/tags **by name**, and an
+  absent key rather than a null. It is also `.strict()` at the top level, so
+  the export's `people`, `proposals`, `contributions` and `exportedAt` are
+  rejected outright rather than ignored.
+
+  What makes this a bug and not a documented limitation is the importer's own
+  first field: `format: z.literal('libresesh.event').optional()`, commented
+  "Present on a document this app produced; ignored, but not rejected". It
+  says it recognises our export and then refuses it. There is no round-trip
+  test in the suite, which is why nobody noticed.
+
+  One piece of luck sizes the fix: `importSessionSchema` already accepts
+  `startsAt`/`endsAt` as ISO instants, so no timezone conversion is involved —
+  the mapping is id → name, minutes → `HH:MM`, null → absent, plus tolerating
+  the export-only top-level keys. A converter proving that is in
+  `_planning/` (it turned the Valley export into a document the schema
+  accepts, verified against `eventImportSchema` itself), but it belongs in the
+  app, not in a script an organiser has to be handed.
+
+  Decide where it goes: the importer accepting both shapes, or export learning
+  to emit the authoring document. Whichever, the missing test is the round
+  trip — export an event, import it, and compare. Note also what the export
+  cannot carry back either way: `people` profiles, `contributions` and every
+  `starCount`. If restoring an instance is the real goal, the encrypted
+  whole-database backup is the tool; this path is for moving one event.
 
 - **The drop still flickers, and the fix so far only made it smaller.**
   Reported 2026-08-31, after the two fixes in CHANGELOG `[Unreleased]` landed
@@ -337,30 +408,38 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   the fix and would only hurt the typo case; bcrypt already makes each guess
   cost something, which is why this is a real backlog item and not a fire.
 
-- **A person who never opened their profile cannot be merged.** Reported
-  2026-09-01: the merge dialog does not offer the people you most want to fold
-  together. Mechanism — a `people` row only exists once somebody edits their
-  profile, is typed as a speaker on a session, or is added by an organiser.
-  Someone who walked in, took a display name at the gate and never touched
-  their profile has no row at all: they live in `event_identities`/`roles`
-  only. The merge dialog lists `bundle.people` and `/people/:id/merge` loads
-  both sides out of the `people` table (`ProfilePage.tsx` MergeModal,
-  `people.ts:231`), so such a person cannot be either side of a merge.
-
-  The duplicate this actually produces: an organiser bills a session to "Ada
-  Lovelace" (auto-creating an unclaimed profile), Ada then joins the gate as
-  "Ada" and gets an identity with no profile. Two records, one human, and
-  merging is not the tool for it — they are not two profiles. The claim path
-  that would fix it fires only on an exact name match and only when she edits
-  her own profile (`people.ts:105-113`). The roster query already carries
-  `person_id` per attendee (`attendees.ts:47`), so Manage Event → People
-  already knows who has a profile and who does not; what is missing is the
-  organiser move "this attendee **is** that profile", which is a claim on
-  someone's behalf rather than a second kind of merge. Worth deciding whether
-  the merge dialog should also list profile-less attendees and quietly do the
-  claim, or whether that belongs on the People tab where the two lists meet.
-
 ## Medium Priority
+
+- **Goal: one database per event, and identity that lives inside the event.**
+  Stated 2026-09-02. Cross-event identity — one cookie is one person across
+  the instance, `GET /me` lists roles in every event, a UID that is "the same
+  at every event" — is judged a feature nobody needs, and it is the source of
+  the three-table identity model (`identities` / `event_identities` /
+  `roles` / `people`) that keeps confusing everyone. The target shape: a
+  registry (`events`, `event_slugs`, passwords) and one SQLite file per
+  event, where a **person is a row with an optional device token** —
+  unclaimed means no token — and username, full name, role, stars and
+  authorship all hang off that one row. Merge becomes trivial (everything
+  keys on the person), device linking and speaker codes still work (adopt a
+  person's token), export/import gets closer to "the file", backup is a
+  copy, and a missed `event_id` in a query can no longer leak across events
+  because there is no other event in the file.
+
+  Not feasible while an event is live: it touches every server route
+  (`ctx.db` becomes a per-request handle, 19 files; `req.identity` is used
+  109 times), the migration runner, backup, clone, the cookie (one per
+  event, `cid_<eventId>`, since the token must not follow a person between
+  files), and the test helpers. A split script is straightforward — copy
+  each event's rows into its file, drop the column — but it is the biggest
+  change since the identity work and wants a quiet week and a tagged
+  release before it. ARCHITECTURE §One database, many events records the
+  opposite decision and must be rewritten when this is taken up.
+
+  **Rule for everything built until then:** put nothing new on
+  `identities` and nothing new that spans events. New facts about a human
+  go on `people`, per event. The "everyone is a person" spec above is the
+  first half of this goal — once `people` is the primary human record, the
+  only instance-wide thing left is the token, and moving it is the split.
 
 - **Put the last two popdowns on `usePopover`.** `ProfileMenu` and
   `SpeakerCombobox` still position themselves and still carry their own
@@ -452,6 +531,23 @@ w-48`, the other `w-full` — so they are exempted by name in
   is 1440, before the `% 24` folds it — and the two helpers should keep matching
   each other, which is the reason to do them in the same commit rather than
   fixing whichever one is noticed first.
+
+- **The People list cannot put somebody out of the event.** Left undone
+  deliberately in the identity work (2026-09-02, spec
+  `self-as-speaker-and-merge-ux.md` §What was built). The role control
+  moves a person between viewer, attendee, speaker and organiser, and a row
+  whose holder has no role reads `signed out` — but only a merge or the
+  person's own logout can produce that state. So an organiser can hand a
+  role back but cannot take one away entirely, and somebody admitted by
+  mistake stays admitted until the event password changes.
+
+  It is a `DELETE /people/:id/role` calling the `clearRole` that
+  `/logout` already uses, plus a "Sign out of this event" item on the role
+  select. What needs deciding first is what it means: the person keeps
+  their username, their profile and everything they wrote, and can walk
+  back in through the gate with the password they still know — so it is a
+  nudge, not a ban, and the UI should not imply otherwise. Wait until an
+  organiser actually asks.
 
 ## Low Priority / Ideas
 

@@ -101,6 +101,11 @@ export const renameSchema = z.object({ displayName: displayNameSchema });
 
 export const linkPhraseSchema = z.object({ phrase: z.string().min(1).max(120) });
 
+/** Give the holder of a profile a different role at this event. */
+export const personRoleSchema = z.object({
+  role: z.enum(['viewer', 'user', 'speaker', 'admin']),
+});
+
 /** Merge duplicate people: `from` is folded into the profile in the URL. */
 export const mergePersonSchema = z.object({ from: z.number().int().positive() });
 
@@ -148,16 +153,23 @@ export const cloneEventSchema = z
   .superRefine(distinctPasswordsRefinement);
 
 /** Demo instances hand out a role on a click; there is no password to check. */
+/** Answering the gate's "is that you?": adopt the unclaimed profile that
+ *  carries your name instead of starting a fresh one. */
+const claimProfileSchema = z.boolean().optional();
+
 export const demoAuthSchema = z.object({
   role: z.enum(['viewer', 'user', 'admin']),
   displayName: displayNameSchema.optional(),
+  claimProfile: claimProfileSchema,
 });
 
 export const authSchema = z.object({
   password: z.string().min(1).max(200),
-  /** The name to go by inside this event. Optional: without one you keep the
-   *  name you already claimed here, or are seeded from your global default. */
+  /** The username to go by inside this event. Optional only for a device
+   *  that already holds one here (re-entering after a logout); a first entry
+   *  without one is refused with `name_required`. */
   displayName: displayNameSchema.optional(),
+  claimProfile: claimProfileSchema,
 });
 
 /** One day keeping different hours from its track's. */

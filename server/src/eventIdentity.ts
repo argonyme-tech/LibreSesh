@@ -57,9 +57,11 @@ export function claimEventName(
 
 /**
  * Resolves author names within one event. Cheap per-request cache, so a bundle
- * resolves each author once. Falls back to the global seed for an identity
+ * resolves each author once. Falls back to the instance seed for an identity
  * that never claimed a name here — an event created before migration 009 can
- * hold contributions from someone who has since been removed from `roles`.
+ * hold contributions from someone who has since been removed from `roles` —
+ * and to the UID when there is no seed either, since a fresh identity has no
+ * name until it types one at a gate.
  */
 export class NameResolver {
   private readonly cache = new Map<number, string>();
@@ -70,7 +72,7 @@ export class NameResolver {
     private readonly eventId: number,
   ) {
     this.stmt = db.prepare<[number, number], { display_name: string }>(
-      `SELECT COALESCE(ei.display_name, i.display_name) AS display_name
+      `SELECT COALESCE(ei.display_name, NULLIF(i.display_name, ''), i.public_id) AS display_name
          FROM identities i
          LEFT JOIN event_identities ei
            ON ei.identity_id = i.id AND ei.event_id = ?

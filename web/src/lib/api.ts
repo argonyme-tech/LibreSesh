@@ -1,5 +1,4 @@
 import type {
-  AttendeeDto,
   BreakDto,
   AuditPageDto,
   BundleDto,
@@ -7,6 +6,7 @@ import type {
   ContributionKind,
   EventDto,
   EventSummary,
+  GateDto,
   GeneratedPasswords,
   ImportResult,
   LinkCodeDto,
@@ -34,6 +34,9 @@ export class ApiError extends Error {
     readonly code: string,
     message: string,
     readonly retryAfter?: number,
+    /** Facts the server attached for the client to act on — the gate's
+     *  `profile_exists` names the profile it found. */
+    readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -59,13 +62,16 @@ async function request<T>(
   const payload: unknown = text ? JSON.parse(text) : undefined;
 
   if (!res.ok) {
-    const err = payload as { error?: { code?: string; message?: string } } | undefined;
+    const err = payload as
+      | { error?: { code?: string; message?: string; details?: Record<string, unknown> } }
+      | undefined;
     const retryAfter = Number(res.headers.get('Retry-After')) || undefined;
     throw new ApiError(
       res.status,
       err?.error?.code ?? 'unknown',
       err?.error?.message ?? 'Something went wrong',
       retryAfter,
+      err?.error?.details,
     );
   }
   return payload as T;
@@ -135,11 +141,17 @@ export const api = {
   /** `displayName` is claimed inside the event, where names are unique. A 409
    *  means someone here already has it — nothing is granted, so the gate can
    *  ask again. */
-  authenticate: (slug: string, password: string, displayName?: string) =>
-    request<{ role: Role }>('POST', `/e/${encode(slug)}/auth`, { password, displayName }),
+  /** The username this device already holds here, before it is in. */
+  gate: (slug: string) => request<GateDto>('GET', `/e/${encode(slug)}/gate`),
+  authenticate: (slug: string, password: string, displayName?: string, claimProfile?: boolean) =>
+    request<{ role: Role }>('POST', `/e/${encode(slug)}/auth`, {
+      password,
+      displayName,
+      claimProfile,
+    }),
   /** Demo instances only: the gate picks a role instead of checking a password. */
-  authenticateAsRole: (slug: string, role: Role, displayName?: string) =>
-    request<{ role: Role }>('POST', `/e/${encode(slug)}/auth`, { role, displayName }),
+  authenticateAsRole: (slug: string, role: Role, displayName?: string, claimProfile?: boolean) =>
+    request<{ role: Role }>('POST', `/e/${encode(slug)}/auth`, { role, displayName, claimProfile }),
   /** Which role a password grants, without granting it — admin only. The
    *  invite-QR panel asks before drawing a code, because the server holds only
    *  bcrypt hashes and cannot check the organiser's typing any other way. */
@@ -202,6 +214,9 @@ export const api = {
   revokeSpeakerCode: (slug: string, id: number) =>
     request<void>('DELETE', `/e/${encode(slug)}/people/${id}/speaker-code`),
   /** Fold profile `from` into `id`: sessions/pitches repoint, `from` disappears. */
+  /** Hand the holder of a profile a different role at this event. */
+  setPersonRole: (slug: string, id: number, role: Role) =>
+    request<PersonDto>('PUT', `/e/${encode(slug)}/people/${id}/role`, { role }),
   mergePerson: (slug: string, id: number, from: number) =>
     request<PersonDto>('POST', `/e/${encode(slug)}/people/${id}/merge`, { from }),
   // 201 when it creates your profile, 200 when it updates it — the caller only
@@ -271,7 +286,6 @@ export const api = {
 
   /** Everyone who has ever picked a name or held a role at this event —
    *  admin-only, the other half of the profile roster. */
-  attendees: (slug: string) => request<AttendeeDto[]>('GET', `/e/${encode(slug)}/attendees`),
 
   /** The per-event JSON export is a plain authenticated GET, so the link in
    *  Manage Event downloads it directly — no fetch, no blob, no wrapper. */

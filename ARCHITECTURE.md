@@ -63,7 +63,7 @@ every failure as `{ error: { code, message } }`.
 | `breaks` | Lunch and friends: a label and local minutes of day, `date` null meaning every day. No room, no author, hard-deleted |
 | `sessions` | Scheduled: always has a room and a time; `blocks_open_booking` holds the floor against attendees |
 | `proposals` | Pitched: no room, no time, until an organiser places it |
-| `people` | Speakers/hosts, optionally claimed by an identity |
+| `people` | One per identity that has entered the event (made at the gate, migration 010), plus organiser-typed shells nobody has claimed yet. Holds the full name; the username lives on `event_identities`. Manage → People lists these and nothing else |
 | `contributions` | Notes, links, questions; `hidden` for moderation |
 | `stars`, `proposal_interest` | Private per-identity interest |
 | `audit` | Append-only log of every write |
@@ -220,9 +220,25 @@ the answer is probably separate *instances*, not separate files.
 
 A name is how one person is known inside one room. Two unconferences a year
 apart have no business fighting over "Ada", so `event_identities` holds the
-name and enforces `UNIQUE(event_id, display_name)`;
-`identities.display_name` is demoted to the seed a newcomer is offered, and
-follows whatever name they last chose.
+name and enforces `UNIQUE(event_id, display_name)`. `identities.display_name`
+is only a trace: empty when an identity is minted, following whatever name
+its owner last chose, prefilled nowhere. A username is typed at every first
+gate — nothing like `attendee_x7f2k` is generated — and a device re-entering
+an event gets its own name back from `GET /e/:slug/gate`.
+
+**Two names, two jobs.** The **username** (`event_identities.display_name`)
+is what the room calls you: unique here, on everything you post, in the
+header chip. The **full name** (`people.name`) is what a session is credited
+to: free to repeat, since two "Alex Chen"s can be in one room and the merge
+tool exists for two rows that are one human, not for namesakes. Every
+identity that enters holds exactly one live `people` row (`ensureOwnProfile`
+in `server/src/people.ts`, called from the gate; migration 010 backfilled the
+entrants from before), with the full name initialised to the username and not
+following it afterwards. A `people` row *without* an identity is a shell an
+organiser typed onto a talk for someone who has not arrived. When somebody
+enters under that shell's name the gate does not hand it over silently — the
+same name can be a different person — but answers `profile_exists` and takes
+it only on a second entry with `claimProfile`.
 
 Global uniqueness was the tempting one-line version — a `UNIQUE` index and a
 check in `PATCH /me` — and it is worse than the bug it fixes. It makes the
@@ -507,7 +523,7 @@ So after a merge:
   same operation as /logout — rather than left signed in as a zombie that is
   present but owns nothing. Deleting the identity itself would not be safe:
   it may be a real person at other events on this instance, and the audit log
-  points at it. Its event display name row stays, so the attendance list and
+  points at it. Its event display name row stays, so the People list and
   old audit entries keep their label and the name stays reserved. The device
   can re-enter through the gate and is then a fresh participant;
 - the re-keying and the sign-out are **scoped to the event being merged**. The

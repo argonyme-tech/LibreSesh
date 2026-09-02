@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { can } from '@shared/capabilities';
 import type { BundleDto, ProposalDto } from '@shared/types';
 import { dateRange } from '@shared/time';
 import { readableInk } from '@shared/tagColors';
@@ -258,6 +259,8 @@ export function ProposalBoard() {
         <ProposalModal
           proposal={editing.proposal}
           people={bundle.people}
+          role={bundle.role}
+          canCreditOthers={can(bundle.permissions, bundle.role, 'session.credit_others')}
           tags={bundle.tags}
           saving={saving}
           onCancel={() => setEditing(null)}

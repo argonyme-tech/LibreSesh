@@ -433,7 +433,7 @@ export function SessionDetail({
         onClick={() => void submit()}
         disabled={!body.trim() || posting}
       >
-        Post as {me?.displayName ?? 'you'}
+        Post as {me?.displayName || 'you'}
       </PrimaryButton>
     </div>
   );

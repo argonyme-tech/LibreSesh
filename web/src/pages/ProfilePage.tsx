@@ -1,18 +1,16 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import type { PersonDetailDto, PersonDto, PersonLink } from '@shared/types';
 import { ApiError, api, type PersonWrite } from '../lib/api';
-import { dayLabel, fmtMin, place, rowId, todayInZone } from '../lib/format';
+import { dayLabel, fmtMin, place, todayInZone } from '../lib/format';
 import { renderMarkdown } from '../lib/markdown';
 import { useEventData } from '../lib/useEventData';
 import { EditIcon } from '../components/icons';
+import { MergeModal } from '../components/MergeModal';
 import {
   EmptyState,
-  Field,
   FormError,
-  FormStack,
   IconButton,
-  Modal,
   PrimaryButton,
   SecondaryButton,
   Spinner,
@@ -36,6 +34,14 @@ export function ProfilePage() {
   const { slug = '', personId = '' } = useParams();
   const id = Number(personId);
   const navigate = useNavigate();
+  /**
+   * Where "back" goes. A profile is reached from two places that are nothing
+   * like each other — the schedule, and Manage → People — and sending an
+   * organiser who came from the People tab out to the schedule made them
+   * navigate back in for every person they looked at. Whoever links here says
+   * where here was; anyone who does not gets the schedule, as before.
+   */
+  const from = (useLocation().state as { back?: { to: string; label: string } } | null)?.back;
   // The bundle gives us the viewer's role, the timezone and live edits.
   const data = useEventData(slug);
 
@@ -163,9 +169,25 @@ export function ProfilePage() {
   return (
     <div className="min-h-screen bg-stone-100 dark:bg-stone-950 text-stone-900 dark:text-stone-100">
       <div className="mx-auto max-w-2xl px-4 py-8">
-        <Link to={`/e/${slug}`} className="text-xs text-stone-500 dark:text-stone-400 underline">
-          ← Schedule
-        </Link>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <Link
+            to={from?.to ?? `/e/${slug}`}
+            className="text-xs text-stone-500 dark:text-stone-400 underline"
+          >
+            ← {from?.label ?? 'Schedule'}
+          </Link>
+          {/* A deep link into a profile arrives with no history to speak of,
+              so an organiser gets the tab named outright rather than only as
+              a back arrow they may not have. */}
+          {isAdmin && from === undefined && (
+            <Link
+              to={`/e/${slug}/admin?tab=people`}
+              className="text-xs text-stone-500 dark:text-stone-400 underline"
+            >
+              Manage → People
+            </Link>
+          )}
+        </div>
 
         <div className="mt-4 rounded-2xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-5 shadow-sm">
           <div className="flex items-start gap-3">
@@ -180,14 +202,14 @@ export function ProfilePage() {
                   }}
                   hint={
                     person.isMine
-                      ? 'The name on this profile — what sessions you host are credited to.'
-                      : undefined
+                      ? 'Your full name — what sessions you give are credited to. Need not be unique.'
+                      : 'Their full name — what sessions they give are credited to.'
                   }
                 >
                   <input
                     value={draftName}
                     onChange={(e) => setDraftName(e.target.value)}
-                    aria-label="Name"
+                    aria-label="Full name"
                     maxLength={120}
                     className={`${inputClass} text-lg font-semibold`}
                     autoFocus
@@ -200,8 +222,8 @@ export function ProfilePage() {
                   </h1>
                   {canEdit && (
                     <IconButton
-                      aria-label="Edit name"
-                      title="Edit name"
+                      aria-label="Edit full name"
+                      title="Edit full name"
                       className="shrink-0"
                       onClick={() => edit('name')}
                     >
@@ -210,13 +232,14 @@ export function ProfilePage() {
                   )}
                 </div>
               )}
-              {/* Profile names are checked for clashes but are not the thing
-                  that identifies anyone — this id is, and it is the one in the
-                  address bar. Per event on purpose: a number that followed a
-                  person between events would tie their names together, which
-                  is exactly what per-event names exist to avoid. */}
-              <p className="mt-0.5 font-mono text-xs text-stone-400 dark:text-stone-500">
-                ({rowId(person.id)})
+              {/* Two names, two jobs: the heading is the full name a session
+                  is credited to, and under it the username the room actually
+                  calls them. The profile's row id used to sit here; it is in
+                  the address bar and nowhere else does anyone need it. */}
+              <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">
+                {person.username === null
+                  ? 'Nobody holds this profile yet'
+                  : `@${person.username}`}
               </p>
             </div>
             {isAdmin && (
@@ -232,18 +255,18 @@ export function ProfilePage() {
                  identity in the event — so it saves through its own call, and
                  an organiser looking at your profile does not get to touch it. */
               <ProfileField
-                label="Display name"
-                hint="How you appear in this event: the header chip, and anything you post. Must be unlike anyone else's here."
+                label="Username"
+                hint="How you appear in this event: the header chip, and anything you post. Unique here; not a login."
                 canEdit
                 filled={displayName !== ''}
-                emptyText="You have no name in this event yet."
-                addLabel="Set a display name"
+                emptyText="You have no username in this event yet."
+                addLabel="Set a username"
                 editing={open === 'displayName'}
                 onEdit={() => edit('displayName')}
                 onClose={close}
                 onSave={async () => {
                   const wanted = draftDisplayName.trim();
-                  if (!wanted) throw new Error('A display name cannot be empty.');
+                  if (!wanted) throw new Error('A username cannot be empty.');
                   if (wanted === displayName) return;
                   await api.renameInEvent(slug, wanted);
                   await data.reload();
@@ -252,7 +275,7 @@ export function ProfilePage() {
                   <input
                     value={draftDisplayName}
                     onChange={(e) => setDraftDisplayName(e.target.value)}
-                    aria-label="Display name"
+                    aria-label="Username"
                     maxLength={40}
                     className={inputClass}
                     autoFocus
@@ -422,6 +445,7 @@ export function ProfilePage() {
           slug={slug}
           survivor={person}
           people={bundle.people}
+          userLabel={bundle.event.userRoleLabel}
           onClose={() => setMerging(false)}
           onMerged={(updated, loserId) => {
             setDetail((d) => (d ? { ...d, person: updated } : d));
@@ -584,89 +608,6 @@ function FieldForm({
         </SecondaryButton>
       </div>
     </form>
-  );
-}
-
-/**
- * Fold a duplicate profile into this one (identity spec, B2). The duplicate's
- * sessions and pitches move here, then it disappears — there is no undo, which
- * is why the sentence spells out the direction before the button.
- */
-function MergeModal({
-  slug,
-  survivor,
-  people,
-  onClose,
-  onMerged,
-}: {
-  slug: string;
-  survivor: PersonDto;
-  people: PersonDto[];
-  onClose: () => void;
-  onMerged: (updated: PersonDto, loserId: number) => void;
-}) {
-  const toast = useToast();
-  const [fromId, setFromId] = useState<number | null>(null);
-  const [busy, setBusy] = useState(false);
-  const candidates = people.filter((p) => p.id !== survivor.id);
-
-  const merge = async () => {
-    if (fromId === null || busy) return;
-    setBusy(true);
-    try {
-      const updated = await api.mergePerson(slug, survivor.id, fromId);
-      onMerged(updated, fromId);
-    } catch (err) {
-      toast.show((err as Error).message);
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      title="Merge a duplicate"
-      description={
-        <>
-          The profile you pick is folded into{' '}
-          <span className="font-medium">{survivor.name}</span>: its sessions and pitches move
-          here, then it is removed. This cannot be undone.
-        </>
-      }
-      onClose={onClose}
-      onSubmit={() => void merge()}
-      footer={
-        <>
-          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-          <PrimaryButton type="submit" disabled={busy || fromId === null}>
-            {busy ? 'Merging…' : 'Merge'}
-          </PrimaryButton>
-        </>
-      }
-    >
-      {candidates.length === 0 ? (
-        <p className="text-sm text-stone-400 dark:text-stone-500">
-          There is no other profile to merge.
-        </p>
-      ) : (
-        <FormStack>
-          <Field label="Duplicate to fold in">
-            <select
-              value={fromId === null ? '' : String(fromId)}
-              onChange={(e) => setFromId(e.target.value ? Number(e.target.value) : null)}
-              className={inputClass}
-            >
-              <option value="">— pick a profile —</option>
-              {candidates.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                  {p.claimed ? ' (claimed)' : ''}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </FormStack>
-      )}
-    </Modal>
   );
 }
 

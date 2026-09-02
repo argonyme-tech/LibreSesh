@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { atLeast, requireRole, requireWritable } from '../auth.js';
 import { audit } from '../audit.js';
 import type { Ctx } from '../context.js';
+import type { Role } from '../shared/types.js';
 import type { ProposalRow } from '../db.js';
 import { conflict, forbidden, notFound } from '../errors.js';
 import { NameResolver } from '../eventIdentity.js';
@@ -10,9 +11,9 @@ import {
   speakerNames,
   toProposalDto,
 } from '../mappers.js';
-import { getPermissions, requireCapability } from '../permissions.js';
+import { can, getPermissions, requireCapability } from '../permissions.js';
 import { limit } from '../ratelimit.js';
-import { resolveSpeaker, setSessionSpeakers } from '../speakers.js';
+import { resolveSpeaker, setSessionSpeakers, type Actor } from '../speakers.js';
 import {
   assertMayPlace,
   assertNoOverlap,
@@ -29,6 +30,17 @@ import { parse, placeSchema, proposalPatchSchema, proposalSchema } from '../vali
  */
 export function proposalRoutes(ctx: Ctx): Router {
   const router = Router({ mergeParams: true });
+
+  /** Who is naming the speaker — see `Actor` in speakers.ts. */
+  const actor = (
+    req: { event: { id: number }; identity: { id: number }; role: Role },
+    existing?: { speaker_id: number | null },
+  ): Actor => ({
+    identityId: req.identity.id,
+    role: req.role,
+    creditOthers: can(getPermissions(ctx.db, req.event.id), req.role, 'session.credit_others'),
+    alreadyCredited: existing?.speaker_id === null || existing === undefined ? [] : [existing.speaker_id],
+  });
 
   const load = (eventId: number, id: number): ProposalRow => {
     const row = ctx.db
@@ -90,7 +102,7 @@ export function proposalRoutes(ctx: Ctx): Router {
 
       const now = new Date().toISOString();
       const id = ctx.db.transaction((): number => {
-        const speakerId = resolveSpeaker(ctx.db, req.event.id, body, null);
+        const speakerId = resolveSpeaker(ctx.db, req.event.id, body, null, actor(req));
         const newId = Number(
           ctx.db
             .prepare(
@@ -143,7 +155,7 @@ export function proposalRoutes(ctx: Ctx): Router {
       if (body.tagIds) assertTagsBelong(ctx.db, req.event.id, body.tagIds);
 
       ctx.db.transaction(() => {
-        const speakerId = resolveSpeaker(ctx.db, req.event.id, body, row.speaker_id);
+        const speakerId = resolveSpeaker(ctx.db, req.event.id, body, row.speaker_id, actor(req, row));
         ctx.db
           .prepare(
             `UPDATE proposals SET title = ?, description = ?, speaker_id = ?, updated_at = ?

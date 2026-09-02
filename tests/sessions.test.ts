@@ -48,7 +48,7 @@ describe('session write rules', () => {
   it('lets an admin create an official session in any room', async () => {
     const res = await create(admin, { roomId: fixedRoom, type: 'official' }).expect(201);
     expect(res.body.type).toBe('official');
-    expect(res.body.createdByName).toMatch(/^attendee_/);
+    expect(res.body.createdByName).toMatch(/^tester_/);
   });
 
   it('forces a user session to type open', async () => {

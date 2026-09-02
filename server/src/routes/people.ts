@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { atLeast, requireRole, requireWritable } from '../auth.js';
+import { atLeast, getRole, requireRole, requireWritable, setRole } from '../auth.js';
 import { audit } from '../audit.js';
 import type { Ctx } from '../context.js';
 import {
@@ -10,17 +10,19 @@ import {
 import type { PersonRow, SessionRow } from '../db.js';
 import { badRequest, conflict, forbidden, notFound } from '../errors.js';
 import { rekeyIdentityWork } from '../mergeIdentityWork.js';
-import { loadProposalDtos, loadSessionDto, toPersonDto } from '../mappers.js';
+import { factsFor, loadProposalDtos, loadSessionDto, toPersonDto } from '../mappers.js';
+import { ensureOwnProfile } from '../people.js';
 import { requireCapability } from '../permissions.js';
 import { limit } from '../ratelimit.js';
 import {
   mergePersonSchema,
   myProfileSchema,
   parse,
+  personRoleSchema,
   personPatchSchema,
   personSchema,
 } from '../validation.js';
-import type { PersonDetailDto } from '../shared/types.js';
+import type { PersonDetailDto, Role } from '../shared/types.js';
 
 /**
  * Speaker and host profiles, scoped to one event (SPEC follow-up to §4).
@@ -29,6 +31,28 @@ import type { PersonDetailDto } from '../shared/types.js';
  */
 export function peopleRoutes(ctx: Ctx): Router {
   const router = Router({ mergeParams: true });
+
+  /**
+   * Two views of one row. `own` answers the caller, so an organiser gets the
+   * private facts — the People list needs the role back after it changes one.
+   * `pub` goes on the wire to every subscriber of the event, admin or not, so
+   * it can never carry them.
+   *
+   * `isMine` is in the same boat: it is a fact about the reader, and the
+   * broadcast computes it for whoever caused the change. The client keeps its
+   * own answer rather than believing that one — see `applyPersonChange`.
+   */
+  const views = (
+    req: { event: { id: number }; identity: { id: number }; role: Role },
+    id: number,
+  ) => {
+    const row = load(req.event.id, id);
+    const facts = factsFor(ctx.db, req.event.id, id);
+    return {
+      own: toPersonDto(row, req.identity.id, facts, req.role === 'admin'),
+      pub: toPersonDto(row, req.identity.id, facts),
+    };
+  };
 
   const load = (eventId: number, id: number): PersonRow => {
     const row = ctx.db
@@ -39,13 +63,6 @@ export function peopleRoutes(ctx: Ctx): Router {
     if (!row) throw notFound('No such profile');
     return row;
   };
-
-  const nameClash = (eventId: number, name: string, excludeId?: number): PersonRow | undefined =>
-    ctx.db
-      .prepare<[number, string, number], PersonRow>(
-        'SELECT * FROM people WHERE event_id = ? AND name = ? AND deleted_at IS NULL AND id != ?',
-      )
-      .get(eventId, name, excludeId ?? -1);
 
   const write = (row: PersonRow, patch: { name?: string; bio?: string; links?: unknown[] }) => {
     ctx.db
@@ -71,13 +88,20 @@ export function peopleRoutes(ctx: Ctx): Router {
       .all(req.event.id, person.id);
 
     const detail: PersonDetailDto = {
-      person: toPersonDto(person, req.identity.id),
+      person: views(req, person.id).own,
       sessions: sessions.map((s) => loadSessionDto(ctx.db, s)),
     };
     res.json(detail);
   });
 
-  /** Your own profile for this event, created on first edit. */
+  /**
+   * Your own profile for this event. Since migration 010 it exists from the
+   * moment you enter, so this is an edit; the create branch is kept for an
+   * identity that got in before that and has not been through a gate since.
+   * The full name is free — two people may share one — so there is nothing
+   * to clash with; the username is the unique thing, and it lives on the
+   * event membership, not here.
+   */
   router.patch(
     '/me/profile',
     requireCapability(ctx.db, 'person.edit_own'),
@@ -90,58 +114,26 @@ export function peopleRoutes(ctx: Ctx): Router {
           'SELECT * FROM people WHERE event_id = ? AND identity_id = ? AND deleted_at IS NULL',
         )
         .get(req.event.id, req.identity.id);
-
-      const name = body.name ?? existing?.name ?? req.identity.display_name;
-      const clash = nameClash(req.event.id, name, existing?.id);
-      // Naming yourself as the speaker on a session or a pitch auto-creates an
-      // unclaimed person under your display name. Refusing the collision would
-      // lock you out of your own profile for good, since every retry defaults
-      // to the same name — so claim that record instead. It is the same person,
-      // and it folds the speaker entry into the profile.
-      if (clash && clash.identity_id !== null) {
-        throw conflict('Someone else here already goes by that name', 'name_taken');
-      }
-
-      let id: number;
-      if (existing) {
-        write(existing, { ...body, name });
-        id = existing.id;
-      } else if (clash) {
-        ctx.db
-          .prepare('UPDATE people SET identity_id = ? WHERE id = ?')
-          .run(req.identity.id, clash.id);
-        write(clash, { ...body, name });
-        id = clash.id;
-      } else {
-        const now = new Date().toISOString();
-        id = Number(
-          ctx.db
-            .prepare(
-              `INSERT INTO people (event_id, identity_id, name, bio, links, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            )
-            .run(
-              req.event.id,
-              req.identity.id,
-              name,
-              body.bio ?? '',
-              JSON.stringify(body.links ?? []),
-              now,
-              now,
-            ).lastInsertRowid,
+      const row =
+        existing ??
+        ensureOwnProfile(
+          ctx.db,
+          req.event.id,
+          req.identity.id,
+          body.name ?? (req.identity.display_name || req.identity.public_id),
         );
-      }
+      write(row, body);
 
-      const dto = toPersonDto(load(req.event.id, id), req.identity.id);
+      const { own, pub } = views(req, row.id);
       audit(ctx.db, {
         identityId: req.identity.id,
         eventId: req.event.id,
         action: existing ? 'update' : 'create',
         entity: 'person',
-        entityId: id,
+        entityId: row.id,
       });
-      ctx.broker.publish(req.event.slug, existing ? 'person.updated' : 'person.created', dto);
-      res.status(existing ? 200 : 201).json(dto);
+      ctx.broker.publish(req.event.slug, existing ? 'person.updated' : 'person.created', pub);
+      res.status(existing ? 200 : 201).json(own);
     },
   );
 
@@ -152,9 +144,6 @@ export function peopleRoutes(ctx: Ctx): Router {
     limit(ctx.limiter, 'write'),
     (req, res) => {
       const body = parse(personSchema, req.body);
-      if (nameClash(req.event.id, body.name)) {
-        throw conflict('Someone here already goes by that name', 'name_taken');
-      }
       const now = new Date().toISOString();
       const id = Number(
         ctx.db
@@ -171,7 +160,7 @@ export function peopleRoutes(ctx: Ctx): Router {
             now,
           ).lastInsertRowid,
       );
-      const dto = toPersonDto(load(req.event.id, id), req.identity.id);
+      const { own, pub } = views(req, id);
       audit(ctx.db, {
         identityId: req.identity.id,
         eventId: req.event.id,
@@ -179,8 +168,8 @@ export function peopleRoutes(ctx: Ctx): Router {
         entity: 'person',
         entityId: id,
       });
-      ctx.broker.publish(req.event.slug, 'person.created', dto);
-      res.status(201).json(dto);
+      ctx.broker.publish(req.event.slug, 'person.created', pub);
+      res.status(201).json(own);
     },
   );
 
@@ -198,12 +187,9 @@ export function peopleRoutes(ctx: Ctx): Router {
       }
 
       const body = parse(personPatchSchema, req.body);
-      if (body.name && nameClash(req.event.id, body.name, person.id)) {
-        throw conflict('Someone here already goes by that name', 'name_taken');
-      }
       write(person, body);
 
-      const dto = toPersonDto(load(req.event.id, person.id), req.identity.id);
+      const { own, pub } = views(req, person.id);
       audit(ctx.db, {
         identityId: req.identity.id,
         eventId: req.event.id,
@@ -211,8 +197,59 @@ export function peopleRoutes(ctx: Ctx): Router {
         entity: 'person',
         entityId: person.id,
       });
-      ctx.broker.publish(req.event.slug, 'person.updated', dto);
-      res.json(dto);
+      ctx.broker.publish(req.event.slug, 'person.updated', pub);
+      res.json(own);
+    },
+  );
+
+  /**
+   * Set the role held by whoever holds this profile. Now that everyone who
+   * enters is a person, the People list is where roles are handed out — the
+   * alternative was telling somebody a different password and asking them to
+   * enter again.
+   *
+   * The one refusal is demoting the last organiser: an event with no admin
+   * can be administered by nobody and repaired by nobody, which is the same
+   * reasoning `getPermissions` uses to force admin on for every capability.
+   * Whoever knows the organiser password can still enter as one.
+   */
+  router.put(
+    '/people/:id/role',
+    requireRole(ctx.db, 'admin'),
+    requireWritable,
+    limit(ctx.limiter, 'write'),
+    (req, res) => {
+      const person = load(req.event.id, Number(req.params.id));
+      const { role } = parse(personRoleSchema, req.body);
+      if (person.identity_id === null) {
+        throw badRequest('Nobody holds that profile yet — a role needs a person to hold it');
+      }
+      if (role !== 'admin' && getRole(ctx.db, person.identity_id, req.event.id) === 'admin') {
+        const others = ctx.db
+          .prepare<[number, number], { n: number }>(
+            `SELECT COUNT(*) AS n FROM roles
+              WHERE event_id = ? AND role = 'admin' AND identity_id != ?`,
+          )
+          .get(req.event.id, person.identity_id);
+        if ((others?.n ?? 0) === 0) {
+          throw conflict(
+            'That is the last organiser — make someone else an organiser first',
+            'last_admin',
+          );
+        }
+      }
+      setRole(ctx.db, person.identity_id, req.event.id, role);
+
+      const { own, pub } = views(req, person.id);
+      audit(ctx.db, {
+        identityId: req.identity.id,
+        eventId: req.event.id,
+        action: 'role_set',
+        entity: 'person',
+        entityId: person.id,
+      });
+      ctx.broker.publish(req.event.slug, 'person.updated', pub);
+      res.json(own);
     },
   );
 
@@ -298,7 +335,7 @@ export function peopleRoutes(ctx: Ctx): Router {
         }
       })();
 
-      const dto = toPersonDto(load(req.event.id, survivor.id), req.identity.id);
+      const { own, pub } = views(req, survivor.id);
       audit(ctx.db, {
         identityId: req.identity.id,
         eventId: req.event.id,
@@ -307,7 +344,7 @@ export function peopleRoutes(ctx: Ctx): Router {
         entityId: loser.id,
       });
       ctx.broker.publish(req.event.slug, 'person.deleted', { id: loser.id });
-      ctx.broker.publish(req.event.slug, 'person.updated', dto);
+      ctx.broker.publish(req.event.slug, 'person.updated', pub);
       if (rekeyed.proposalIds.length > 0) {
         const changed = new Set(rekeyed.proposalIds);
         for (const proposal of loadProposalDtos(ctx.db, req.event.id, req.identity.id)) {
@@ -324,7 +361,7 @@ export function peopleRoutes(ctx: Ctx): Router {
           ctx.broker.publish(req.event.slug, 'session.updated', loadSessionDto(ctx.db, row));
         }
       }
-      res.json(dto);
+      res.json(own);
     },
   );
 
@@ -349,11 +386,7 @@ export function peopleRoutes(ctx: Ctx): Router {
         entity: 'person',
         entityId: person.id,
       });
-      ctx.broker.publish(
-        req.event.slug,
-        'person.updated',
-        toPersonDto(load(req.event.id, person.id), req.identity.id),
-      );
+      ctx.broker.publish(req.event.slug, 'person.updated', views(req, person.id).pub);
       res.json({ phrase });
     },
   );

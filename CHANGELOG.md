@@ -6,6 +6,108 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **Everyone who enters an event is a person there.** A `people` row used
+  to appear only when someone edited their profile, was typed onto a
+  session, or was added by an organiser — so a newcomer who had passed the
+  gate was in neither the speaker picker nor the merge dialog, and typing
+  their own name on a session bred an unclaimed twin. The gate now makes
+  the row the moment a username is claimed (migration 010 backfills every
+  existing entrant), and a person has two names with two jobs: a
+  **username**, typed at the gate, unique in the event, on posts and in
+  the header; and a **full name**, credited on sessions, free to repeat.
+  Two "Alex Chen"s can both be here; the merge tool is for two rows that
+  are one human, not for namesakes.
+
+  The username is now required the first time in — nothing like
+  `attendee_x7f2k` is generated any more — and a device re-entering an
+  event gets its own name back from the new `GET /e/:slug/gate`. Arriving
+  under the name of a profile an organiser typed onto a talk before you
+  came no longer adopts it silently: the gate asks *"There is a speaker
+  profile here called Ada Lovelace, on 2 sessions. Is that you?"* and
+  takes it only on a yes. Spec:
+  `_planning/specs/self-as-speaker-and-merge-ux.md`.
+
+- **The speaker field offers you.** Your own row is pinned to the top of
+  the picker as "· you", claimed rows show `@username` so two namesakes can
+  be told apart, and a new session or pitch by anyone but an organiser
+  starts credited to its author, one click to remove. A viewer's person is
+  visible like anyone's — they star and post — but is not on offer as a
+  speaker (`PersonDto.creditable`), and the server refuses a non-organiser
+  crediting one. Organisers may still credit anyone.
+
+- **A profile page goes back where you opened it from.** Every profile sent
+  you to the schedule, so an organiser working through Manage → People had
+  to navigate back in for each person they looked at. The link now names
+  where you came from, and an organiser who arrived by deep link gets
+  "Manage → People" outright. The heading is the full name a session is
+  credited to, with the `@username` the room calls them beneath it; the
+  `ID: 00054` under the name has gone, since the profile's row id is in the
+  address bar and needed nowhere else.
+
+- **A merge dialog that shows who is who.** Merging is the only thing an
+  organiser cannot undo, and it asked for the decision through a bare
+  `<select>` of names — two people called Ada Lovelace look identical in a
+  dropdown, and one of them may be a real person with three talks and a
+  device in the room. The dialog now leads with the rows that look like the
+  same human and says why ("same name", "initials match", "same surname"),
+  then a search over name, username and UID, then everyone else; every row
+  carries the same facts the People list shows.
+
+  Picking somebody does not merge them. It shows the two side by side and
+  the sentence for *this* merge: sessions move and nothing else; or the
+  other profile's holder takes this one over; or — the case that costs the
+  most, and the one that was never spelled out — everything that person
+  did in the event moves across and their device is signed out of it.
+  Merge is also reachable from each row of the People list now, not only
+  from a profile page.
+
+- **Manage → People is one list, and hands out roles.** It was two stacked
+  lists — speaker profiles above, an attendance list of everyone who had
+  entered below — which asked an organiser to hold "profile" and "person
+  who is here" apart as separate ideas, and put the second a scroll away.
+  Now that entering an event creates a profile they are the same list: one
+  dense row per person carrying full name, `@username`, UID, one badge,
+  session count and last seen, with segments (All, Arrived, Unclaimed,
+  Organisers, Speakers) that carry counts, a search box over name,
+  username and UID, and an order toggle between name and last seen.
+
+  Each row has a **role control**: `PUT /people/:id/role` hands somebody
+  viewer, attendee, speaker or organiser, audited as `role_set`. Before
+  this the only way to change a role was to tell someone a different
+  password and ask them to enter again, which is not something you can do
+  to a person already in the room. It refuses to demote the last organiser
+  — an event nobody can administer has no way back — which is the same
+  reasoning the permission matrix uses to force admin on everywhere.
+
+  `GET /attendees` and its `AttendeeDto` are gone, replaced by three
+  organiser-only fields on the person: `lastSeenAt`, `joinedAt` and
+  `sessionCount`. The `ID: 00054` beside a name goes too — it was the
+  per-event row id, which is already in the profile URL; the UID is the
+  identifier that means anything across the audit log. Delete is offered
+  only for a profile nobody holds.
+
+### Fixed
+
+- **A change to one person no longer rewrites what everyone else sees.**
+  `person.created` / `person.updated` frames go to every subscriber, but
+  `isMine` and the organiser-only facts are computed for whoever caused
+  the change — so an organiser editing a bio told the owner the profile
+  was not theirs, and any edit blanked the role badges on another
+  organiser's People list until they reloaded. The wire frame now never
+  carries the private facts (the reply to the caller does, when they are
+  an organiser), and the client keeps what it had worked out for itself
+  about a row it already holds.
+
+### Added
+
+- **A capability for crediting other people.** `session.credit_others`
+  joins the permission matrix, open by default for attendees and speakers:
+  the app leans towards rooms where people trust each other and invite
+  co-hosts. Switched off, the speaker field is a toggle between you and
+  nobody, no free text, and the server holds you to it on sessions and
+  pitches alike — except that editing your own talk keeps the co-host an
+  organiser added. Organisers are never held to it.
+
 - **A session can be given by more than one person.** `sessions.speaker_id`
   held exactly one, which is wrong for most of what an unconference actually
   runs: a panel, a pair, a workshop with two facilitators, a talk and its

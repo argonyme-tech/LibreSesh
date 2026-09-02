@@ -13,7 +13,8 @@
 import { hashPassword } from './auth.js';
 import type { Db } from './db.js';
 import { ROOM_COLORS } from './shared/roomColors.js';
-import { newDisplayName, newIdentityToken, newPublicId } from './identity.js';
+import { newIdentityToken, newPublicId } from './identity.js';
+import { ensureOwnProfile } from './people.js';
 import { localDate, zonedTimeToUtc } from './shared/time.js';
 
 export const DEMO_SLUG = 'democonf-2026';
@@ -188,15 +189,27 @@ const LINKS = [
   { body: 'Related talk', url: 'https://example.org/talk' },
 ];
 
-function createIdentity(db: Db, name?: string): number {
+function createIdentity(db: Db, name: string): number {
   const now = new Date().toISOString();
   const info = db
     .prepare(
       'INSERT INTO identities (public_id, token, display_name, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)',
     )
-    .run(newPublicId(db), newIdentityToken(), name ?? newDisplayName(), now, now);
+    .run(newPublicId(db), newIdentityToken(), name, now, now);
   return Number(info.lastInsertRowid);
 }
+
+/** Everyone who has entered an event holds a username there and is a person
+ *  there — the two things the gate writes, done here for seeded attendees. */
+function enterEvent(db: Db, eventId: number, identityId: number, name: string): void {
+  db.prepare(
+    `INSERT INTO event_identities (event_id, identity_id, display_name, claimed_at)
+     VALUES (?, ?, ?, ?)`,
+  ).run(eventId, identityId, name, new Date().toISOString());
+  ensureOwnProfile(db, eventId, identityId, name);
+}
+
+const ATTENDEE_NAMES = ['programme_team', 'sam', 'jo', 'ravi', 'mira', 'lee'];
 
 /**
  * Creates the demo event. Idempotent per slug: without `replace` an existing
@@ -325,8 +338,12 @@ export function seedDemoEvent(db: Db, options: DemoSeedOptions = {}): DemoSeedRe
     // A couple of sessions deliberately have no speaker at all.
     const speakerChoices: (number | null)[] = [...personIds, null, null];
 
-    const organiser = createIdentity(db, 'programme_team');
-    const attendees = [organiser, ...Array.from({ length: 5 }, () => createIdentity(db))];
+    const attendees = ATTENDEE_NAMES.map((name) => {
+      const id = createIdentity(db, name);
+      enterEvent(db, eventId, id, name);
+      return id;
+    });
+    const organiser = attendees[0] as number;
     db.prepare(
       'INSERT INTO roles (identity_id, event_id, role, granted_at) VALUES (?, ?, ?, ?)',
     ).run(organiser, eventId, 'admin', now);

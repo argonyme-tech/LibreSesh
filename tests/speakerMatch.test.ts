@@ -41,7 +41,7 @@ describe('speaker matching', () => {
     expect(second.body.speakers[0].id).toBe(first.body.speakers[0].id);
 
     const bundle = await admin.get('/api/e/testconf/bundle').expect(200);
-    expect(bundle.body.people).toHaveLength(1);
+    expect(bundle.body.people.filter((p: { claimed: boolean }) => !p.claimed)).toHaveLength(1);
   });
 
   it('stores a new speaker with collapsed whitespace', async () => {
@@ -62,9 +62,16 @@ describe('speaker matching', () => {
          VALUES (?, NULL, 'Sam', '', '[]', ?, ?)`,
       )
       .run(eventId, now, now);
-    const identityId = harness.db
-      .prepare<[], { id: number }>('SELECT id FROM identities ORDER BY id LIMIT 1')
-      .get()!.id;
+    // A second device, so the claim does not collide with the admin's own
+    // person (everyone who enters already holds one).
+    const identityId = Number(
+      harness.db
+        .prepare(
+          `INSERT INTO identities (public_id, token, display_name, created_at, last_seen_at)
+           VALUES ('ab123', 'twin-token', 'sam', ?, ?)`,
+        )
+        .run(now, now).lastInsertRowid,
+    );
     const claimed = Number(
       harness.db
         .prepare(
