@@ -6,6 +6,7 @@ import {
   seedEvent,
   type Agent,
   type Harness,
+  nextUsername,
 } from './helpers.js';
 
 const BASE = {
@@ -108,7 +109,7 @@ describe('event passwords must tell the roles apart', () => {
       await someone.get('/api/me').expect(200);
       const res = await someone
         .post('/api/e/testconf/auth')
-        .send({ password: 'admin-pw' })
+        .send({ password: 'admin-pw', displayName: nextUsername() })
         .expect(200);
       expect(res.body.role).toBe('viewer');
     });
@@ -132,7 +133,7 @@ describe('blank passwords are filled in', () => {
   const signIn = async (slug: string, password: string) => {
     const someone = agentFor(harness);
     await someone.get('/api/me').expect(200);
-    return someone.post(`/api/e/${slug}/auth`).send({ password });
+    return someone.post(`/api/e/${slug}/auth`).send({ password, displayName: nextUsername() });
   };
 
   afterEach(() => harness.close());
@@ -190,7 +191,7 @@ describe('blank passwords are filled in', () => {
       seedEvent(harness.db);
       admin = agentFor(harness);
       await admin.get('/api/me').expect(200);
-      await admin.post('/api/e/testconf/auth').send({ role: 'admin' }).expect(200);
+      await admin.post('/api/e/testconf/auth').send({ role: 'admin', displayName: nextUsername() }).expect(200);
     });
 
     it('gives a newly created event real passwords, not the published ones', async () => {
@@ -202,7 +203,7 @@ describe('blank passwords are filled in', () => {
       // And that event's gate is a password prompt, not a role picker.
       const visitor = agentFor(harness);
       await visitor.get('/api/me').expect(200);
-      await visitor.post('/api/e/demo-conf/auth').send({ role: 'admin' }).expect(400);
+      await visitor.post('/api/e/demo-conf/auth').send({ role: 'admin', displayName: nextUsername() }).expect(400);
     });
 
     it('restores the published passwords when the demo fixture is recreated', async () => {

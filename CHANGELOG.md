@@ -6,6 +6,27 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **Everyone who enters an event is a person there.** A `people` row used
+  to appear only when someone edited their profile, was typed onto a
+  session, or was added by an organiser — so a newcomer who had passed the
+  gate was in neither the speaker picker nor the merge dialog, and typing
+  their own name on a session bred an unclaimed twin. The gate now makes
+  the row the moment a username is claimed (migration 010 backfills every
+  existing entrant), and a person has two names with two jobs: a
+  **username**, typed at the gate, unique in the event, on posts and in
+  the header; and a **full name**, credited on sessions, free to repeat.
+  Two "Alex Chen"s can both be here; the merge tool is for two rows that
+  are one human, not for namesakes.
+
+  The username is now required the first time in — nothing like
+  `attendee_x7f2k` is generated any more — and a device re-entering an
+  event gets its own name back from the new `GET /e/:slug/gate`. Arriving
+  under the name of a profile an organiser typed onto a talk before you
+  came no longer adopts it silently: the gate asks *"There is a speaker
+  profile here called Ada Lovelace, on 2 sessions. Is that you?"* and
+  takes it only on a yes. Spec:
+  `_planning/specs/self-as-speaker-and-merge-ux.md`.
+
 - **A session can be given by more than one person.** `sessions.speaker_id`
   held exactly one, which is wrong for most of what an unconference actually
   runs: a panel, a pair, a workshop with two facilitators, a talk and its

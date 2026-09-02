@@ -8,9 +8,10 @@ import {
   settleSpeakerCodeAfterMerge,
 } from '../deviceLink.js';
 import type { PersonRow, SessionRow } from '../db.js';
-import { badRequest, conflict, forbidden, notFound } from '../errors.js';
+import { badRequest, forbidden, notFound } from '../errors.js';
 import { rekeyIdentityWork } from '../mergeIdentityWork.js';
 import { loadProposalDtos, loadSessionDto, toPersonDto } from '../mappers.js';
+import { ensureOwnProfile } from '../people.js';
 import { requireCapability } from '../permissions.js';
 import { limit } from '../ratelimit.js';
 import {
@@ -39,13 +40,6 @@ export function peopleRoutes(ctx: Ctx): Router {
     if (!row) throw notFound('No such profile');
     return row;
   };
-
-  const nameClash = (eventId: number, name: string, excludeId?: number): PersonRow | undefined =>
-    ctx.db
-      .prepare<[number, string, number], PersonRow>(
-        'SELECT * FROM people WHERE event_id = ? AND name = ? AND deleted_at IS NULL AND id != ?',
-      )
-      .get(eventId, name, excludeId ?? -1);
 
   const write = (row: PersonRow, patch: { name?: string; bio?: string; links?: unknown[] }) => {
     ctx.db
@@ -77,7 +71,14 @@ export function peopleRoutes(ctx: Ctx): Router {
     res.json(detail);
   });
 
-  /** Your own profile for this event, created on first edit. */
+  /**
+   * Your own profile for this event. Since migration 010 it exists from the
+   * moment you enter, so this is an edit; the create branch is kept for an
+   * identity that got in before that and has not been through a gate since.
+   * The full name is free — two people may share one — so there is nothing
+   * to clash with; the username is the unique thing, and it lives on the
+   * event membership, not here.
+   */
   router.patch(
     '/me/profile',
     requireCapability(ctx.db, 'person.edit_own'),
@@ -90,55 +91,23 @@ export function peopleRoutes(ctx: Ctx): Router {
           'SELECT * FROM people WHERE event_id = ? AND identity_id = ? AND deleted_at IS NULL',
         )
         .get(req.event.id, req.identity.id);
-
-      const name = body.name ?? existing?.name ?? req.identity.display_name;
-      const clash = nameClash(req.event.id, name, existing?.id);
-      // Naming yourself as the speaker on a session or a pitch auto-creates an
-      // unclaimed person under your display name. Refusing the collision would
-      // lock you out of your own profile for good, since every retry defaults
-      // to the same name — so claim that record instead. It is the same person,
-      // and it folds the speaker entry into the profile.
-      if (clash && clash.identity_id !== null) {
-        throw conflict('Someone else here already goes by that name', 'name_taken');
-      }
-
-      let id: number;
-      if (existing) {
-        write(existing, { ...body, name });
-        id = existing.id;
-      } else if (clash) {
-        ctx.db
-          .prepare('UPDATE people SET identity_id = ? WHERE id = ?')
-          .run(req.identity.id, clash.id);
-        write(clash, { ...body, name });
-        id = clash.id;
-      } else {
-        const now = new Date().toISOString();
-        id = Number(
-          ctx.db
-            .prepare(
-              `INSERT INTO people (event_id, identity_id, name, bio, links, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            )
-            .run(
-              req.event.id,
-              req.identity.id,
-              name,
-              body.bio ?? '',
-              JSON.stringify(body.links ?? []),
-              now,
-              now,
-            ).lastInsertRowid,
+      const row =
+        existing ??
+        ensureOwnProfile(
+          ctx.db,
+          req.event.id,
+          req.identity.id,
+          body.name ?? (req.identity.display_name || req.identity.public_id),
         );
-      }
+      write(row, body);
 
-      const dto = toPersonDto(load(req.event.id, id), req.identity.id);
+      const dto = toPersonDto(load(req.event.id, row.id), req.identity.id);
       audit(ctx.db, {
         identityId: req.identity.id,
         eventId: req.event.id,
         action: existing ? 'update' : 'create',
         entity: 'person',
-        entityId: id,
+        entityId: row.id,
       });
       ctx.broker.publish(req.event.slug, existing ? 'person.updated' : 'person.created', dto);
       res.status(existing ? 200 : 201).json(dto);
@@ -152,9 +121,6 @@ export function peopleRoutes(ctx: Ctx): Router {
     limit(ctx.limiter, 'write'),
     (req, res) => {
       const body = parse(personSchema, req.body);
-      if (nameClash(req.event.id, body.name)) {
-        throw conflict('Someone here already goes by that name', 'name_taken');
-      }
       const now = new Date().toISOString();
       const id = Number(
         ctx.db
@@ -198,9 +164,6 @@ export function peopleRoutes(ctx: Ctx): Router {
       }
 
       const body = parse(personPatchSchema, req.body);
-      if (body.name && nameClash(req.event.id, body.name, person.id)) {
-        throw conflict('Someone here already goes by that name', 'name_taken');
-      }
       write(person, body);
 
       const dto = toPersonDto(load(req.event.id, person.id), req.identity.id);

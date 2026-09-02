@@ -7,6 +7,15 @@ Last updated: 2026-09-02
 
 ## In Progress
 
+- **Everyone who enters is a person.** Started 2026-09-02, plan in
+  `_planning/plans/2026-09-02-everyone-is-a-person.md`, spec in
+  `_planning/specs/self-as-speaker-and-merge-ux.md`. Step 0 (a `people`
+  row for every identity at the gate, required username, non-unique full
+  name, the gate's "is that you?" prompt, backfill migration 010) is in
+  the main session on `dev`; Steps 1–2 follow here; Steps 3–5 (one People
+  list with a role control, the merge dialog, the back link) are handed
+  to a second agent on `feat/everyone-is-a-person`.
+
 Working on `dev`; `main` is the released line and only takes merges. The
 breaks rework has landed — `feat/event-level-breaks` (`5e53811`) is an
 ancestor of `dev` — so its code half is done and written up in CHANGELOG
@@ -372,30 +381,38 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   the fix and would only hurt the typo case; bcrypt already makes each guess
   cost something, which is why this is a real backlog item and not a fire.
 
-- **A person who never opened their profile cannot be merged.** Reported
-  2026-09-01: the merge dialog does not offer the people you most want to fold
-  together. Mechanism — a `people` row only exists once somebody edits their
-  profile, is typed as a speaker on a session, or is added by an organiser.
-  Someone who walked in, took a display name at the gate and never touched
-  their profile has no row at all: they live in `event_identities`/`roles`
-  only. The merge dialog lists `bundle.people` and `/people/:id/merge` loads
-  both sides out of the `people` table (`ProfilePage.tsx` MergeModal,
-  `people.ts:231`), so such a person cannot be either side of a merge.
-
-  The duplicate this actually produces: an organiser bills a session to "Ada
-  Lovelace" (auto-creating an unclaimed profile), Ada then joins the gate as
-  "Ada" and gets an identity with no profile. Two records, one human, and
-  merging is not the tool for it — they are not two profiles. The claim path
-  that would fix it fires only on an exact name match and only when she edits
-  her own profile (`people.ts:105-113`). The roster query already carries
-  `person_id` per attendee (`attendees.ts:47`), so Manage Event → People
-  already knows who has a profile and who does not; what is missing is the
-  organiser move "this attendee **is** that profile", which is a claim on
-  someone's behalf rather than a second kind of merge. Worth deciding whether
-  the merge dialog should also list profile-less attendees and quietly do the
-  claim, or whether that belongs on the People tab where the two lists meet.
-
 ## Medium Priority
+
+- **Goal: one database per event, and identity that lives inside the event.**
+  Stated 2026-09-02. Cross-event identity — one cookie is one person across
+  the instance, `GET /me` lists roles in every event, a UID that is "the same
+  at every event" — is judged a feature nobody needs, and it is the source of
+  the three-table identity model (`identities` / `event_identities` /
+  `roles` / `people`) that keeps confusing everyone. The target shape: a
+  registry (`events`, `event_slugs`, passwords) and one SQLite file per
+  event, where a **person is a row with an optional device token** —
+  unclaimed means no token — and username, full name, role, stars and
+  authorship all hang off that one row. Merge becomes trivial (everything
+  keys on the person), device linking and speaker codes still work (adopt a
+  person's token), export/import gets closer to "the file", backup is a
+  copy, and a missed `event_id` in a query can no longer leak across events
+  because there is no other event in the file.
+
+  Not feasible while an event is live: it touches every server route
+  (`ctx.db` becomes a per-request handle, 19 files; `req.identity` is used
+  109 times), the migration runner, backup, clone, the cookie (one per
+  event, `cid_<eventId>`, since the token must not follow a person between
+  files), and the test helpers. A split script is straightforward — copy
+  each event's rows into its file, drop the column — but it is the biggest
+  change since the identity work and wants a quiet week and a tagged
+  release before it. ARCHITECTURE §One database, many events records the
+  opposite decision and must be rewritten when this is taken up.
+
+  **Rule for everything built until then:** put nothing new on
+  `identities` and nothing new that spans events. New facts about a human
+  go on `people`, per event. The "everyone is a person" spec above is the
+  first half of this goal — once `people` is the primary human record, the
+  only instance-wide thing left is the token, and moving it is the split.
 
 - **Put the last two popdowns on `usePopover`.** `ProfileMenu` and
   `SpeakerCombobox` still position themselves and still carry their own

@@ -8,6 +8,7 @@ import {
   seedRoom,
   type Agent,
   type Harness,
+  nextUsername,
 } from './helpers.js';
 
 describe('contributions', () => {
@@ -46,7 +47,7 @@ describe('contributions', () => {
   it('accepts notes and questions from users', async () => {
     const note = await post(author, { kind: 'note', body: 'A note' }).expect(201);
     expect(note.body.kind).toBe('note');
-    expect(note.body.createdByName).toMatch(/^attendee_/);
+    expect(note.body.createdByName).toMatch(/^tester_/);
     await post(author, { kind: 'question', body: 'Why?' }).expect(201);
   });
 
@@ -430,7 +431,7 @@ describe('event settings and creation', () => {
         adminPassword: 'admin22',
       })
       .expect(201);
-    await admin.post('/api/e/testconf-rail/auth').send({ password: 'admin22' }).expect(200);
+    await admin.post('/api/e/testconf-rail/auth').send({ password: 'admin22', displayName: nextUsername() }).expect(200);
     const res = await admin.get('/api/e/testconf-rail/bundle').expect(200);
     expect(res.body.event.weekRailFrom).toBe(21);
   });

@@ -4,6 +4,12 @@ export type Role = 'viewer' | 'user' | 'speaker' | 'admin';
 export type SessionType = 'official' | 'open';
 export type ContributionKind = 'note' | 'link' | 'question';
 
+/** What the gate needs before anyone is in: the username this device already
+ *  holds here, if it has entered before. */
+export interface GateDto {
+  heldName: string | null;
+}
+
 export interface Me {
   id: number;
   /** Your "UID": 5 hex chars, the same at every event on this instance.

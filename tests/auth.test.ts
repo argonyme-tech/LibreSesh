@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { atLeast, roleForPassword } from '../server/src/auth.js';
 import type { EventRow } from '../server/src/db.js';
-import { agentFor, makeHarness, seedEvent, type Harness } from './helpers.js';
+import { agentFor, makeHarness, seedEvent, type Harness, nextUsername } from './helpers.js';
 
 describe('role ranking', () => {
   it('orders viewer < user < admin', () => {
@@ -58,7 +58,8 @@ describe('identity', () => {
   it('mints an anonymous identity on first contact and keeps it', async () => {
     const agent = agentFor(harness);
     const first = await agent.get('/api/me').expect(200);
-    expect(first.body.displayName).toMatch(/^attendee_[a-z0-9]{5}$/);
+    // No name until one is typed at a gate: nothing is generated for you.
+    expect(first.body.displayName).toBe('');
     expect(first.body.roles).toEqual({});
 
     const second = await agent.get('/api/me').expect(200);
@@ -74,7 +75,7 @@ describe('identity', () => {
   it('renames, including for viewers', async () => {
     const agent = agentFor(harness);
     await agent.get('/api/me');
-    await agent.post('/api/e/testconf/auth').send({ password: 'viewer-pw' }).expect(200);
+    await agent.post('/api/e/testconf/auth').send({ password: 'viewer-pw', displayName: nextUsername() }).expect(200);
     const res = await agent.patch('/api/me').send({ displayName: '  Dana  ' }).expect(200);
     expect(res.body.displayName).toBe('Dana');
     expect(res.body.roles).toEqual({ testconf: 'viewer' });
@@ -98,7 +99,7 @@ describe('event auth endpoint', () => {
 
   it('grants the matching role', async () => {
     const agent = agentFor(harness);
-    const res = await agent.post('/api/e/testconf/auth').send({ password: 'user-pw' }).expect(200);
+    const res = await agent.post('/api/e/testconf/auth').send({ password: 'user-pw', displayName: nextUsername() }).expect(200);
     expect(res.body).toEqual({ role: 'user' });
   });
 
@@ -112,10 +113,10 @@ describe('event auth endpoint', () => {
 
   it('upgrades and downgrades the stored role', async () => {
     const agent = agentFor(harness);
-    await agent.post('/api/e/testconf/auth').send({ password: 'viewer-pw' }).expect(200);
-    await agent.post('/api/e/testconf/auth').send({ password: 'admin-pw' }).expect(200);
+    await agent.post('/api/e/testconf/auth').send({ password: 'viewer-pw', displayName: nextUsername() }).expect(200);
+    await agent.post('/api/e/testconf/auth').send({ password: 'admin-pw', displayName: nextUsername() }).expect(200);
     expect((await agent.get('/api/me')).body.roles.testconf).toBe('admin');
-    await agent.post('/api/e/testconf/auth').send({ password: 'viewer-pw' }).expect(200);
+    await agent.post('/api/e/testconf/auth').send({ password: 'viewer-pw', displayName: nextUsername() }).expect(200);
     expect((await agent.get('/api/me')).body.roles.testconf).toBe('viewer');
   });
 
@@ -135,7 +136,7 @@ describe('event auth endpoint', () => {
       await agent.post('/api/e/testconf/auth').send({ password: 'wrong' }).expect(403);
     }
     // A success returns its token, so the next wrong guess is still the 5th.
-    await agent.post('/api/e/testconf/auth').send({ password: 'user-pw' }).expect(200);
+    await agent.post('/api/e/testconf/auth').send({ password: 'user-pw', displayName: nextUsername() }).expect(200);
     await agent.post('/api/e/testconf/auth').send({ password: 'wrong' }).expect(403);
   });
 
@@ -147,13 +148,34 @@ describe('event auth endpoint', () => {
 
   it('logout drops the role but keeps the name', async () => {
     const agent = agentFor(harness);
-    await agent.post('/api/e/testconf/auth').send({ password: 'admin-pw' }).expect(200);
+    await agent.post('/api/e/testconf/auth').send({ password: 'admin-pw', displayName: nextUsername() }).expect(200);
     await agent.patch('/api/me').send({ displayName: 'Robin' }).expect(200);
     await agent.post('/api/e/testconf/logout').expect(204);
     const me = await agent.get('/api/me').expect(200);
     expect(me.body.displayName).toBe('Robin');
     expect(me.body.roles).toEqual({});
     await agent.get('/api/e/testconf/bundle').expect(401);
+  });
+
+  it('requires a username the first time, and remembers it after', async () => {
+    const agent = agentFor(harness);
+    await agent.get('/api/me').expect(200);
+    // Nothing to fall back on: no seed name is generated any more.
+    const refused = await agent.post('/api/e/testconf/auth').send({ password: 'user-pw' }).expect(400);
+    expect(refused.body.error.code).toBe('name_required');
+    expect((await agent.get('/api/e/testconf/gate').expect(200)).body).toEqual({ heldName: null });
+
+    await agent
+      .post('/api/e/testconf/auth')
+      .send({ password: 'user-pw', displayName: 'Robin' })
+      .expect(200);
+    expect((await agent.get('/api/e/testconf/gate').expect(200)).body).toEqual({ heldName: 'Robin' });
+
+    // Re-entering after a logout may leave the name out and keeps it.
+    await agent.post('/api/e/testconf/logout').expect(204);
+    await agent.post('/api/e/testconf/auth').send({ password: 'viewer-pw' }).expect(200);
+    const bundle = await agent.get('/api/e/testconf/bundle').expect(200);
+    expect(bundle.body.displayName).toBe('Robin');
   });
 
   it('404s for an unknown event', async () => {
@@ -173,7 +195,7 @@ describe('demo mode', () => {
     await agent.get('/api/me').expect(200);
 
     // No password field at all -> the password schema rejects it.
-    await agent.post('/api/e/testconf/auth').send({ role: 'admin' }).expect(400);
+    await agent.post('/api/e/testconf/auth').send({ role: 'admin', displayName: nextUsername() }).expect(400);
     await agent.get('/api/e/testconf/bundle').expect(401);
   });
 
@@ -200,7 +222,7 @@ describe('demo mode', () => {
     const agent = agentFor(harness);
     await agent.get('/api/me').expect(200);
 
-    const res = await agent.post('/api/e/testconf/auth').send({ role: 'admin' }).expect(200);
+    const res = await agent.post('/api/e/testconf/auth').send({ role: 'admin', displayName: nextUsername() }).expect(200);
     expect(res.body.role).toBe('admin');
 
     // And that role really works.
@@ -213,8 +235,8 @@ describe('demo mode', () => {
     const agent = agentFor(harness);
     await agent.get('/api/me').expect(200);
 
-    await agent.post('/api/e/testconf/auth').send({ role: 'admin' }).expect(200);
-    await agent.post('/api/e/testconf/auth').send({ role: 'viewer' }).expect(200);
+    await agent.post('/api/e/testconf/auth').send({ role: 'admin', displayName: nextUsername() }).expect(200);
+    await agent.post('/api/e/testconf/auth').send({ role: 'viewer', displayName: nextUsername() }).expect(200);
     // Downgraded for real: admin-only writes are refused again.
     await agent.post('/api/e/testconf/rooms').send({ name: 'Nope' }).expect(403);
   });
@@ -239,11 +261,11 @@ describe('demo mode', () => {
     await agent.get('/api/me').expect(200);
 
     // No role picker here — the gate wants a password.
-    await agent.post('/api/e/testconf/auth').send({ role: 'admin' }).expect(400);
+    await agent.post('/api/e/testconf/auth').send({ role: 'admin', displayName: nextUsername() }).expect(400);
     await agent.post('/api/e/testconf/auth').send({ password: 'nope' }).expect(403);
     await agent.get('/api/e/testconf/bundle').expect(401);
 
-    const ok = await agent.post('/api/e/testconf/auth').send({ password: 'admin-pw' }).expect(200);
+    const ok = await agent.post('/api/e/testconf/auth').send({ password: 'admin-pw', displayName: nextUsername() }).expect(200);
     expect(ok.body.role).toBe('admin');
   });
 
@@ -263,7 +285,7 @@ describe('demo mode', () => {
     await agent.get('/api/me').expect(200);
     // The demo branch parses `role`, so a password-only body is a 400 — the
     // gate sends one shape or the other, never both.
-    await agent.post('/api/e/testconf/auth').send({ password: 'admin-pw' }).expect(400);
+    await agent.post('/api/e/testconf/auth').send({ password: 'admin-pw', displayName: nextUsername() }).expect(400);
   });
 });
 

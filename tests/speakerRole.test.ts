@@ -41,8 +41,7 @@ describe('speaker role', () => {
     speaker = await actorWithRole(harness, 'testconf', 'user-pw');
     const profile = await speaker
       .patch('/api/e/testconf/me/profile')
-      .send({ name: 'Ada' })
-      .expect(201);
+      .send({ name: 'Ada' }).expect(200);
     personId = profile.body.id as number;
     const { body: me } = await speaker.get('/api/me').expect(200);
     promote(me.id as number);
@@ -100,8 +99,7 @@ describe('speaker role', () => {
     const attendee = await actorWithRole(harness, 'testconf', 'user-pw');
     const profile = await attendee
       .patch('/api/e/testconf/me/profile')
-      .send({ name: 'Grace' })
-      .expect(201);
+      .send({ name: 'Grace' }).expect(200);
     const created = await admin
       .post('/api/e/testconf/sessions')
       .send({

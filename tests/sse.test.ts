@@ -1,6 +1,6 @@
 import type { Server } from 'node:http';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { DAY_ONE, at, makeHarness, seedEvent, seedRoom, type Harness } from './helpers.js';
+import { DAY_ONE, at, makeHarness, seedEvent, seedRoom, type Harness, nextUsername } from './helpers.js';
 
 /** A cookie-carrying fetch against the real listening server. */
 class Client {
@@ -28,7 +28,10 @@ class Client {
 
   async enter(slug: string, password: string): Promise<void> {
     await this.request('GET', '/api/me');
-    const res = await this.request('POST', `/api/e/${slug}/auth`, { password });
+    const res = await this.request('POST', `/api/e/${slug}/auth`, {
+      password,
+      displayName: nextUsername(),
+    });
     expect(res.status).toBe(200);
   }
 }

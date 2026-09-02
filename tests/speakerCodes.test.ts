@@ -106,8 +106,7 @@ describe('speaker codes', () => {
     // An organiser who is also speaking stays an organiser.
     const profile = await admin
       .patch('/api/e/testconf/me/profile')
-      .send({ name: 'Orga' })
-      .expect(201);
+      .send({ name: 'Orga' }).expect(200);
     await mint(profile.body.id as number);
     const { body: me } = await admin.get('/api/me').expect(200);
     expect(me.roles.testconf).toBe('admin');

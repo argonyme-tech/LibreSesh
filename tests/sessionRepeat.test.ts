@@ -111,9 +111,9 @@ describe('repeating a session from the form', () => {
       expect(s.description).toBe('Same every day.');
     }
     const people = (await admin.get('/api/e/testconf/bundle').expect(200)).body as {
-      people: unknown[];
+      people: { claimed: boolean }[];
     };
-    expect(people.people).toHaveLength(1);
+    expect(people.people.filter((p) => !p.claimed)).toHaveLength(1);
   });
 
   /**

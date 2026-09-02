@@ -180,14 +180,14 @@ export function ProfilePage() {
                   }}
                   hint={
                     person.isMine
-                      ? 'The name on this profile — what sessions you host are credited to.'
-                      : undefined
+                      ? 'Your full name — what sessions you give are credited to. Need not be unique.'
+                      : 'Their full name — what sessions they give are credited to.'
                   }
                 >
                   <input
                     value={draftName}
                     onChange={(e) => setDraftName(e.target.value)}
-                    aria-label="Name"
+                    aria-label="Full name"
                     maxLength={120}
                     className={`${inputClass} text-lg font-semibold`}
                     autoFocus
@@ -200,8 +200,8 @@ export function ProfilePage() {
                   </h1>
                   {canEdit && (
                     <IconButton
-                      aria-label="Edit name"
-                      title="Edit name"
+                      aria-label="Edit full name"
+                      title="Edit full name"
                       className="shrink-0"
                       onClick={() => edit('name')}
                     >
@@ -232,18 +232,18 @@ export function ProfilePage() {
                  identity in the event — so it saves through its own call, and
                  an organiser looking at your profile does not get to touch it. */
               <ProfileField
-                label="Display name"
-                hint="How you appear in this event: the header chip, and anything you post. Must be unlike anyone else's here."
+                label="Username"
+                hint="How you appear in this event: the header chip, and anything you post. Unique here; not a login."
                 canEdit
                 filled={displayName !== ''}
-                emptyText="You have no name in this event yet."
-                addLabel="Set a display name"
+                emptyText="You have no username in this event yet."
+                addLabel="Set a username"
                 editing={open === 'displayName'}
                 onEdit={() => edit('displayName')}
                 onClose={close}
                 onSave={async () => {
                   const wanted = draftDisplayName.trim();
-                  if (!wanted) throw new Error('A display name cannot be empty.');
+                  if (!wanted) throw new Error('A username cannot be empty.');
                   if (wanted === displayName) return;
                   await api.renameInEvent(slug, wanted);
                   await data.reload();
@@ -252,7 +252,7 @@ export function ProfilePage() {
                   <input
                     value={draftDisplayName}
                     onChange={(e) => setDraftDisplayName(e.target.value)}
-                    aria-label="Display name"
+                    aria-label="Username"
                     maxLength={40}
                     className={inputClass}
                     autoFocus

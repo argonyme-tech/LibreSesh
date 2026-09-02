@@ -3,7 +3,6 @@ import type { NextFunction, Request, Response } from 'express';
 import type { Db, IdentityRow } from './db.js';
 
 const BASE62 = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-const LOWER36 = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
 export const COOKIE_NAME = 'cid';
 const TOKEN_LENGTH = 22;
@@ -49,8 +48,6 @@ export function setIdentityCookie(res: Response, token: string, isProd: boolean)
     path: '/',
   });
 }
-/** Suffixed so two people in the same room can tell each other apart. */
-export const newDisplayName = (): string => `attendee_${randomString(5, LOWER36)}`;
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -89,14 +86,15 @@ export function identityMiddleware(db: Db, isProd: boolean) {
 
     if (!identity) {
       const token = newIdentityToken();
-      const displayName = newDisplayName();
       const publicId = newPublicId(db);
-      const info = insert.run(publicId, token, displayName, now, now);
+      // No seed name: a username is typed at the first gate, never handed
+      // out. The column follows the last name chosen, for the next gate.
+      const info = insert.run(publicId, token, '', now, now);
       identity = {
         id: Number(info.lastInsertRowid),
         public_id: publicId,
         token,
-        display_name: displayName,
+        display_name: '',
         created_at: now,
         last_seen_at: now,
         ics_token: null,

@@ -6,6 +6,9 @@ export class HttpError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    /** Machine-readable facts a client needs to act on the error — the
+     *  gate's "is that you?" prompt carries the profile it found. */
+    readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = 'HttpError';
@@ -44,7 +47,13 @@ export function errorHandler(
     return;
   }
   if (err instanceof HttpError) {
-    res.status(err.status).json({ error: { code: err.code, message: err.message } });
+    res.status(err.status).json({
+      error: {
+        code: err.code,
+        message: err.message,
+        ...(err.details === undefined ? {} : { details: err.details }),
+      },
+    });
     return;
   }
   // A schedule larger than the body cap is the one way an ordinary request

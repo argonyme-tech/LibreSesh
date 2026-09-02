@@ -47,7 +47,7 @@ describe('attendees', () => {
   });
 
   it('links the profile an attendee holds', async () => {
-    await admin.patch('/api/e/testconf/me/profile').send({}).expect(201);
+    await admin.patch('/api/e/testconf/me/profile').send({}).expect(200);
     const [me] = await read();
     expect(me?.personId).not.toBeNull();
   });
