@@ -177,7 +177,7 @@ export function SessionDetail({
           })()}
           {session.type === 'open' ? (
             <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
-              open session
+              non-official
             </span>
           ) : (
             <span className="rounded-full bg-stone-100 dark:bg-stone-800 px-2 py-0.5 text-xs font-semibold text-stone-600 dark:text-stone-300">

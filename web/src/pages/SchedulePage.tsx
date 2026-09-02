@@ -959,7 +959,7 @@ export function SchedulePage() {
     {
       target: "session-block",
       title: "Open a session",
-      body: "Tap any block for its description, speaker and everyone's notes, links and questions. Dashed green blocks are open sessions that anyone may propose.",
+      body: "Tap any block for its description, speaker and everyone's notes, links and questions. Dashed green blocks are non-official — anyone may propose one, and something else can always run alongside it.",
     },
     {
       target: "filters",
@@ -978,7 +978,7 @@ export function SchedulePage() {
     tourSteps.push({
       target: "add",
       title: "Add a session",
-      body: "Organisers add official sessions anywhere; everyone else proposes open sessions in the rooms that anyone may book.",
+      body: "Organisers add official sessions anywhere; everyone else proposes non-official ones in the rooms that anyone may book.",
     });
   }
   if (role === "admin") {

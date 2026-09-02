@@ -52,6 +52,22 @@ import {
 
 
 
+/**
+ * The two ways a session gets onto the schedule. The second used to be
+ * labelled "open", which read as *open to join* — the opposite of a useful
+ * distinction on a schedule where everything is open to join. It is stated as
+ * the negative of the first now, with the consequence that actually matters
+ * spelled out beside it: only an official session can hold the floor, so
+ * anything non-official can always have something running alongside it.
+ *
+ * The stored value is unchanged (`official | open`); this is what a person
+ * reads.
+ */
+const PLACEMENTS: readonly { value: 'official' | 'open'; label: string; note?: string }[] = [
+  { value: 'official', label: 'Official' },
+  { value: 'open', label: 'Non-official', note: 'allow parallel sessions' },
+];
+
 export interface SessionModalProps {
   session?: SessionDto;
   rooms: RoomDto[];
@@ -212,7 +228,7 @@ export function SessionModal({
     const [h, m] = start.split(':').map(Number);
     const startMin = Math.round(((h ?? 0) * 60 + (m ?? 0)) / 5) * 5;
     if (!isAdmin && (startMin < dayStartMin || startMin + durMin > dayEndMin)) {
-      setError(`Open sessions must sit between ${fmtMin(dayStartMin)} and ${fmtMin(dayEndMin)}`);
+      setError(`A session you place must sit between ${fmtMin(dayStartMin)} and ${fmtMin(dayEndMin)}`);
       return;
     }
     const streams = livestreams
@@ -246,7 +262,7 @@ export function SessionModal({
     }, repeat);
   };
 
-  const heading = session ? 'Edit session' : isAdmin ? 'Add session' : 'Propose an open session';
+  const heading = session ? 'Edit session' : isAdmin ? 'Add session' : 'Propose a session';
 
   return (
     // `wide`: the form is mostly two- and three-column FormGrids (day, start,
@@ -257,7 +273,7 @@ export function SessionModal({
       description={
         isAdmin
           ? undefined
-          : 'Open sessions live in rooms that anyone may book, and stay editable by you.'
+          : 'What you propose lives in a room anyone may book, and stays editable by you.'
       }
       onClose={onCancel}
       wide
@@ -337,9 +353,10 @@ export function SessionModal({
           {isAdmin && (
             <Field label="Placement">
               <div className="flex items-center gap-1.5">
-                {(['official', 'open'] as const).map((t) => (
-                  <Chip key={t} active={type === t} onClick={() => setType(t)}>
-                    <span className="capitalize">{t}</span>
+                {PLACEMENTS.map((p) => (
+                  <Chip key={p.value} active={type === p.value} onClick={() => setType(p.value)}>
+                    {p.label}
+                    {p.note && <span className="ml-1 font-normal opacity-70">: {p.note}</span>}
                   </Chip>
                 ))}
                 <HelpButton
@@ -358,15 +375,20 @@ export function SessionModal({
                   </p>
                   <p>
                     <strong className="font-semibold text-stone-800 dark:text-stone-100">
-                      Open
+                      Non-official
                     </strong>{' '}
                     is attendee-placed. Whoever created it can keep editing it, and it can only
                     go in a room that allows booking.
                   </p>
                   <p>
+                    Only an official session can hold the floor — that is what “allow parallel
+                    sessions” means here: a non-official one never stops anybody putting
+                    something on at the same time.
+                  </p>
+                  <p>
                     Making a session official therefore locks it against the person who put it
-                    up. Neither type affects timing: organisers may double-book a room, everyone
-                    else may not, whichever type it is.
+                    up. Neither choice affects timing: organisers may double-book a room,
+                    everyone else may not, whichever it is.
                   </p>
                 </HelpNote>
               )}

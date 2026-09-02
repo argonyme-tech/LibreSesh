@@ -45,6 +45,16 @@ All notable changes to this project are documented here.
 
 ### Changed
 
+- **"Open session" is gone from the schedule; the word meant the wrong thing.**
+  A block that is not part of the published programme was badged `open session`
+  on the grid, `open` in the list and `open session` on the sheet — and read as
+  *open to join*, which every session on a schedule is. The one word meant to
+  mark the exception described the rule. All three say **non-official** now,
+  and the session form's Placement control offers **Official** and
+  **Non-official: allow parallel sessions**, which states the consequence that
+  actually differs: only an official session can hold the floor, so something
+  can always run alongside a non-official one. The stored values are unchanged.
+
 - **A session can run longer than three hours, and for any number of minutes.**
   The duration picker offered seven fixed choices ending at 180, and the server
   refused anything over 480 — so a full-day excursion, an all-afternoon poster

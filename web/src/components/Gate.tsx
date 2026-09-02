@@ -196,7 +196,7 @@ export function Gate({ slug, eventName, me, onEntered }: GateProps) {
   const demo = me?.demoEventSlugs?.includes(slug) === true;
   const roles: { role: Role; label: string; blurb: string }[] = [
     { role: 'viewer', label: 'Viewer', blurb: 'Read the schedule, star sessions' },
-    { role: 'user', label: 'Attendee', blurb: 'Add notes, propose open sessions' },
+    { role: 'user', label: 'Attendee', blurb: 'Add notes, propose sessions' },
     { role: 'admin', label: 'Organiser', blurb: 'Full control of the event' },
   ];
 

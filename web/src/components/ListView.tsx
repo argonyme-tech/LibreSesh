@@ -181,7 +181,7 @@ export function ListView({
                     })}
                     {session.type === 'open' && (
                       <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:text-emerald-300">
-                        open
+                        non-official
                       </span>
                     )}
                     {clashes && (

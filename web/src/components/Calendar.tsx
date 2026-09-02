@@ -826,8 +826,14 @@ export function Calendar({
                     {subtitleOf(session)}
                   </div>
                 )}
+                {/* "open session" read as *open to join*, which every session
+                    on this grid is — so the one word meant to mark the
+                    exception described the rule. Named as the negative of
+                    official, the way the session form says it. */}
                 {session.type === 'open' && (
-                  <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">open session</span>
+                  <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                    non-official
+                  </span>
                 )}
                 {editable && (
                   <div

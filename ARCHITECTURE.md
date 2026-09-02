@@ -97,7 +97,11 @@ redirects cannot be handed to a new event.
 ### A format is not a type
 
 `sessions.type` is `official | open` and answers **who put this here**: the
-published programme, or an attendee booking a room that allows it. It decides
+published programme, or an attendee booking a room that allows it. The stored
+values are unchanged, but nothing shows the word "open" to a reader any more —
+it read as *open to join*, which every session on the schedule is, so the badge
+meant to mark the exception described the rule. The UI says **Official** and
+**Non-official** throughout. It decides
 permissions — who may move the session, whether it can hold the floor — and it
 is the oldest column in the table.
 
