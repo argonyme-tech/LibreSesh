@@ -4,7 +4,14 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **The end of a day's list offers the next one.** Reaching the bottom is
+  the moment a reader asks what happens tomorrow, and the answer was a day
+  picker back at the top of the page. There is a button there now, naming
+  the day it goes to. Only under a day that had something in it: on an
+  empty day the page already says so, and a lone button under nothing
+  reads as the day's entire content.
 
 ## [0.2.3] — 2026-09-02
 

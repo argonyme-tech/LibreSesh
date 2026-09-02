@@ -19,9 +19,14 @@ export interface ListViewProps {
   clashingIds: Set<number>;
   timezone: string;
   day: string;
+  /** The day after this one, when the event has one. A list ends where the
+   *  day ends, and the reader who got there is almost always asking what
+   *  happens next rather than reaching for the day picker at the top. */
+  nextDay?: { date: string; label: string };
   nowMin: number | null;
   onOpen: (id: number) => void;
   onToggleStar: (session: SessionDto) => void;
+  onGoToDay?: (date: string) => void;
 }
 
 /** Chronological agenda for one day, grouped by start time (SPEC §7.2). */
@@ -36,9 +41,11 @@ export function ListView({
   clashingIds,
   timezone,
   day,
+  nextDay,
   nowMin,
   onOpen,
   onToggleStar,
+  onGoToDay,
 }: ListViewProps) {
   const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
   const tagById = useMemo(() => new Map(tags.map((t) => [t.id, t])), [tags]);
@@ -212,6 +219,19 @@ export function ListView({
           </div>
         </div>
         ),
+      )}
+
+      {/* The end of the day, and the way out of it. Only when there is
+          something above it: on an empty day the page already says so, and a
+          lone button under nothing reads as the whole day's content. */}
+      {nextDay && rows.length > 0 && onGoToDay && (
+        <button
+          type="button"
+          onClick={() => onGoToDay(nextDay.date)}
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-stone-300 px-3 py-3 text-sm font-semibold text-stone-600 hover:border-stone-500 hover:text-stone-900 dark:border-stone-600 dark:text-stone-300 dark:hover:border-stone-400 dark:hover:text-stone-100"
+        >
+          Next day · {nextDay.label}
+        </button>
       )}
     </div>
   );
