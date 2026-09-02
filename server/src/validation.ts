@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LINK_RULE, safeLink } from './shared/links.js';
 import { badRequest } from './errors.js';
 import { isValidTimezone } from './shared/time.js';
 
@@ -264,21 +265,15 @@ export const tagSchema = z.object({
 });
 export const tagPatchSchema = tagSchema.partial();
 
-/** A labelled http(s) link. Profiles carry a handful; so does a session, one
- *  per stream. Same protocol rules as a contribution's link. */
+/** A labelled link. Profiles carry a handful; so does a session, one per
+ *  stream. Same rules as a contribution's link — see `safeLink`. */
 const linkSchema = z.object({
   label: trimmed(60),
   url: z
     .string()
+    .trim()
     .max(2000)
-    .refine((raw) => {
-      try {
-        const parsed = new URL(raw);
-        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-      } catch {
-        return false;
-      }
-    }, 'Only http and https links'),
+    .refine((raw) => safeLink(raw) !== null, LINK_RULE),
 });
 
 /**
@@ -351,15 +346,8 @@ export const contributionSchema = z
         ctx.addIssue({ code: 'custom', path: ['url'], message: 'Links need a URL' });
         return;
       }
-      let parsed: URL;
-      try {
-        parsed = new URL(v.url);
-      } catch {
-        ctx.addIssue({ code: 'custom', path: ['url'], message: 'That is not a valid URL' });
-        return;
-      }
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        ctx.addIssue({ code: 'custom', path: ['url'], message: 'Only http and https links' });
+      if (safeLink(v.url) === null) {
+        ctx.addIssue({ code: 'custom', path: ['url'], message: LINK_RULE });
       }
     } else if (v.url) {
       ctx.addIssue({ code: 'custom', path: ['url'], message: 'Only links may carry a URL' });

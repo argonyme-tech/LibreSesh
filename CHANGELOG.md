@@ -6,6 +6,24 @@ All notable changes to this project are documented here.
 
 ### Added
 
+### Changed
+
+- **A link no longer has to be on the web.** The rule was an allow-list of
+  two schemes, http and https, which refused a session streamed over IPFS
+  or Swarm, a magnet link, an RTMP feed from a room's own camera, and
+  everything anyone might invent next. It is a deny-list now: anything that
+  parses as a URI is a link, except the handful of schemes that run
+  something on the reader's machine rather than fetching something —
+  `javascript:`, `data:`, `vbscript:`, `blob:`, `file:` and friends.
+
+  One rule, in `shared/links.ts`, used by the stream links, profile links,
+  contribution links and the markdown in descriptions and bios, so a link
+  written in a bio and a link typed into a field cannot disagree about what
+  is allowed. It leans on the URL parser rather than matching text, which
+  is what keeps `JavaScript:` and a leading space from getting through.
+
+### Added
+
 - **A session can carry more than one stream link.** One column held one
   link, so the main camera fitted and the room's own feed, the interpreted
   channel or a mirror somebody set up went into the description or nowhere.

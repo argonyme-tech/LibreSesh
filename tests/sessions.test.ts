@@ -308,8 +308,16 @@ describe('a session can be streamed more than once', () => {
     expect(cleared.body.livestreams).toEqual([]);
   });
 
-  it('refuses a link that is not http(s), and a nameless one', async () => {
+  it('takes a stream that is not on the web at all', async () => {
+    const swarm = { label: 'Swarm', url: 'bzz://abc123def456/live' };
+    const ipfs = { label: 'IPFS', url: 'ipfs://bafybeigdyrztabc123/stream.m3u8' };
+    const res = await make({ livestreams: [swarm, ipfs] }).expect(201);
+    expect(res.body.livestreams).toEqual([swarm, ipfs]);
+  });
+
+  it('refuses a link that runs code, or one with no scheme, or a nameless one', async () => {
     await make({ livestreams: [{ label: 'Bad', url: 'javascript:alert(1)' }] }).expect(400);
+    await make({ livestreams: [{ label: 'Bad', url: 'data:text/html,<script>x</script>' }] }).expect(400);
     await make({ livestreams: [{ label: 'Bad', url: 'not a url' }] }).expect(400);
     await make({ livestreams: [{ label: '', url: YT.url }] }).expect(400);
   });

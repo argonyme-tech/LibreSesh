@@ -8,6 +8,7 @@ import type {
   TagDto,
   TrackDto,
 } from '@shared/types';
+import { LINK_RULE, safeLink } from '@shared/links';
 import { windowLabel, windowOn } from '@shared/trackHours';
 import type { SessionWrite } from '../lib/api';
 import { fmtMin, place } from '../lib/format';
@@ -181,8 +182,8 @@ export function SessionModal({
     const streams = livestreams
       .map((l) => ({ label: l.label.trim(), url: l.url.trim() }))
       .filter((l) => l.url !== '' || l.label !== '');
-    if (streams.some((l) => !/^https?:\/\//i.test(l.url))) {
-      setError('Every stream link must start with http:// or https://');
+    if (streams.some((l) => safeLink(l.url) === null)) {
+      setError(LINK_RULE);
       return;
     }
     if (streams.some((l) => l.label === '')) {
@@ -465,7 +466,7 @@ export function SessionModal({
                       )
                     }
                     aria-label={`Link for stream ${i + 1}`}
-                    placeholder="https://…"
+                    placeholder="https:// or ipfs://…"
                     maxLength={2000}
                     className={inputClass}
                   />
