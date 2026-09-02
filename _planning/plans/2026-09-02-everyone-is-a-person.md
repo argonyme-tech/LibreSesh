@@ -43,7 +43,17 @@ One commit per step, tests with each. Steps 0–2 in the main session on
 - [x] Combobox offers only self when lacking.
 - [x] Tests.
 
-## Step 3 — one People list with a role control (hand-off)
+## Step 3 — one People list with a role control
+
+- [x] `personFacts` grows `lastSeenAt`, `joinedAt`, `sessionCount`;
+      `PersonDto` grows the three, organiser-only.
+- [x] `PUT /people/:id/role`, audited, refusing to demote the last organiser.
+- [x] `/attendees`, `AttendeeDto`, `AdminAttendees` and their test removed.
+- [x] `web/src/lib/people.ts`: segments, counts, search, order, badge — pure.
+- [x] `PersonLine` shared with the merge dialog; dense rows; `ID:` dropped.
+- [x] Route replies disclose to organisers, broadcasts never do; the client
+      keeps its own `isMine` and private facts (`applyPersonChange`).
+- [x] Tests: roster facts, the role route, the pure predicates.
 
 ## Step 4 — the merge dialog (hand-off)
 

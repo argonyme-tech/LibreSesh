@@ -38,7 +38,7 @@ different moments:
 
 | Table | Created when | What the UI treats it as |
 | --- | --- | --- |
-| `event_identities` + `roles` | at the gate, for everyone | the attendance list (Manage → People, lower half) |
+| `event_identities` + `roles` | at the gate, for everyone | the attendance list (Manage → People, lower half — removed in Step 3) |
 | `people` | on first profile edit, when a session names them, or when an organiser adds them | the roster: speaker picker, merge candidates, People tab upper half |
 
 The speaker picker (`SpeakerCombobox`) and the merge dialog (`MergeModal`
@@ -275,9 +275,18 @@ and merges them. That is the honest state; guessing in a migration is
 how a namesake gets someone else's sessions.
 
 **Deleting a person** on the People list is only offered for unclaimed
-rows after this. Deleting a claimed row would break the invariant and the
-next request would recreate it. What an organiser wants to do to a live
-attendee is change their role (Step 3) or, later, sign them out.
+rows after this. Taking away the profile somebody is credited and posts
+under while they are still in the room is not a thing an organiser means
+to do; two rows for one human is what Merge is for, and what an organiser
+wants to do to a live attendee is change their role (Step 3).
+
+The server still allows it, deliberately. Refusing would corner an
+organiser who minted a speaker code by mistake — minting claims the
+profile, so the row could then never be removed — and the invariant heals
+itself anyway: the row comes back at that person's next gate entry or
+profile edit. (Corrected 2026-09-02 while building Step 3: an earlier
+draft said the next *request* would recreate it, which is not true —
+`ensureOwnProfile` runs at the gate, not on every request.)
 
 **`/attendees` and `AdminAttendees` go away** in Step 3. `AdminAttendees`
 is the endpoint's only client reader (checked; the audit page resolves

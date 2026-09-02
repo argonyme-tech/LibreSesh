@@ -397,8 +397,96 @@ describe('speaker profiles', () => {
         // Absent, not null: "not disclosed to you" rather than "unclaimed".
         expect(grace).not.toHaveProperty('role');
         expect(grace).not.toHaveProperty('codePending');
+        expect(grace).not.toHaveProperty('lastSeenAt');
+        expect(grace).not.toHaveProperty('sessionCount');
         expect(grace?.claimed).toBe(true);
       }
+    });
+
+    /** What the People list shows in place of the attendance list it
+     *  replaced: who they are, when they arrived, when they were last here,
+     *  and how much of the programme is theirs. */
+    it('carries the username, the dates and the session count', async () => {
+      const bundle = await user.get('/api/e/testconf/bundle').expect(200);
+      const username = bundle.body.displayName as string;
+      await makeSession(admin, { speakers: [username] }).expect(201);
+      await makeSession(admin, { speakers: [username, 'Ada Lovelace'] }, ).expect(201);
+
+      const people = (await admin.get('/api/e/testconf/bundle').expect(200)).body.people as {
+        name: string;
+        username: string | null;
+        lastSeenAt: string | null;
+        joinedAt: string | null;
+        sessionCount: number;
+      }[];
+      const theirs = people.find((p) => p.username === username);
+      expect(theirs?.sessionCount).toBe(2);
+      expect(theirs?.lastSeenAt).toBeTruthy();
+      expect(theirs?.joinedAt).toBeTruthy();
+
+      // A profile nobody holds has no username, no dates, and its own count.
+      const ada = people.find((p) => p.name === 'Ada Lovelace');
+      expect(ada).toMatchObject({ username: null, lastSeenAt: null, joinedAt: null, sessionCount: 1 });
+    });
+
+    it('gives every person a distinct, stable UID for the audit log', async () => {
+      const first = await peopleFor(admin);
+      const second = await peopleFor(admin);
+      const uids = first.map((p) => p.holderUid).filter((u): u is string => typeof u === 'string');
+      expect(uids).toHaveLength(3); // admin, user, viewer — everyone who entered
+      for (const value of uids) expect(value).toMatch(/^[0-9a-f]{5}$/);
+      expect(new Set(uids).size).toBe(uids.length);
+      expect(second.map((p) => p.holderUid)).toEqual(first.map((p) => p.holderUid));
+    });
+  });
+
+  /**
+   * Roles are handed out from the People list now. Before this an organiser
+   * could only tell somebody a different password and ask them to enter
+   * again, which is not a thing you can do to a person already in the room.
+   */
+  describe('handing out a role', () => {
+    const setRole = (agent: Agent, personId: number, role: string) =>
+      agent.put(`/api/e/testconf/people/${personId}/role`).send({ role });
+    const personOf = async (agent: Agent): Promise<number> => {
+      const bundle = await agent.get('/api/e/testconf/bundle').expect(200);
+      return bundle.body.people.find((p: { isMine: boolean }) => p.isMine).id as number;
+    };
+
+    it('changes the role of whoever holds the profile, and says so in the DTO', async () => {
+      const id = await personOf(user);
+      const res = await setRole(admin, id, 'speaker').expect(200);
+      expect(res.body).toMatchObject({ id, role: 'speaker' });
+      expect((await user.get('/api/e/testconf/bundle').expect(200)).body.role).toBe('speaker');
+    });
+
+    it('is audited', async () => {
+      const id = await personOf(user);
+      await setRole(admin, id, 'admin').expect(200);
+      const audit = await admin.get('/api/e/testconf/audit').expect(200);
+      expect(audit.body.entries[0]).toMatchObject({ action: 'role_set', entityId: id });
+    });
+
+    it('refuses a profile nobody holds', async () => {
+      const shell = await admin.post('/api/e/testconf/people').send({ name: 'Shell' }).expect(201);
+      await setRole(admin, shell.body.id, 'speaker').expect(400);
+    });
+
+    it('refuses to demote the last organiser, and allows it once there are two', async () => {
+      const mine = await personOf(admin);
+      const refused = await setRole(admin, mine, 'user').expect(409);
+      expect(refused.body.error.code).toBe('last_admin');
+      // Still an organiser: the refusal did not half-apply.
+      expect((await admin.get('/api/e/testconf/bundle').expect(200)).body.role).toBe('admin');
+
+      await setRole(admin, await personOf(user), 'admin').expect(200);
+      await setRole(admin, mine, 'user').expect(200);
+    });
+
+    it('is admin-only', async () => {
+      const id = await personOf(user);
+      await user.put(`/api/e/testconf/people/${id}/role`).send({ role: 'admin' }).expect(403);
+      await viewer.put(`/api/e/testconf/people/${id}/role`).send({ role: 'admin' }).expect(403);
     });
   });
 

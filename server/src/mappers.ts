@@ -108,6 +108,9 @@ export interface PersonFacts {
   role: Role | null;
   holderUid: string | null;
   codePending: boolean;
+  lastSeenAt: string | null;
+  joinedAt: string | null;
+  sessionCount: number;
 }
 
 export const NOBODY: PersonFacts = {
@@ -116,6 +119,9 @@ export const NOBODY: PersonFacts = {
   role: null,
   holderUid: null,
   codePending: false,
+  lastSeenAt: null,
+  joinedAt: null,
+  sessionCount: 0,
 };
 
 export const toPersonDto = (
@@ -133,14 +139,22 @@ export const toPersonDto = (
   username: facts.username,
   creditable: facts.creditable,
   ...(disclose
-    ? { role: facts.role, holderUid: facts.holderUid, codePending: facts.codePending }
+    ? {
+        role: facts.role,
+        holderUid: facts.holderUid,
+        codePending: facts.codePending,
+        lastSeenAt: facts.lastSeenAt,
+        joinedAt: facts.joinedAt,
+        sessionCount: facts.sessionCount,
+      }
     : {}),
   updatedAt: row.updated_at,
 });
 
 /**
- * Who holds each profile, and whether the phrase they were sent has ever been
- * used.
+ * Who holds each profile, what they have done here, and whether the phrase
+ * they were sent has ever been used. One query for the whole People list,
+ * which is why the counts are subqueries rather than a second round trip.
  *
  * `codePending` reads the code itself — a `link_codes` row for this person with
  * no `used_at`. The tempting signal, `identities.last_seen_at`, does not work:
@@ -159,6 +173,9 @@ export function personFacts(db: Db, eventId: number, onlyId?: number): Map<numbe
       role: Role | null;
       holder_uid: string | null;
       code_pending: number;
+      last_seen_at: string | null;
+      joined_at: string | null;
+      session_count: number;
     }>(
       // `link_codes.person_id` is unique where set, so this joins at most one
       // code per person.
@@ -166,7 +183,12 @@ export function personFacts(db: Db, eventId: number, onlyId?: number): Map<numbe
               ei.display_name AS username,
               r.role AS role,
               i.public_id AS holder_uid,
-              CASE WHEN lc.id IS NOT NULL AND lc.used_at IS NULL THEN 1 ELSE 0 END AS code_pending
+              CASE WHEN lc.id IS NOT NULL AND lc.used_at IS NULL THEN 1 ELSE 0 END AS code_pending,
+              i.last_seen_at AS last_seen_at,
+              ei.claimed_at AS joined_at,
+              (SELECT COUNT(*) FROM session_speakers ss
+                 JOIN sessions s ON s.id = ss.session_id
+                WHERE ss.person_id = p.id AND s.deleted_at IS NULL) AS session_count
          FROM people p
     LEFT JOIN identities i ON i.id = p.identity_id
     LEFT JOIN event_identities ei ON ei.identity_id = p.identity_id AND ei.event_id = ?
@@ -184,6 +206,9 @@ export function personFacts(db: Db, eventId: number, onlyId?: number): Map<numbe
         role: r.role,
         holderUid: r.holder_uid,
         codePending: r.code_pending === 1,
+        lastSeenAt: r.last_seen_at,
+        joinedAt: r.joined_at,
+        sessionCount: r.session_count,
       },
     ]),
   );

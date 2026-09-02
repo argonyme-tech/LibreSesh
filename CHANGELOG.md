@@ -35,6 +35,45 @@ All notable changes to this project are documented here.
   speaker (`PersonDto.creditable`), and the server refuses a non-organiser
   crediting one. Organisers may still credit anyone.
 
+- **Manage → People is one list, and hands out roles.** It was two stacked
+  lists — speaker profiles above, an attendance list of everyone who had
+  entered below — which asked an organiser to hold "profile" and "person
+  who is here" apart as separate ideas, and put the second a scroll away.
+  Now that entering an event creates a profile they are the same list: one
+  dense row per person carrying full name, `@username`, UID, one badge,
+  session count and last seen, with segments (All, Arrived, Unclaimed,
+  Organisers, Speakers) that carry counts, a search box over name,
+  username and UID, and an order toggle between name and last seen.
+
+  Each row has a **role control**: `PUT /people/:id/role` hands somebody
+  viewer, attendee, speaker or organiser, audited as `role_set`. Before
+  this the only way to change a role was to tell someone a different
+  password and ask them to enter again, which is not something you can do
+  to a person already in the room. It refuses to demote the last organiser
+  — an event nobody can administer has no way back — which is the same
+  reasoning the permission matrix uses to force admin on everywhere.
+
+  `GET /attendees` and its `AttendeeDto` are gone, replaced by three
+  organiser-only fields on the person: `lastSeenAt`, `joinedAt` and
+  `sessionCount`. The `ID: 00054` beside a name goes too — it was the
+  per-event row id, which is already in the profile URL; the UID is the
+  identifier that means anything across the audit log. Delete is offered
+  only for a profile nobody holds.
+
+### Fixed
+
+- **A change to one person no longer rewrites what everyone else sees.**
+  `person.created` / `person.updated` frames go to every subscriber, but
+  `isMine` and the organiser-only facts are computed for whoever caused
+  the change — so an organiser editing a bio told the owner the profile
+  was not theirs, and any edit blanked the role badges on another
+  organiser's People list until they reloaded. The wire frame now never
+  carries the private facts (the reply to the caller does, when they are
+  an organiser), and the client keeps what it had worked out for itself
+  about a row it already holds.
+
+### Added
+
 - **A capability for crediting other people.** `session.credit_others`
   joins the permission matrix, open by default for attendees and speakers:
   the app leans towards rooms where people trust each other and invite

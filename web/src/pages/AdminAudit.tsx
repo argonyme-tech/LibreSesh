@@ -32,6 +32,7 @@ const ACTIONS: Record<string, string> = {
   link_failed: 'failed a device phrase for',
   speaker_code_mint: 'minted a speaker code for',
   speaker_code_revoke: 'revoked the speaker code for',
+  role_set: 'changed the role of',
   invite_qr: 'made an invite QR for',
   permissions: 'changed',
 };

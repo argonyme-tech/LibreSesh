@@ -1,5 +1,4 @@
 import type {
-  AttendeeDto,
   BreakDto,
   AuditPageDto,
   BundleDto,
@@ -215,6 +214,9 @@ export const api = {
   revokeSpeakerCode: (slug: string, id: number) =>
     request<void>('DELETE', `/e/${encode(slug)}/people/${id}/speaker-code`),
   /** Fold profile `from` into `id`: sessions/pitches repoint, `from` disappears. */
+  /** Hand the holder of a profile a different role at this event. */
+  setPersonRole: (slug: string, id: number, role: Role) =>
+    request<PersonDto>('PUT', `/e/${encode(slug)}/people/${id}/role`, { role }),
   mergePerson: (slug: string, id: number, from: number) =>
     request<PersonDto>('POST', `/e/${encode(slug)}/people/${id}/merge`, { from }),
   // 201 when it creates your profile, 200 when it updates it — the caller only
@@ -284,7 +286,6 @@ export const api = {
 
   /** Everyone who has ever picked a name or held a role at this event —
    *  admin-only, the other half of the profile roster. */
-  attendees: (slug: string) => request<AttendeeDto[]>('GET', `/e/${encode(slug)}/attendees`),
 
   /** The per-event JSON export is a plain authenticated GET, so the link in
    *  Manage Event downloads it directly — no fetch, no blob, no wrapper. */

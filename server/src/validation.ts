@@ -101,6 +101,11 @@ export const renameSchema = z.object({ displayName: displayNameSchema });
 
 export const linkPhraseSchema = z.object({ phrase: z.string().min(1).max(120) });
 
+/** Give the holder of a profile a different role at this event. */
+export const personRoleSchema = z.object({
+  role: z.enum(['viewer', 'user', 'speaker', 'admin']),
+});
+
 /** Merge duplicate people: `from` is folded into the profile in the URL. */
 export const mergePersonSchema = z.object({ from: z.number().int().positive() });
 

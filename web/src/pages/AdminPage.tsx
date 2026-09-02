@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type {
   BreakDto,
   PersonDto,
+  Role,
   RoomDto,
   TagDto,
   TrackDto,
@@ -15,15 +16,22 @@ import { TAG_COLORS, nextTagColor, readableInk } from '@shared/tagColors';
 import { ColorPicker } from '../components/ColorPicker';
 import { windowLabel } from '@shared/trackHours';
 import { ApiError, api, type BreakWrite, type TrackWrite, type TrashDto } from '../lib/api';
-import { fmtMin, minutesOf, relativeTime, rowId, snapMinute, uid } from '../lib/format';
+import { fmtMin, minutesOf, relativeTime, snapMinute } from '../lib/format';
 import { useEventData } from '../lib/useEventData';
+import {
+  PEOPLE_FILTERS,
+  filterCounts,
+  filterPeople,
+  type PeopleFilter,
+  type PeopleSort,
+} from '../lib/people';
+import { PersonLine } from '../components/PersonLine';
 import { auditKeepField, parseNumberField, weekRailFromField } from '../lib/numberField';
 import { AdminBreaks, dayName } from './AdminBreaks';
 import { AdminRooms, type RoomDraft } from './AdminRooms';
 import { AdminPermissions } from './AdminPermissions';
 import { AdminBackup } from './AdminBackup';
 import { AdminAudit } from './AdminAudit';
-import { AdminAttendees } from './AdminAttendees';
 import { AdminInvite } from './AdminInvite';
 import {
   DangerButton,
@@ -37,7 +45,6 @@ import {
   IconButton,
   NumberField,
   PrimaryButton,
-  RoleBadge,
   SecondaryButton,
   Section,
   Spinner,
@@ -89,6 +96,9 @@ export function AdminPage() {
    *  following them once the tag is added. */
   const [tagColor, setTagColor] = useState<string | null>(null);
   const [personName, setPersonName] = useState('');
+  const [peopleFilter, setPeopleFilter] = useState<PeopleFilter>('all');
+  const [peopleQuery, setPeopleQuery] = useState('');
+  const [peopleSort, setPeopleSort] = useState<PeopleSort>('name');
 
   const bundle = data.bundle;
   const event = bundle?.event;
@@ -206,6 +216,11 @@ export function AdminPage() {
       </EmptyState>
     );
   }
+
+  // Derived rather than stored: SSE edits land in the bundle, and a list that
+  // remembered its own copy would show a role change one refresh late.
+  const peopleCounts = filterCounts(bundle.people);
+  const shownPeople = filterPeople(bundle.people, peopleFilter, peopleQuery, peopleSort);
 
   const addRoom = async (draft: RoomDraft) => {
     try {
@@ -402,6 +417,21 @@ export function AdminPage() {
       const created = await api.createPerson(slug, { name: personName.trim() });
       data.apply({ type: 'person.created', entity: created });
       setPersonName('');
+    } catch (err) {
+      fail(err);
+    }
+  };
+
+  /**
+   * Hand somebody a different role. The server refuses to demote the last
+   * organiser — an event nobody can administer has no way back — so that
+   * refusal arrives as a toast rather than being predicted here.
+   */
+  const changeRole = async (person: PersonDto, role: string) => {
+    if (role === '') return;
+    try {
+      const updated = await api.setPersonRole(slug, person.id, role as Role);
+      data.apply({ type: 'person.updated', entity: updated });
     } catch (err) {
       fail(err);
     }
@@ -852,67 +882,108 @@ export function AdminPage() {
         <div role="tabpanel" id="admin-panel-people" aria-labelledby="admin-tab-people">
           <Section
             title="People"
-            description="Speaker and host profiles, with the role each holder has at this event. Anyone can claim their own from the schedule; organisers hand out a speaker code for the rest."
+            description="Everyone who has entered this event, plus the people you are expecting. Entering claims a username and creates a profile; a profile nobody holds is one you or a session named, still waiting for them to arrive."
           >
-            <ul className="mb-4 space-y-2">
-              {bundle.people.map((person) => (
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <div role="group" aria-label="Filter people" className="flex flex-wrap gap-1">
+                {PEOPLE_FILTERS.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    aria-pressed={peopleFilter === f.id}
+                    onClick={() => setPeopleFilter(f.id)}
+                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      peopleFilter === f.id
+                        ? 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900'
+                        : 'bg-stone-100 text-stone-600 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700'
+                    }`}
+                  >
+                    {f.label} <span className="tabular-nums opacity-60">{peopleCounts[f.id]}</span>
+                  </button>
+                ))}
+              </div>
+              <input
+                type="search"
+                value={peopleQuery}
+                onChange={(e) => setPeopleQuery(e.target.value)}
+                aria-label="Search people"
+                placeholder="Name, @username or UID"
+                className="ml-auto w-48 rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs text-stone-700 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-200"
+              />
+              {/* Two orders, because there are two questions: "where is
+                  so-and-so in the list" and "who is actually still here". */}
+              <button
+                type="button"
+                onClick={() => setPeopleSort((s) => (s === 'name' ? 'seen' : 'name'))}
+                className="rounded-lg border border-stone-300 px-2 py-1 text-xs font-medium text-stone-600 hover:border-stone-500 dark:border-stone-600 dark:text-stone-300"
+              >
+                {peopleSort === 'name' ? 'By name' : 'By last seen'}
+              </button>
+            </div>
+
+            <ul className="mb-4">
+              {shownPeople.map((person) => (
                 <li
                   key={person.id}
-                  className="flex flex-wrap items-center gap-2 rounded-lg bg-stone-50 dark:bg-stone-800 px-3 py-2"
+                  className="flex flex-wrap items-center gap-2 border-b border-stone-100 py-1.5 last:border-0 dark:border-stone-800"
                 >
-                  <span className="min-w-32 flex-1 text-sm font-medium">
-                    {person.name}
-                    <span className="ml-1.5 font-mono text-xs font-normal text-stone-400 dark:text-stone-500">
-                      ({rowId(person.id)})
-                    </span>
-                  </span>
-                  {/* Three things an organiser acts on differently: nobody
-                      has this profile; somebody has it, at some role; or the
-                      code minted for it has never been redeemed — which
-                      `claimed` cannot say, since minting claims the profile
-                      the moment the phrase is printed. */}
-                  {person.role != null && (
-                    <RoleBadge role={person.role} userLabel={event.userRoleLabel} />
-                  )}
-                  {!person.claimed && (
-                    <span className="rounded-full border border-dashed border-stone-300 px-2 py-0.5 text-xs text-stone-500 dark:border-stone-600 dark:text-stone-400">
-                      unclaimed
-                    </span>
-                  )}
-                  {person.holderUid != null && (
-                    <span
-                      title="Identity holding this profile — the same at every event on this instance"
-                      className="font-mono text-xs text-stone-400 dark:text-stone-500"
+                  <PersonLine person={person} userLabel={event.userRoleLabel} />
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {person.claimed && (
+                      <select
+                        value={person.role ?? ''}
+                        onChange={(e) => void changeRole(person, e.target.value)}
+                        aria-label={`Role for ${person.name}`}
+                        className="rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs font-medium text-stone-700 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-200"
+                      >
+                        {/* Only reachable for somebody who left, or whose role
+                            an organiser took away; picking a real one lets
+                            them back in. */}
+                        {person.role == null && (
+                          <option value="" disabled>
+                            signed out
+                          </option>
+                        )}
+                        <option value="viewer">Viewer</option>
+                        <option value="user">{event.userRoleLabel || 'Attendee'}</option>
+                        <option value="speaker">Speaker</option>
+                        <option value="admin">Organiser</option>
+                      </select>
+                    )}
+                    <Link
+                      to={`/e/${slug}/p/${person.id}`}
+                      className="rounded-lg border border-stone-300 bg-white px-2.5 py-1 text-xs font-semibold text-stone-700 hover:border-stone-500 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-stone-400"
                     >
-                      ({uid(person.holderUid)})
-                    </span>
-                  )}
-                  {person.codePending === true && (
-                    <span
-                      title="A speaker code was minted for them and has never been redeemed."
-                      className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
-                    >
-                      code unused
-                    </span>
-                  )}
-                  <Link
-                    to={`/e/${slug}/p/${person.id}`}
-                    className="shrink-0 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:border-stone-500 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-stone-400"
-                  >
-                    Edit
-                  </Link>
-                  <DangerButton className="shrink-0 px-3 py-1.5" onClick={() => void removePerson(person)}>
-                    Delete
-                  </DangerButton>
+                      Edit
+                    </Link>
+                    {/* Only for a profile nobody holds. Deleting one somebody
+                        holds would take away the profile they are credited
+                        and post under while they are still in the room; two
+                        rows for one human is what Merge is for. */}
+                    {!person.claimed && (
+                      <DangerButton
+                        className="px-2.5 py-1 text-xs"
+                        onClick={() => void removePerson(person)}
+                      >
+                        Delete
+                      </DangerButton>
+                    )}
+                  </div>
                 </li>
               ))}
-              {bundle.people.length === 0 && (
-                <li className="text-sm text-stone-400 dark:text-stone-500">No people yet.</li>
+              {shownPeople.length === 0 && (
+                <li className="py-2 text-sm text-stone-400 dark:text-stone-500">
+                  {bundle.people.length === 0 ? 'Nobody here yet.' : 'Nobody matches that.'}
+                </li>
               )}
             </ul>
+
             <FormRow>
               <div className="min-w-40 flex-1">
-                <Field label="New person">
+                <Field
+                  label="Expect someone"
+                  hint="Creates a profile nobody holds yet — for a speaker you are billing before they arrive. They claim it at the gate, or with a speaker code."
+                >
                   <input
                     value={personName}
                     onChange={(e) => setPersonName(e.target.value)}
@@ -927,7 +998,6 @@ export function AdminPage() {
               </PrimaryButton>
             </FormRow>
           </Section>
-          <AdminAttendees slug={slug} userLabel={event.userRoleLabel} />
         </div>
       )}
 

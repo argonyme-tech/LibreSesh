@@ -63,7 +63,7 @@ every failure as `{ error: { code, message } }`.
 | `breaks` | Lunch and friends: a label and local minutes of day, `date` null meaning every day. No room, no author, hard-deleted |
 | `sessions` | Scheduled: always has a room and a time; `blocks_open_booking` holds the floor against attendees |
 | `proposals` | Pitched: no room, no time, until an organiser places it |
-| `people` | One per identity that has entered the event (made at the gate, migration 010), plus organiser-typed shells nobody has claimed yet. Holds the full name; the username lives on `event_identities` |
+| `people` | One per identity that has entered the event (made at the gate, migration 010), plus organiser-typed shells nobody has claimed yet. Holds the full name; the username lives on `event_identities`. Manage → People lists these and nothing else |
 | `contributions` | Notes, links, questions; `hidden` for moderation |
 | `stars`, `proposal_interest` | Private per-identity interest |
 | `audit` | Append-only log of every write |
@@ -523,7 +523,7 @@ So after a merge:
   same operation as /logout — rather than left signed in as a zombie that is
   present but owns nothing. Deleting the identity itself would not be safe:
   it may be a real person at other events on this instance, and the audit log
-  points at it. Its event display name row stays, so the attendance list and
+  points at it. Its event display name row stays, so the People list and
   old audit entries keep their label and the name stays reserved. The device
   can re-enter through the gate and is then a fresh participant;
 - the re-keying and the sign-out are **scoped to the event being merged**. The

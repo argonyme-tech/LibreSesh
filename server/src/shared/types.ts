@@ -174,29 +174,15 @@ export interface PersonDto {
    * identity at mint time and so claims the profile immediately.
    */
   codePending?: boolean;
+  /** Organisers only. Last request from this person's device anywhere on the
+   *  instance, minute-coarse; null for a profile nobody holds. */
+  lastSeenAt?: string | null;
+  /** Organisers only. When they first took a username here; null for a
+   *  profile nobody holds. */
+  joinedAt?: string | null;
+  /** Organisers only. Live sessions this person is credited on. */
+  sessionCount?: number;
   updatedAt: string;
-}
-
-/**
- * One row of the admin attendance list: everyone who has ever passed this
- * event's gate. There is no anonymous read — the whole event router sits
- * behind `requireRole('viewer')`, and both gate paths write a display name
- * and a role before letting anyone in — so this is the complete set of
- * people who have ever seen the event. Logout removes the role but keeps
- * the name row; the list only grows.
- */
-export interface AttendeeDto {
-  uid: string;
-  /** Their display name in this event, or their instance-wide default. */
-  name: string;
-  role: Role | null;
-  /** When they first picked a name or received a role here. */
-  joinedAt: string;
-  /** Last request from this identity anywhere on the instance, minute-coarse. */
-  lastSeenAt: string;
-  /** The speaker/host profile they hold in this event, if any. */
-  personId: number | null;
-  isMe: boolean;
 }
 
 export interface PersonDetailDto {

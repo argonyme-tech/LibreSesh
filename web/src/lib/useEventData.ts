@@ -76,6 +76,39 @@ const byBreakTime = (breaks: BreakDto[]): BreakDto[] =>
 const byTagName = (tags: TagDto[]): TagDto[] =>
   tags.slice().sort((a, b) => a.name.localeCompare(b.name));
 
+/**
+ * A change frame describes the row, not whoever is reading it.
+ *
+ * The server computes `isMine` and the organiser-only facts (role, UID, last
+ * seen, counts) for the request that caused the broadcast, and the broadcast
+ * goes to every subscriber — so believing them wholesale would tell everyone
+ * watching that somebody else's profile is theirs, and would blank an
+ * organiser's People list every time anyone edited a bio. What this reader
+ * already worked out about a row it already has is kept.
+ *
+ * For a row that is new here there is nothing to keep, and one rule still
+ * holds: you have at most one profile per event, so a frame claiming a second
+ * one is yours is claiming it for its author, not for you.
+ */
+function applyPersonChange(people: PersonDto[], incoming: PersonDto): PersonDto[] {
+  const prev = people.find((p) => p.id === incoming.id);
+  const merged: PersonDto =
+    prev === undefined
+      ? { ...incoming, isMine: incoming.isMine && !people.some((p) => p.isMine) }
+      : {
+          ...prev,
+          ...incoming,
+          isMine: prev.isMine,
+          role: prev.role,
+          holderUid: prev.holderUid,
+          codePending: prev.codePending,
+          lastSeenAt: prev.lastSeenAt,
+          joinedAt: prev.joinedAt,
+          sessionCount: prev.sessionCount,
+        };
+  return byPersonName(upsert(people, merged));
+}
+
 const byPersonName = (people: PersonDto[]): PersonDto[] =>
   people.slice().sort((a, b) => a.name.localeCompare(b.name));
 
@@ -225,7 +258,7 @@ function applyChange(state: State, change: ChangeEvent): State {
     case 'person.updated':
       return {
         ...state,
-        bundle: { ...bundle, people: byPersonName(upsert(bundle.people, change.entity as PersonDto)) },
+        bundle: { ...bundle, people: applyPersonChange(bundle.people, change.entity as PersonDto) },
       };
     case 'person.deleted': {
       const { id } = change.entity as { id: number };
