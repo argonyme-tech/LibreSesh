@@ -193,6 +193,26 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   rule the tag UI cannot express. Decide it explicitly; picking tags is
   defensible if the constraint moves into the session form instead.
 
+  **Where it goes in the form is settled: the top of the session modal.** It
+  is the first control in the `What it is` group, above Title — a mini
+  picker, one row of chips — because the format is the choice that shapes
+  every field beneath it: a lightning talk is five minutes, a workshop is two
+  hours in a room with tables, and picking that first is what lets the rest
+  of the form default sensibly instead of being retyped.
+
+  Two things fall out of that placement. The widget already exists twice in
+  this file — the Tags row (`SessionModal.tsx:284`) is a `flex flex-wrap` of
+  `Chip`s with a colour dot, which is exactly the picker wanted, minus the
+  multi-select. And the collision stops being theoretical: `SessionModal.tsx`
+  already renders a `Field label="Type"` as a row of chips
+  (line 493, admin-only, in the `Extras` group at the _bottom_). Two chip
+  rows in one form, both labelled Type, at opposite ends of it, is not
+  something a rename in the DTO alone fixes — that field's visible label has
+  to change too, or move under the Attendance toggle it actually belongs
+  with. Also decide what the row does when an event defines a dozen formats:
+  Tags wraps and that is fine for a multi-select, but a wrapping three-line
+  single-choice row at the top of the form is worse than a select.
+
   Downstream, once it exists: the format is the obvious second filter after
   tags, the obvious thing to show on a block that has room for one more word,
   and something the importer should accept by name the way it takes rooms and
