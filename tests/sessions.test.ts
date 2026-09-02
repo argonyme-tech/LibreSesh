@@ -251,65 +251,71 @@ describe('editing and deleting sessions', () => {
   });
 });
 
-describe('session livestream link', () => {
+describe('a session can be streamed more than once', () => {
   let harness: Harness;
+  let eventId: number;
   let roomId: number;
   let admin: Agent;
 
   beforeEach(async () => {
     harness = makeHarness();
-    const eventId = seedEvent(harness.db);
-    roomId = seedRoom(harness.db, eventId, { name: 'Main Hall' });
+    eventId = seedEvent(harness.db);
+    roomId = seedRoom(harness.db, eventId, { openBooking: 1 });
     admin = await actorWithRole(harness, 'testconf', 'admin-pw');
   });
   afterEach(() => harness.close());
 
-  const create = (body: Record<string, unknown> = {}) =>
+  const make = (body: Record<string, unknown> = {}) =>
     admin.post('/api/e/testconf/sessions').send({
       roomId,
-      title: 'Keynote',
+      title: 'Talk',
       startsAt: at(DAY_ONE, 600),
       endsAt: at(DAY_ONE, 660),
       ...body,
     });
 
-  it('defaults to an empty string, which means "no stream"', async () => {
-    const res = await create().expect(201);
-    expect(res.body.livestreamUrl).toBe('');
+  const YT = { label: 'YouTube', url: 'https://stream.example.org/hall' };
+  const DE = { label: 'German', url: 'https://stream.example.org/hall-de' };
+
+  it('has none by default — most sessions are not streamed', async () => {
+    const res = await make().expect(201);
+    expect(res.body.livestreams).toEqual([]);
   });
 
-  it('round-trips a link through create and patch', async () => {
-    const created = await create({ livestreamUrl: 'https://stream.example.org/hall' }).expect(201);
-    expect(created.body.livestreamUrl).toBe('https://stream.example.org/hall');
+  it('keeps every stream, and their order, through create and patch', async () => {
+    const res = await make({ livestreams: [YT, DE] }).expect(201);
+    expect(res.body.livestreams).toEqual([YT, DE]);
 
     const patched = await admin
-      .patch(`/api/e/testconf/sessions/${created.body.id}`)
-      .send({ livestreamUrl: 'https://stream.example.org/moved' })
+      .patch(`/api/e/testconf/sessions/${res.body.id}`)
+      .send({ livestreams: [DE, YT] })
       .expect(200);
-    expect(patched.body.livestreamUrl).toBe('https://stream.example.org/moved');
+    expect(patched.body.livestreams).toEqual([DE, YT]);
   });
 
-  it('clears the link with an empty string', async () => {
-    const created = await create({ livestreamUrl: 'https://stream.example.org/hall' }).expect(201);
+  it('leaves them alone when a patch says nothing, and clears them on []', async () => {
+    const res = await make({ livestreams: [YT] }).expect(201);
+    const renamed = await admin
+      .patch(`/api/e/testconf/sessions/${res.body.id}`)
+      .send({ title: 'Renamed' })
+      .expect(200);
+    expect(renamed.body.livestreams).toEqual([YT]);
+
     const cleared = await admin
-      .patch(`/api/e/testconf/sessions/${created.body.id}`)
-      .send({ livestreamUrl: '' })
+      .patch(`/api/e/testconf/sessions/${res.body.id}`)
+      .send({ livestreams: [] })
       .expect(200);
-    expect(cleared.body.livestreamUrl).toBe('');
+    expect(cleared.body.livestreams).toEqual([]);
   });
 
-  it('leaves the link alone when the patch omits it', async () => {
-    const created = await create({ livestreamUrl: 'https://stream.example.org/hall' }).expect(201);
-    const patched = await admin
-      .patch(`/api/e/testconf/sessions/${created.body.id}`)
-      .send({ title: 'Keynote II' })
-      .expect(200);
-    expect(patched.body.livestreamUrl).toBe('https://stream.example.org/hall');
+  it('refuses a link that is not http(s), and a nameless one', async () => {
+    await make({ livestreams: [{ label: 'Bad', url: 'javascript:alert(1)' }] }).expect(400);
+    await make({ livestreams: [{ label: 'Bad', url: 'not a url' }] }).expect(400);
+    await make({ livestreams: [{ label: '', url: YT.url }] }).expect(400);
   });
 
-  it('rejects a non-http(s) link', async () => {
-    await create({ livestreamUrl: 'javascript:alert(1)' }).expect(400);
-    await create({ livestreamUrl: 'not a url' }).expect(400);
+  it('does not take more than a programme could mean', async () => {
+    await make({ livestreams: Array.from({ length: 7 }, () => YT) }).expect(400);
   });
 });
 

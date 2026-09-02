@@ -13,7 +13,7 @@ import type {
   Me,
   PersonDetailDto,
   PersonDto,
-  PersonLink,
+  LabelledLink,
   ProfileClaimDto,
   ProposalDto,
   Role,
@@ -359,8 +359,8 @@ export interface SessionWrite {
    * person. Omit to leave the billing alone; `[]` clears it.
    */
   speakers?: (number | string)[];
-  /** Watch-along link, http(s). '' clears it. */
-  livestreamUrl?: string;
+  /** Watch-along links, http(s). `[]` clears them. */
+  livestreams?: LabelledLink[];
   startsAt: string;
   endsAt: string;
   tagIds?: number[];
@@ -428,7 +428,7 @@ export interface TrashDto {
 export interface PersonWrite {
   name: string;
   bio?: string;
-  links?: PersonLink[];
+  links?: LabelledLink[];
 }
 
 export interface SettingsWrite {

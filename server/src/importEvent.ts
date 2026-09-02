@@ -530,9 +530,9 @@ export function importEvent(
     const insertSession = db.prepare(
       `INSERT INTO sessions
         (event_id, room_id, track_id, type, blocks_open_booking, title,
-         description, speaker, livestream_url, starts_at, ends_at,
+         description, speaker, livestreams, starts_at, ends_at,
          created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, '', '', ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, '', '[]', ?, ?, ?, ?, ?)`,
     );
     const insertSessionSpeaker = db.prepare(
       'INSERT OR IGNORE INTO session_speakers (session_id, person_id, sort_order) VALUES (?, ?, ?)',

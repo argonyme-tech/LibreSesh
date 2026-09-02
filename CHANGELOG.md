@@ -6,6 +6,16 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **A session can carry more than one stream link.** One column held one
+  link, so the main camera fitted and the room's own feed, the interpreted
+  channel or a mirror somebody set up went into the description or nowhere.
+  A session now holds up to six labelled links, in the shape profiles have
+  used for theirs, and the session sheet lists them by name. A single
+  unlabelled one still reads "Watch the livestream", as it always did.
+
+  Migration 012 moves the existing link into the list and drops the old
+  column. `SessionDto.livestreamUrl` is gone, replaced by `livestreams`.
+
 - **The end of a day's list offers the next one.** Reaching the bottom is
   the moment a reader asks what happens tomorrow, and the answer was a day
   picker back at the top of the page. There is a button there now, naming

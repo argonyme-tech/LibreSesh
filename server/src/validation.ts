@@ -264,21 +264,22 @@ export const tagSchema = z.object({
 });
 export const tagPatchSchema = tagSchema.partial();
 
-/** An optional http(s) URL. '' is allowed and means "not set" — that is how a
- *  livestream link is cleared. Same protocol rules as contribution links. */
-const optionalHttpUrl = z
-  .string()
-  .trim()
-  .max(2000)
-  .refine((raw) => {
-    if (raw === '') return true;
-    try {
-      const parsed = new URL(raw);
-      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-    } catch {
-      return false;
-    }
-  }, 'Only http and https links');
+/** A labelled http(s) link. Profiles carry a handful; so does a session, one
+ *  per stream. Same protocol rules as a contribution's link. */
+const linkSchema = z.object({
+  label: trimmed(60),
+  url: z
+    .string()
+    .max(2000)
+    .refine((raw) => {
+      try {
+        const parsed = new URL(raw);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+      } catch {
+        return false;
+      }
+    }, 'Only http and https links'),
+});
 
 /**
  * A break — lunch, dinner, coffee. Local minutes of day rather than instants,
@@ -326,7 +327,9 @@ export const sessionSchema = z.object({
     .array(z.union([z.number().int().positive(), trimmed(120)]))
     .max(12)
     .optional(),
-  livestreamUrl: optionalHttpUrl.optional(),
+  /** A session may be streamed more than once — a main camera, a room feed,
+   *  an interpreted channel. `[]` clears them. */
+  livestreams: z.array(linkSchema).max(6).optional(),
   startsAt: isoInstantSchema,
   endsAt: isoInstantSchema,
   tagIds: z.array(z.number().int().positive()).max(20).optional(),
@@ -387,22 +390,6 @@ export const placeSchema = z.object({
   startsAt: isoInstantSchema,
   endsAt: isoInstantSchema,
   type: z.enum(['official', 'open']).optional(),
-});
-
-/** Profile links reuse the contribution URL rules: http(s) only. */
-const linkSchema = z.object({
-  label: trimmed(60),
-  url: z
-    .string()
-    .max(2000)
-    .refine((raw) => {
-      try {
-        const parsed = new URL(raw);
-        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-      } catch {
-        return false;
-      }
-    }, 'Only http and https links'),
 });
 
 export const personSchema = z.object({

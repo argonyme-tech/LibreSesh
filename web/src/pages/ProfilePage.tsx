@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import type { PersonDetailDto, PersonDto, PersonLink } from '@shared/types';
+import type { PersonDetailDto, PersonDto, LabelledLink } from '@shared/types';
 import { ApiError, api, type PersonWrite } from '../lib/api';
 import { dayLabel, fmtMin, place, todayInZone } from '../lib/format';
 import { renderMarkdown } from '../lib/markdown';
@@ -55,7 +55,7 @@ export function ProfilePage() {
   const [draftDisplayName, setDraftDisplayName] = useState('');
   const [draftName, setDraftName] = useState('');
   const [draftBio, setDraftBio] = useState('');
-  const [draftLinks, setDraftLinks] = useState<PersonLink[]>([]);
+  const [draftLinks, setDraftLinks] = useState<LabelledLink[]>([]);
 
   useEffect(() => {
     let live = true;
@@ -180,7 +180,7 @@ export function ProfilePage() {
     data.apply({ type: 'person.updated', entity: updated });
   };
 
-  const setLink = (i: number, patch: Partial<PersonLink>) =>
+  const setLink = (i: number, patch: Partial<LabelledLink>) =>
     setDraftLinks((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
 
   return (

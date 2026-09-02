@@ -127,7 +127,9 @@ export interface TagDto {
   color: string;
 }
 
-export interface PersonLink {
+/** A label and an http(s) link. Profiles have carried a few since §4;
+ *  sessions carry their streams the same way rather than in a second shape. */
+export interface LabelledLink {
   label: string;
   url: string;
 }
@@ -136,7 +138,7 @@ export interface PersonDto {
   id: number;
   name: string;
   bio: string;
-  links: PersonLink[];
+  links: LabelledLink[];
   /** True when this profile belongs to the requesting identity. */
   isMine: boolean;
   /** True when some attendee owns it, so only they and organisers may edit. */
@@ -231,9 +233,12 @@ export interface SessionDto {
    * a cramped block truncates to. Empty when nobody is credited.
    */
   speakers: PersonRef[];
-  /** Watch-along link, http(s). Empty string means there is no stream, which
-   *  is the default — the UI hides the field rather than showing it blank. */
-  livestreamUrl: string;
+  /**
+   * Watch-along links, http(s). Usually empty, sometimes one, occasionally
+   * several: a main camera, a room's own feed, an interpreted channel. The
+   * UI hides the row entirely rather than showing it blank.
+   */
+  livestreams: LabelledLink[];
   /** UTC ISO-8601. */
   startsAt: string;
   endsAt: string;
@@ -407,7 +412,7 @@ export interface EventExport {
     id: number;
     name: string;
     bio: string;
-    links: PersonLink[];
+    links: LabelledLink[];
     /** Whether someone holds this profile — never *who*. */
     claimed: boolean;
     createdAt: string;
@@ -425,7 +430,7 @@ export interface EventExport {
      *  most sessions have exactly one. */
     speakers: string[];
     speaker: string;
-    livestreamUrl: string;
+    livestreams: LabelledLink[];
     startsAt: string;
     endsAt: string;
     tagIds: number[];
