@@ -26,6 +26,7 @@ import {
   type PeopleSort,
 } from '../lib/people';
 import { PersonLine } from '../components/PersonLine';
+import { MergeModal } from '../components/MergeModal';
 import { auditKeepField, parseNumberField, weekRailFromField } from '../lib/numberField';
 import { AdminBreaks, dayName } from './AdminBreaks';
 import { AdminRooms, type RoomDraft } from './AdminRooms';
@@ -99,6 +100,7 @@ export function AdminPage() {
   const [peopleFilter, setPeopleFilter] = useState<PeopleFilter>('all');
   const [peopleQuery, setPeopleQuery] = useState('');
   const [peopleSort, setPeopleSort] = useState<PeopleSort>('name');
+  const [merging, setMerging] = useState<PersonDto | null>(null);
 
   const bundle = data.bundle;
   const event = bundle?.event;
@@ -950,6 +952,14 @@ export function AdminPage() {
                         <option value="admin">Organiser</option>
                       </select>
                     )}
+                    {/* The survivor is the row you start from, which is why
+                        it is per-row rather than one button above the list. */}
+                    <SecondaryButton
+                      className="px-2.5 py-1 text-xs"
+                      onClick={() => setMerging(person)}
+                    >
+                      Merge…
+                    </SecondaryButton>
                     <Link
                       to={`/e/${slug}/p/${person.id}`}
                       className="rounded-lg border border-stone-300 bg-white px-2.5 py-1 text-xs font-semibold text-stone-700 hover:border-stone-500 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-stone-400"
@@ -977,6 +987,24 @@ export function AdminPage() {
                 </li>
               )}
             </ul>
+
+            {merging && (
+              <MergeModal
+                slug={slug}
+                survivor={merging}
+                people={bundle.people}
+                userLabel={event.userRoleLabel}
+                onClose={() => setMerging(null)}
+                onMerged={(updated, loserId) => {
+                  data.apply({ type: 'person.deleted', entity: { id: loserId } });
+                  data.apply({ type: 'person.updated', entity: updated });
+                  // Sessions and pitches moved too, so the rest of the bundle
+                  // is stale in ways no single change frame describes.
+                  void data.reload();
+                  setMerging(null);
+                }}
+              />
+            )}
 
             <FormRow>
               <div className="min-w-40 flex-1">

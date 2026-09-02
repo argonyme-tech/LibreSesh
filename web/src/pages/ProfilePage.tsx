@@ -6,13 +6,11 @@ import { dayLabel, fmtMin, place, rowId, todayInZone } from '../lib/format';
 import { renderMarkdown } from '../lib/markdown';
 import { useEventData } from '../lib/useEventData';
 import { EditIcon } from '../components/icons';
+import { MergeModal } from '../components/MergeModal';
 import {
   EmptyState,
-  Field,
   FormError,
-  FormStack,
   IconButton,
-  Modal,
   PrimaryButton,
   SecondaryButton,
   Spinner,
@@ -422,6 +420,7 @@ export function ProfilePage() {
           slug={slug}
           survivor={person}
           people={bundle.people}
+          userLabel={bundle.event.userRoleLabel}
           onClose={() => setMerging(false)}
           onMerged={(updated, loserId) => {
             setDetail((d) => (d ? { ...d, person: updated } : d));
@@ -584,89 +583,6 @@ function FieldForm({
         </SecondaryButton>
       </div>
     </form>
-  );
-}
-
-/**
- * Fold a duplicate profile into this one (identity spec, B2). The duplicate's
- * sessions and pitches move here, then it disappears — there is no undo, which
- * is why the sentence spells out the direction before the button.
- */
-function MergeModal({
-  slug,
-  survivor,
-  people,
-  onClose,
-  onMerged,
-}: {
-  slug: string;
-  survivor: PersonDto;
-  people: PersonDto[];
-  onClose: () => void;
-  onMerged: (updated: PersonDto, loserId: number) => void;
-}) {
-  const toast = useToast();
-  const [fromId, setFromId] = useState<number | null>(null);
-  const [busy, setBusy] = useState(false);
-  const candidates = people.filter((p) => p.id !== survivor.id);
-
-  const merge = async () => {
-    if (fromId === null || busy) return;
-    setBusy(true);
-    try {
-      const updated = await api.mergePerson(slug, survivor.id, fromId);
-      onMerged(updated, fromId);
-    } catch (err) {
-      toast.show((err as Error).message);
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      title="Merge a duplicate"
-      description={
-        <>
-          The profile you pick is folded into{' '}
-          <span className="font-medium">{survivor.name}</span>: its sessions and pitches move
-          here, then it is removed. This cannot be undone.
-        </>
-      }
-      onClose={onClose}
-      onSubmit={() => void merge()}
-      footer={
-        <>
-          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-          <PrimaryButton type="submit" disabled={busy || fromId === null}>
-            {busy ? 'Merging…' : 'Merge'}
-          </PrimaryButton>
-        </>
-      }
-    >
-      {candidates.length === 0 ? (
-        <p className="text-sm text-stone-400 dark:text-stone-500">
-          There is no other profile to merge.
-        </p>
-      ) : (
-        <FormStack>
-          <Field label="Duplicate to fold in">
-            <select
-              value={fromId === null ? '' : String(fromId)}
-              onChange={(e) => setFromId(e.target.value ? Number(e.target.value) : null)}
-              className={inputClass}
-            >
-              <option value="">— pick a profile —</option>
-              {candidates.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                  {p.claimed ? ' (claimed)' : ''}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </FormStack>
-      )}
-    </Modal>
   );
 }
 

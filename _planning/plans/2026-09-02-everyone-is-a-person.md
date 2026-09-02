@@ -55,6 +55,13 @@ One commit per step, tests with each. Steps 0–2 in the main session on
       keeps its own `isMine` and private facts (`applyPersonChange`).
 - [x] Tests: roster facts, the role route, the pure predicates.
 
-## Step 4 — the merge dialog (hand-off)
+## Step 4 — the merge dialog
+
+- [x] `suggestDuplicates` and `mergeConsequence` in `web/src/lib/people.ts`.
+- [x] `MergeModal` moved to `web/src/components/MergeModal.tsx`: suggestions,
+      search, everyone else; radio rows built from `PersonLine`.
+- [x] Confirm step — two columns and the consequence sentence for the case.
+- [x] Merge… on every People row, as well as the profile page.
+- [x] Tests: `tests/peopleSuggest.test.ts`.
 
 ## Step 5 — a way back from the profile page (hand-off)

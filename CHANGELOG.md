@@ -35,6 +35,23 @@ All notable changes to this project are documented here.
   speaker (`PersonDto.creditable`), and the server refuses a non-organiser
   crediting one. Organisers may still credit anyone.
 
+- **A merge dialog that shows who is who.** Merging is the only thing an
+  organiser cannot undo, and it asked for the decision through a bare
+  `<select>` of names — two people called Ada Lovelace look identical in a
+  dropdown, and one of them may be a real person with three talks and a
+  device in the room. The dialog now leads with the rows that look like the
+  same human and says why ("same name", "initials match", "same surname"),
+  then a search over name, username and UID, then everyone else; every row
+  carries the same facts the People list shows.
+
+  Picking somebody does not merge them. It shows the two side by side and
+  the sentence for *this* merge: sessions move and nothing else; or the
+  other profile's holder takes this one over; or — the case that costs the
+  most, and the one that was never spelled out — everything that person
+  did in the event moves across and their device is signed out of it.
+  Merge is also reachable from each row of the People list now, not only
+  from a profile page.
+
 - **Manage → People is one list, and hands out roles.** It was two stacked
   lists — speaker profiles above, an attendance list of everyone who had
   entered below — which asked an organiser to hold "profile" and "person
