@@ -22,6 +22,11 @@ import {
 } from "../lib/format";
 import { useEventData } from "../lib/useEventData";
 import { matchesQuery } from "../lib/search";
+// Mimir add-on: the co-facilitator. Both live beside the Pitches link
+// rather than in the account chrome, because they are ways of looking at
+// the programme.
+import { MimirFab } from "../components/MimirChat";
+import { RhythmCheck } from "../components/RhythmCheck";
 import { useFilters } from "../lib/useFilters";
 import { roomHasInfo, roomNote, seatsLabel } from "../lib/rooms";
 import { UNTRACKED, matchesTracks, trackNote } from "../lib/tracks";
@@ -1220,6 +1225,25 @@ export function SchedulePage() {
                     </span>
                   )}
                 </Link>
+
+                {/* Mimir add-on: her own tab. Indigo is Mimir speaking. */}
+                <Link
+                  to={`/e/${slug}/mimir`}
+                  className="rounded-lg border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 px-3 py-2 text-xs font-medium text-indigo-700 dark:text-indigo-300 hover:border-indigo-400 dark:hover:border-indigo-500"
+                >
+                  &#9670; M&iacute;mir
+                </Link>
+
+                {/* Mimir add-on: advisory rhythm notes. Renders nothing at all
+                    when the schedule has nothing to flag, so a vanilla event
+                    never grows a control it did not ask for. */}
+                <RhythmCheck
+                  sessions={bundle.sessions}
+                  rooms={bundle.rooms}
+                  breaks={bundle.breaks}
+                  tracks={bundle.tracks}
+                  timezone={bundle.event.timezone}
+                />
               </div>
             </div>
           </div>
@@ -1659,6 +1683,10 @@ export function SchedulePage() {
       {tourOpen && (
         <Tour steps={tourSteps} onClose={closeTour} />
       )}
+
+      {/* Mimir add-on: her floating presence. Last in the tree and fixed to the
+          corner, so it sits over the page without taking part in its layout. */}
+      <MimirFab slug={slug} role={bundle.role} />
     </div>
   );
 }
