@@ -151,6 +151,18 @@ export interface PersonDto {
    *  they post already. */
   username: string | null;
   /**
+   * When an organiser tidied this profile out of the way, or null for a live
+   * one. An archived profile is not a deleted one: it keeps its sessions, its
+   * bio, its role and whoever holds it, and drops out of the People list and
+   * the speaker picker only.
+   *
+   * Public, unlike the organiser-only facts below, because the one person who
+   * most needs to know is the holder — they are the way back out, and they
+   * cannot ask for it if their own profile does not say so. It discloses
+   * nothing about who runs the event.
+   */
+  archivedAt: string | null;
+  /**
    * Whether this person may be credited as a speaker by someone who is not
    * an organiser: true for an unclaimed profile and for a holder with the
    * attendee role or above, false for a viewer's — a livestream audience

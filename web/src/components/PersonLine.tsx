@@ -43,6 +43,14 @@ export function PersonStatusBadge({
           signed out
         </span>
       )}
+      {person.archivedAt !== null && (
+        <span
+          title="An organiser filed this profile away: it keeps its sessions, its role and its holder, and is out of the People list and the speaker picker until somebody takes it back out."
+          className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+        >
+          archived
+        </span>
+      )}
       {person.codeState === 'pending' && (
         <span
           title="A speaker code was minted for them and has never been redeemed — the phrase is still sitting in an unread message."

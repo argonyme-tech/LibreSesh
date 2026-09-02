@@ -78,9 +78,12 @@ export function resolveSpeaker(
 
   const existing = db
     .prepare<[number, string], { id: number }>(
+      // Live profiles before archived ones: an archived profile is still a
+      // real profile and a name that only matches one still finds it, but a
+      // name typed today means the person who is here today.
       `SELECT id FROM people
         WHERE event_id = ? AND deleted_at IS NULL AND lower(name) = lower(?)
-        ORDER BY (identity_id IS NULL), id LIMIT 1`,
+        ORDER BY (archived_at IS NOT NULL), (identity_id IS NULL), id LIMIT 1`,
     )
     .get(eventId, name);
   if (existing) {

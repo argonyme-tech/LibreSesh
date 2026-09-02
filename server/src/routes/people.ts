@@ -250,6 +250,87 @@ export function peopleRoutes(ctx: Ctx): Router {
   );
 
   /**
+   * Archive a profile: out of the organiser's lists, still a live profile.
+   *
+   * Deleting was the only tidy-up there was, and it is the wrong tool for the
+   * profiles that actually accumulate — the ones made while testing the room,
+   * a walk-in who never came back. It cannot be undone, it strips the name off
+   * every session it was credited on, and it refuses outright for anyone who
+   * holds their own profile. Archiving keeps all of that and only stops the
+   * profile turning up in the People list and the speaker picker.
+   *
+   * Nothing about permission changes: the holder keeps their role, their
+   * cookie and their way in, which is what makes the route below theirs to
+   * use as well as an organiser's.
+   */
+  router.post(
+    '/people/:id/archive',
+    requireRole(ctx.db, 'admin'),
+    requireWritable,
+    limit(ctx.limiter, 'write'),
+    (req, res) => {
+      const person = load(req.event.id, Number(req.params.id));
+      if (person.archived_at === null) {
+        ctx.db
+          .prepare('UPDATE people SET archived_at = ? WHERE id = ?')
+          .run(new Date().toISOString(), person.id);
+      }
+      const { own, pub } = views(req, person.id);
+      audit(ctx.db, {
+        identityId: req.identity.id,
+        eventId: req.event.id,
+        action: 'archive',
+        entity: 'person',
+        entityId: person.id,
+      });
+      ctx.broker.publish(req.event.slug, 'person.updated', pub);
+      res.json(own);
+    },
+  );
+
+  /**
+   * Out of the archive again — an organiser's doing, or the holder's own.
+   *
+   * The holder is the reason this is not admin-only. An organiser tidying up
+   * at the end of a day cannot tell a profile that is finished with from one
+   * whose person is coming back tomorrow, and the person themselves can: they
+   * still hold the cookie, so they open their profile, see that it was put
+   * away, and take it back out without having to find an organiser. Archiving
+   * is a filing decision, and this is the appeal against it.
+   *
+   * `requireRole(user)` rather than `viewer`: a livestream audience has no
+   * profile of its own to be archived, and the check below is what actually
+   * grants it — you may unarchive your own profile, or any if you run the
+   * event.
+   */
+  router.delete(
+    '/people/:id/archive',
+    requireRole(ctx.db, 'user'),
+    requireWritable,
+    limit(ctx.limiter, 'write'),
+    (req, res) => {
+      const person = load(req.event.id, Number(req.params.id));
+      const mine = person.identity_id !== null && person.identity_id === req.identity.id;
+      if (!mine && req.role !== 'admin') {
+        throw forbidden('Only an organiser, or whoever holds it, can take a profile out of the archive');
+      }
+      if (person.archived_at !== null) {
+        ctx.db.prepare('UPDATE people SET archived_at = NULL WHERE id = ?').run(person.id);
+      }
+      const { own, pub } = views(req, person.id);
+      audit(ctx.db, {
+        identityId: req.identity.id,
+        eventId: req.event.id,
+        action: 'unarchive',
+        entity: 'person',
+        entityId: person.id,
+      });
+      ctx.broker.publish(req.event.slug, 'person.updated', pub);
+      res.json(own);
+    },
+  );
+
+  /**
    * Fold a duplicate profile into this one (identity spec, B2): sessions and
    * pitches are repointed, blanks on the survivor fill from the duplicate, the
    * duplicate is soft-deleted. When only one side is claimed, the claim moves

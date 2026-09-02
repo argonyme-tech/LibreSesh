@@ -67,6 +67,29 @@ All notable changes to this project are documented here.
   just left. The role now sits under the name, organisers only, as the same
   editable badge; a profile nobody holds shows why it has none instead.
 
+- **A profile can be archived instead of deleted.** The profiles that pile
+  up at a real event are the ones made while testing the room, a shell typed
+  twice, a walk-in who never came back — and deleting was the only tidy-up
+  there was. It cannot be undone, it strips the name off every session the
+  profile was credited on, and it refuses outright for anyone who holds their
+  own profile, which is exactly the case an organiser most wants tidied.
+
+  An archived profile keeps its sessions, its bio, its role, its speaker code
+  and whoever holds it. All it loses is its place in the lists: every segment
+  of Manage → People except the new **Archived** one drops it, and the speaker
+  picker stops offering it. Crediting by name still finds it rather than
+  making a twin.
+
+  **Whoever holds it can take it back out.** They still have their cookie and
+  their role, so an archived profile tells its holder what happened and offers
+  them the way back — no organiser needed. That is the difference from
+  deleting, and it is why an organiser can file a profile away without having
+  to be sure the person is gone for good.
+
+  The row's three action buttons became a menu behind ⋯ to make room for the
+  fourth, keeping Open in the row; the actions column got narrower doing it
+  and the name column took the space.
+
 - **Every column of the People table sorts, both ways.** One button offered
   two of the five orders — by name, or by last seen — so "who has no
   username yet", "who is still only a viewer" and "whose device is this

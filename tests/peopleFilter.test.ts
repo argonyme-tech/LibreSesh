@@ -25,6 +25,7 @@ const person = (over: Partial<PersonDto> & { id: number; name: string }): Person
   links: [],
   isMine: false,
   claimed: false,
+  archivedAt: null,
   username: null,
   creditable: true,
   updatedAt: '2026-09-01T10:00:00.000Z',
@@ -97,7 +98,36 @@ describe('the People list', () => {
         unclaimed: 1,
         organisers: 1,
         speakers: 1,
+        archived: 0,
       });
+    });
+
+    /**
+     * Archived is the one segment that is not a lens over the others. A
+     * segment that still showed the profiles an organiser has put away would
+     * put the clutter straight back, which is the whole thing archiving is
+     * for — so every other segment drops them, and the count under Archived
+     * is how an organiser sees what they have down there.
+     */
+    it('keeps archived profiles out of every other segment, and counts them under their own', () => {
+      const filed = { ...speaker, archivedAt: '2026-09-02T13:00:00.000Z' };
+      const list = [organiser, filed, attendee, departed, shell];
+
+      expect(matchesFilter(filed, 'archived')).toBe(true);
+      for (const segment of ['all', 'arrived', 'speakers', 'organisers', 'unclaimed'] as const) {
+        expect(matchesFilter(filed, segment), segment).toBe(false);
+      }
+      expect(matchesFilter(speaker, 'archived')).toBe(false);
+
+      expect(filterCounts(list)).toEqual({
+        all: 4,
+        arrived: 3,
+        unclaimed: 1,
+        organisers: 1,
+        speakers: 0,
+        archived: 1,
+      });
+      expect(filterPeople(list, 'archived', '', BY_NAME).map((p) => p.id)).toEqual([filed.id]);
     });
 
     it('offers every segment it can count', () => {

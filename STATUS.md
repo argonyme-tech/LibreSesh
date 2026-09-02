@@ -54,12 +54,22 @@ lives in `_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
   profile** (the "This is me" button on an unclaimed profile, and the
   approval queue above the People list), **the next-day button** at the
   end of a day's list, **several stream links** on a session, which
-  changed the session form, and **the role tag** — the People list's role
-  select is now a coloured badge with a pencil in it, opening a menu, and
-  the same control is on the profile page under the name. The two things
-  to look at there: whether the badge still fits the `w-24` role column at
-  the longest role word an event can set, and whether the menu opens over
-  the row rather than pushing it.
+  changed the session form, and everything from 2026-09-02's People work:
+
+  - **The role tag.** The People list's role select is a coloured badge
+    with a pencil in it, opening a menu, and the same control is on the
+    profile page under the name. Look at whether the badge still fits the
+    `w-24` role column at the longest role word an event can set, and
+    whether the menu opens over the row rather than pushing it.
+  - **Sortable columns.** Every heading in the People table is now the
+    control that orders by it. Look at the arrow on the active column and
+    whether the headings still line up with the rows under them.
+  - **Archiving.** The row's three action buttons became `Open` plus a ⋯
+    menu (Merge, Archive, Delete). Look at the menu's placement on the last
+    row of a long list — it is `bottom-end` and flips, but that is
+    untested against a real viewport — and at the amber notice on an
+    archived profile, which is the one screen the holder is meant to find
+    on their own.
 
   The **gate** is still the one nobody has opened, and it is the screen
   every attendee must get through: it now refuses an empty username and

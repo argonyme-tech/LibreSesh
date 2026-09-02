@@ -343,6 +343,98 @@ describe('speaker profiles', () => {
   });
 
   /**
+   * Archiving: out of the organiser's lists, still a live profile.
+   *
+   * Deleting was the only tidy-up there was, and it refuses outright for
+   * anyone who holds their own profile — which is exactly the case an
+   * organiser most wants tidied away, since the profiles that accumulate are
+   * the ones made while testing the room.
+   */
+  describe('archiving a profile', () => {
+    const personIdFor = async (name: string) => {
+      const res = await makeSession(admin, { speakers: [name] }).expect(201);
+      return res.body.speakers[0].id as number;
+    };
+    const personFrom = async (agent: Agent, id: number) =>
+      ((await agent.get('/api/e/testconf/bundle').expect(200)).body.people as {
+        id: number;
+        archivedAt: string | null;
+      }[]).find((p) => p.id === id);
+
+    it('marks the profile without removing it or its sessions', async () => {
+      const id = await personIdFor('Ada Lovelace');
+      const archived = await admin.post(`/api/e/testconf/people/${id}/archive`).expect(200);
+      expect(archived.body.archivedAt).not.toBeNull();
+
+      // Still there, still on its session: this is filing, not deleting.
+      expect((await personFrom(admin, id))?.archivedAt).not.toBeNull();
+      const sessions = (await admin.get('/api/e/testconf/bundle').expect(200)).body.sessions as {
+        speakers: { id: number }[];
+      }[];
+      expect(sessions[0]?.speakers.map((sp) => sp.id)).toEqual([id]);
+    });
+
+    it('comes back out, and says so to everyone', async () => {
+      const id = await personIdFor('Ada Lovelace');
+      await admin.post(`/api/e/testconf/people/${id}/archive`).expect(200);
+      const back = await admin.delete(`/api/e/testconf/people/${id}/archive`).expect(200);
+      expect(back.body.archivedAt).toBeNull();
+      expect((await personFrom(user, id))?.archivedAt).toBeNull();
+    });
+
+    /**
+     * The reason archiving is not deleting. The holder keeps their cookie and
+     * their role, so they can find their own profile put away and take it
+     * back out without having to catch an organiser.
+     */
+    it('lets whoever holds the profile take it back out', async () => {
+      await user.patch('/api/e/testconf/me/profile').send({ name: 'Grace' }).expect(200);
+      const mine = ((await user.get('/api/e/testconf/bundle').expect(200)).body.people as {
+        id: number;
+        isMine: boolean;
+      }[]).find((p) => p.isMine);
+      const id = mine?.id as number;
+
+      await admin.post(`/api/e/testconf/people/${id}/archive`).expect(200);
+      const back = await user.delete(`/api/e/testconf/people/${id}/archive`).expect(200);
+      expect(back.body.archivedAt).toBeNull();
+    });
+
+    it('does not let one attendee unarchive another', async () => {
+      const id = await personIdFor('Ada Lovelace');
+      await admin.post(`/api/e/testconf/people/${id}/archive`).expect(200);
+      await user.delete(`/api/e/testconf/people/${id}/archive`).expect(403);
+      await user.post(`/api/e/testconf/people/${id}/archive`).expect(403);
+      expect((await personFrom(admin, id))?.archivedAt).not.toBeNull();
+    });
+
+    it('is idempotent in both directions', async () => {
+      const id = await personIdFor('Ada Lovelace');
+      const first = await admin.post(`/api/e/testconf/people/${id}/archive`).expect(200);
+      const second = await admin.post(`/api/e/testconf/people/${id}/archive`).expect(200);
+      // The second press does not re-stamp the date: when it was filed is
+      // what tells a tidy-up from a mistake three weeks later.
+      expect(second.body.archivedAt).toBe(first.body.archivedAt);
+      await admin.delete(`/api/e/testconf/people/${id}/archive`).expect(200);
+      await admin.delete(`/api/e/testconf/people/${id}/archive`).expect(200);
+    });
+
+    /**
+     * Crediting by name still finds an archived profile rather than spawning
+     * a twin of it — but a live profile of the same name wins, because a name
+     * typed today means the person who is here today.
+     */
+    it('prefers a live profile over an archived one when a name is credited', async () => {
+      const archivedId = await personIdFor('Ada Lovelace');
+      await admin.post(`/api/e/testconf/people/${archivedId}/archive`).expect(200);
+
+      const again = await makeSession(admin, { speakers: ['Ada Lovelace'] }).expect(201);
+      // Nothing live has that name, so the archived one is who they meant.
+      expect(again.body.speakers[0].id).toBe(archivedId);
+    });
+  });
+
+  /**
    * The roster an organiser acts on: who holds each profile, at what role, and
    * whether the phrase they were sent has ever been used. `claimed` alone
    * cannot answer the last one, because minting a speaker code attaches an

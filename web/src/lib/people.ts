@@ -9,7 +9,13 @@ import type { PersonDto, Role } from '@shared/types';
  * what tells them apart, and the merge dialog reuses them for its search.
  */
 
-export type PeopleFilter = 'all' | 'arrived' | 'unclaimed' | 'organisers' | 'speakers';
+export type PeopleFilter =
+  | 'all'
+  | 'arrived'
+  | 'unclaimed'
+  | 'organisers'
+  | 'speakers'
+  | 'archived';
 
 /**
  * The segments are lenses, not a partition: an organiser has also arrived, so
@@ -18,6 +24,12 @@ export type PeopleFilter = 'all' | 'arrived' | 'unclaimed' | 'organisers' | 'spe
  * "Arrived" rather than "attendees" on purpose — `user` is a role whose label
  * an organiser can change, and this segment is not that role, it is everyone
  * whose profile somebody holds.
+ *
+ * **Archived is the exception, and the only one.** Every other segment leaves
+ * archived profiles out, because a segment showing them would put the clutter
+ * straight back — tidying a profile away has to mean it is away. So Archived
+ * is not a lens over the list, it is the other list, and it sits last with
+ * its count so an organiser can always see how much they have put down there.
  */
 export const PEOPLE_FILTERS: { id: PeopleFilter; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -25,9 +37,14 @@ export const PEOPLE_FILTERS: { id: PeopleFilter; label: string }[] = [
   { id: 'unclaimed', label: 'Unclaimed' },
   { id: 'organisers', label: 'Organisers' },
   { id: 'speakers', label: 'Speakers' },
+  { id: 'archived', label: 'Archived' },
 ];
 
+export const isArchived = (person: PersonDto): boolean => person.archivedAt !== null;
+
 export function matchesFilter(person: PersonDto, filter: PeopleFilter): boolean {
+  if (filter === 'archived') return isArchived(person);
+  if (isArchived(person)) return false;
   switch (filter) {
     case 'all':
       return true;
@@ -170,7 +187,7 @@ export function filterPeople(
  *  the search box: a count that moved as you typed would make the segments
  *  look like they were losing people. */
 export function filterCounts(people: PersonDto[]): Record<PeopleFilter, number> {
-  const counts = { all: 0, arrived: 0, unclaimed: 0, organisers: 0, speakers: 0 };
+  const counts = { all: 0, arrived: 0, unclaimed: 0, organisers: 0, speakers: 0, archived: 0 };
   for (const person of people) {
     for (const { id } of PEOPLE_FILTERS) {
       if (matchesFilter(person, id)) counts[id] += 1;

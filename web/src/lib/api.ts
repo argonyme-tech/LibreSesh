@@ -226,6 +226,16 @@ export const api = {
   withdrawClaim: (slug: string, id: number) =>
     request<ProfileClaimDto[]>('DELETE', `/e/${encode(slug)}/claims/${id}`),
 
+  /**
+   * Tidy a profile out of the organiser's lists without deleting it: it keeps
+   * its sessions, its role and its holder.
+   */
+  archivePerson: (slug: string, id: number) =>
+    request<PersonDto>('POST', `/e/${encode(slug)}/people/${id}/archive`),
+  /** Out again — an organiser's doing, or the holder's own. */
+  unarchivePerson: (slug: string, id: number) =>
+    request<PersonDto>('DELETE', `/e/${encode(slug)}/people/${id}/archive`),
+
   /** Hand the holder of a profile a different role at this event. */
   setPersonRole: (slug: string, id: number, role: Role) =>
     request<PersonDto>('PUT', `/e/${encode(slug)}/people/${id}/role`, { role }),

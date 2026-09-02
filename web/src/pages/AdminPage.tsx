@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { FloatingFocusManager } from '@floating-ui/react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type {
   BreakDto,
@@ -29,6 +30,7 @@ import {
   type PeopleSortColumn,
 } from '../lib/people';
 import { PersonStatusBadge } from '../components/PersonLine';
+import { popoverPanelClass, usePopover } from '../components/Popover';
 import { RoleControl } from '../components/RoleControl';
 
 /**
@@ -45,7 +47,7 @@ const PEOPLE_COL = {
   uid: 'hidden w-16 shrink-0 sm:block',
   role: 'w-24 shrink-0',
   seen: 'hidden w-14 shrink-0 sm:block',
-  actions: 'w-40 shrink-0',
+  actions: 'w-28 shrink-0',
 };
 
 /**
@@ -103,9 +105,112 @@ function PeopleHeader({
 
 /** One size for every action, so the column is a column. */
 const peopleActionClass =
-  'w-[4.25rem] rounded-lg border border-stone-300 bg-white px-1 py-1 text-xs font-semibold ' +
+  'w-[3.5rem] rounded-lg border border-stone-300 bg-white px-1 py-1 text-xs font-semibold ' +
   'text-stone-700 hover:border-stone-500 dark:border-stone-600 dark:bg-stone-900 ' +
   'dark:text-stone-200 dark:hover:border-stone-400';
+
+/**
+ * Everything you can do to a row that is not opening it.
+ *
+ * They were three buttons in the row until archiving made them four, and four
+ * did not fit a column this table can spare the width for. A menu is the
+ * better shape anyway: Merge, Archive and Delete are each consequential and
+ * each need a sentence to be safe to press, and a sentence does not fit on a
+ * 56-pixel button. What is left in the row is the one that is neither — Open.
+ */
+function PersonActions({
+  person,
+  onMerge,
+  onArchive,
+  onDelete,
+}: {
+  person: PersonDto;
+  onMerge: () => void;
+  onArchive: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const { refs, floatingStyles, context, getReferenceProps, getFloatingProps } = usePopover({
+    open,
+    onOpenChange: setOpen,
+    role: 'menu',
+    placement: 'bottom-end',
+  });
+  const archived = person.archivedAt !== null;
+
+  const run = (act: () => void) => {
+    setOpen(false);
+    act();
+  };
+  const itemClass =
+    'flex w-full flex-col items-start rounded-lg px-2 py-1.5 text-left hover:bg-stone-100 disabled:opacity-40 disabled:hover:bg-transparent dark:hover:bg-stone-800';
+
+  return (
+    <>
+      <button
+        ref={refs.setReference}
+        type="button"
+        aria-label={`More for ${person.name}`}
+        {...getReferenceProps({ onClick: () => setOpen((o) => !o) })}
+        className={`${peopleActionClass} w-8 text-center`}
+      >
+        ⋯
+      </button>
+      {open && (
+        <FloatingFocusManager context={context} modal={false}>
+          <div
+            ref={refs.setFloating}
+            style={floatingStyles}
+            aria-label={`Actions for ${person.name}`}
+            {...getFloatingProps()}
+            className={`${popoverPanelClass} w-64 p-1 text-xs`}
+          >
+            <button type="button" role="menuitem" onClick={() => run(onMerge)} className={itemClass}>
+              <span className="font-semibold text-stone-700 dark:text-stone-200">Merge…</span>
+              <span className="text-stone-500 dark:text-stone-400">
+                Fold a duplicate of {person.name} into this profile.
+              </span>
+            </button>
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => run(onArchive)}
+              className={itemClass}
+            >
+              <span className="font-semibold text-stone-700 dark:text-stone-200">
+                {archived ? 'Take out of the archive' : 'Archive'}
+              </span>
+              <span className="text-stone-500 dark:text-stone-400">
+                {archived
+                  ? 'Back into the People list and the speaker picker.'
+                  : 'Out of this list and the speaker picker. Keeps their sessions, their role and their way in — and they can take themselves back out.'}
+              </span>
+            </button>
+
+            {/* Deleting a profile somebody holds was always refused; the
+                button explaining that is gone, and the explanation now points
+                at the thing that does work. */}
+            <button
+              type="button"
+              role="menuitem"
+              disabled={person.claimed}
+              onClick={() => run(onDelete)}
+              className={`${itemClass} enabled:text-red-700 dark:enabled:text-red-400`}
+            >
+              <span className="font-semibold">Delete</span>
+              <span className={person.claimed ? 'text-stone-500 dark:text-stone-400' : ''}>
+                {person.claimed
+                  ? 'They are in this event, so their profile cannot be deleted. Archive it instead.'
+                  : 'Gone for good. Its sessions keep their slot and lose the speaker.'}
+              </span>
+            </button>
+          </div>
+        </FloatingFocusManager>
+      )}
+    </>
+  );
+}
 import { MergeModal } from '../components/MergeModal';
 import { auditKeepField, parseNumberField, weekRailFromField } from '../lib/numberField';
 import { AdminBreaks, dayName } from './AdminBreaks';
@@ -544,6 +649,29 @@ export function AdminPage() {
     try {
       const updated = await api.setPersonRole(slug, person.id, role);
       data.apply({ type: 'person.updated', entity: updated });
+    } catch (err) {
+      fail(err);
+    }
+  };
+
+  /**
+   * Put a profile away, or take it back out. No confirmation: nothing is lost
+   * and the same menu item undoes it, which is the difference between this and
+   * Delete — and asking twice about a reversible tidy-up is how an organiser
+   * learns to click through dialogs without reading them.
+   */
+  const toggleArchive = async (person: PersonDto) => {
+    try {
+      const updated =
+        person.archivedAt === null
+          ? await api.archivePerson(slug, person.id)
+          : await api.unarchivePerson(slug, person.id);
+      data.apply({ type: 'person.updated', entity: updated });
+      toast.show(
+        updated.archivedAt === null
+          ? `${updated.name} is back in the list`
+          : `${updated.name} archived — find them under Archived`,
+      );
     } catch (err) {
       fail(err);
     }
@@ -1196,38 +1324,27 @@ export function AdminPage() {
                     {person.lastSeenAt == null ? '—' : relativeTime(person.lastSeenAt)}
                   </span>
 
-                  {/* Three buttons the same size on every row, so the column
-                      reads as a column. Delete stays put rather than
-                      disappearing, and says why it is off. */}
+                  {/* Open first, the rest behind one button. Three buttons
+                      fitted the column; four did not, and the fourth is the
+                      one an organiser reaches for most — so the row keeps the
+                      thing it does every time and puts the three occasional,
+                      consequential ones in a menu where each can say what it
+                      does. The column got narrower doing it, which the name
+                      column took. */}
                   <span className={`${PEOPLE_COL.actions} flex justify-end gap-1`}>
-                    <button
-                      type="button"
-                      onClick={() => setMerging(person)}
-                      title={`Fold a duplicate of ${person.name} into this profile`}
-                      className={peopleActionClass}
-                    >
-                      Merge
-                    </button>
                     <Link
                       to={`/e/${slug}/p/${person.id}`}
                       state={{ back: { to: `/e/${slug}/admin?tab=people`, label: 'People' } }}
                       className={`${peopleActionClass} text-center`}
                     >
-                      Edit
+                      Open
                     </Link>
-                    <button
-                      type="button"
-                      disabled={person.claimed}
-                      onClick={() => void removePerson(person)}
-                      title={
-                        person.claimed
-                          ? 'They are in this event, so their profile cannot be deleted. Fold a duplicate in with Merge, or change their role.'
-                          : 'Remove this profile. Its sessions keep their slot and lose the speaker.'
-                      }
-                      className={`${peopleActionClass} enabled:text-red-700 enabled:hover:border-red-400 disabled:opacity-40 dark:enabled:text-red-400`}
-                    >
-                      Delete
-                    </button>
+                    <PersonActions
+                      person={person}
+                      onMerge={() => setMerging(person)}
+                      onArchive={() => void toggleArchive(person)}
+                      onDelete={() => void removePerson(person)}
+                    />
                   </span>
                 </li>
               ))}

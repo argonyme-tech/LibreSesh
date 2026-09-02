@@ -63,7 +63,7 @@ every failure as `{ error: { code, message } }`.
 | `breaks` | Lunch and friends: a label and local minutes of day, `date` null meaning every day. No room, no author, hard-deleted |
 | `sessions` | Scheduled: always has a room and a time; `blocks_open_booking` holds the floor against attendees |
 | `proposals` | Pitched: no room, no time, until an organiser places it |
-| `people` | One per identity that has entered the event (made at the gate, migration 010), plus organiser-typed shells nobody has claimed yet. Holds the full name; the username lives on `event_identities`. Manage → People lists these and nothing else |
+| `people` | One per identity that has entered the event (made at the gate, migration 010), plus organiser-typed shells nobody has claimed yet. Holds the full name; the username lives on `event_identities`. `archived_at` files a row out of the lists without deleting it (migration 013). Manage → People lists these and nothing else |
 | `contributions` | Notes, links, questions; `hidden` for moderation |
 | `stars`, `proposal_interest` | Private per-identity interest |
 | `audit` | Append-only log of every write |
@@ -469,6 +469,40 @@ claimed — precisely so that redemption stays the same dumb token adoption in
 both cases. That is what makes one speaker code work from any number of
 devices. Phrases are stored hashed; guesses share the password rate-limit
 budget.
+
+### Archiving a profile, and why it is not deleting
+
+A `people` row has three states, not two: live, archived (`archived_at` set),
+and soft-deleted (`deleted_at` set). The middle one exists because deleting is
+the wrong tool for the profiles that actually accumulate at a real event — the
+ones made while testing the room, a shell typed twice, a walk-in who never came
+back. Deleting cannot be undone, it strips the name off every session the
+profile was credited on, and `DELETE /people/:id` refuses outright for anyone
+who *holds* their profile, which is exactly the case an organiser most wants
+tidied away.
+
+Archiving changes nothing but visibility. The row keeps its sessions, its bio,
+its role, its speaker code and its identity. What it loses is its place in the
+lists an organiser reads: every segment of Manage → People except **Archived**
+drops it, and the speaker picker stops offering it. Crediting by name still
+finds it — `resolveSpeaker` orders live profiles first and falls through to an
+archived one rather than spawning a twin — because a name that matches only an
+archived profile is still that person.
+
+**The holder is the way back out.** `DELETE /people/:id/archive` takes
+`requireRole('user')` rather than `admin`, and then allows it for an organiser
+*or* for whoever holds the row. That is deliberate and it is the whole
+difference from deletion: an organiser tidying up at the end of a day cannot
+tell a profile that is finished with from one whose person is coming back
+tomorrow, and the person themselves can. They still hold their cookie and their
+role, so they open their profile, see that it was put away, and take it back
+out. `archivedAt` is therefore on the public `PersonDto` and not among the
+organiser-only facts — the one reader who most needs it is the holder, and it
+discloses nothing about who runs the event.
+
+Both directions are idempotent and both are audited (`archive`, `unarchive`).
+Archiving twice does not re-stamp the date: *when* it was filed is what tells a
+tidy-up from a mistake three weeks later.
 
 ### Merging two people
 

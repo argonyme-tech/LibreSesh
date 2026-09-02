@@ -1,0 +1,19 @@
+-- Archiving a profile: out of the way, not gone.
+--
+-- An organiser running a real event accumulates profiles that are not people
+-- — the ones they made while testing the room, a shell typed twice, a
+-- walk-in who never came back. Deleting is the only tool there was, and it is
+-- the wrong one: it is irreversible, it strips the profile off every session
+-- it was credited on, and it refuses outright for anyone who holds their
+-- profile, which is exactly the case an organiser most wants tidied away.
+--
+-- So: a third state between live and deleted. An archived profile keeps its
+-- sessions, its bio, its role and its identity; it simply stops appearing in
+-- the lists an organiser reads. And because the identity is untouched,
+-- whoever holds it still has their way in — they come back with the cookie
+-- they already had and take themselves out of the archive, without needing an
+-- organiser to notice. That is the point of archiving rather than deleting.
+--
+-- Nullable rather than a boolean: *when* is what tells a tidy-up from a
+-- mistake three weeks later, and the audit log names who.
+ALTER TABLE people ADD COLUMN archived_at TEXT;

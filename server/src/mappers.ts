@@ -137,6 +137,7 @@ export const toPersonDto = (
   links: parseLinks(row.links),
   isMine: row.identity_id !== null && row.identity_id === viewerIdentityId,
   claimed: row.identity_id !== null,
+  archivedAt: row.archived_at,
   username: facts.username,
   creditable: facts.creditable,
   ...(disclose

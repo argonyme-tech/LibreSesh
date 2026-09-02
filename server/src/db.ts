@@ -124,6 +124,9 @@ export interface PersonRow {
   links: string;
   created_at: string;
   updated_at: string;
+  /** Tidied out of the organiser's lists, but still a live profile: it keeps
+   *  its sessions, its role and its holder. See migration 013. */
+  archived_at: string | null;
   deleted_at: string | null;
 }
 

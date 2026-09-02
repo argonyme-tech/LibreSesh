@@ -33,6 +33,8 @@ const ACTIONS: Record<string, string> = {
   speaker_code_mint: 'minted a speaker code for',
   speaker_code_revoke: 'revoked the speaker code for',
   role_set: 'changed the role of',
+  archive: 'archived',
+  unarchive: 'took out of the archive',
   claim_request: 'asked to hold',
   claim_approve: 'agreed that they are',
   claim_decline: 'turned down a request to hold',
