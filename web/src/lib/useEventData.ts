@@ -90,23 +90,26 @@ const byTagName = (tags: TagDto[]): TagDto[] =>
  * holds: you have at most one profile per event, so a frame claiming a second
  * one is yours is claiming it for its author, not for you.
  */
-function applyPersonChange(people: PersonDto[], incoming: PersonDto): PersonDto[] {
+export function applyPersonChange(people: PersonDto[], incoming: PersonDto): PersonDto[] {
   const prev = people.find((p) => p.id === incoming.id);
-  const merged: PersonDto =
-    prev === undefined
-      ? { ...incoming, isMine: incoming.isMine && !people.some((p) => p.isMine) }
-      : {
-          ...prev,
-          ...incoming,
-          isMine: prev.isMine,
-          role: prev.role,
-          holderUid: prev.holderUid,
-          codePending: prev.codePending,
-          lastSeenAt: prev.lastSeenAt,
-          joinedAt: prev.joinedAt,
-          sessionCount: prev.sessionCount,
-        };
-  return byPersonName(upsert(people, merged));
+  if (prev === undefined) {
+    return byPersonName(
+      upsert(people, { ...incoming, isMine: incoming.isMine && !people.some((p) => p.isMine) }),
+    );
+  }
+  // Spread is exactly the rule wanted for the organiser-only facts: the
+  // server *omits* those keys from anything it broadcasts and includes them
+  // in the reply to an organiser, so a key that is present is one this
+  // reader is entitled to and is newer than what they hold, and a key that
+  // is absent leaves what they already had untouched. Pinning them to `prev`
+  // instead — which this did at first — threw away the role the organiser
+  // had just set, and the select snapped back a moment after they used it.
+  //
+  // `isMine` cannot work that way, because it is always present and is
+  // always about the requester. A row's owner does not change under someone
+  // who is watching it; the one thing that would change it, claiming a
+  // profile at the gate, arrives as a fresh page rather than as a frame.
+  return byPersonName(upsert(people, { ...prev, ...incoming, isMine: prev.isMine }));
 }
 
 const byPersonName = (people: PersonDto[]): PersonDto[] =>
