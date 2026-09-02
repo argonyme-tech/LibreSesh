@@ -61,6 +61,41 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
 ## High Priority
 
+- **An event this app exported cannot be imported back.** Found 2026-09-02
+  restoring a production event onto a fresh staging box: the export downloads,
+  the import rejects it. The first error reads `breaks.0.start: Required`, but
+  that is one of **103** — every one of the 96 sessions fails too, and the real
+  answer is that these are two different formats wearing one name.
+
+  `exportEvent.ts` writes a dump keyed by database id: `startMin`/`endMin`
+  integers on breaks and tracks, `roomId`/`trackId`/`tagIds` on sessions,
+  `date: null` where there is no date. `eventImportSchema` takes the authoring
+  document: `start`/`end` as `HH:MM`, rooms/tracks/tags **by name**, and an
+  absent key rather than a null. It is also `.strict()` at the top level, so
+  the export's `people`, `proposals`, `contributions` and `exportedAt` are
+  rejected outright rather than ignored.
+
+  What makes this a bug and not a documented limitation is the importer's own
+  first field: `format: z.literal('libresesh.event').optional()`, commented
+  "Present on a document this app produced; ignored, but not rejected". It
+  says it recognises our export and then refuses it. There is no round-trip
+  test in the suite, which is why nobody noticed.
+
+  One piece of luck sizes the fix: `importSessionSchema` already accepts
+  `startsAt`/`endsAt` as ISO instants, so no timezone conversion is involved —
+  the mapping is id → name, minutes → `HH:MM`, null → absent, plus tolerating
+  the export-only top-level keys. A converter proving that is in
+  `_planning/` (it turned the Valley export into a document the schema
+  accepts, verified against `eventImportSchema` itself), but it belongs in the
+  app, not in a script an organiser has to be handed.
+
+  Decide where it goes: the importer accepting both shapes, or export learning
+  to emit the authoring document. Whichever, the missing test is the round
+  trip — export an event, import it, and compare. Note also what the export
+  cannot carry back either way: `people` profiles, `contributions` and every
+  `starCount`. If restoring an instance is the real goal, the encrypted
+  whole-database backup is the tool; this path is for moving one event.
+
 - **The drop still flickers, and the fix so far only made it smaller.**
   Reported 2026-08-31, after the two fixes in CHANGELOG `[Unreleased]` landed
   (`461e7ab`, `9b95de7`): a dragged block and a permission switch still show a
