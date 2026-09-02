@@ -517,9 +517,12 @@ export function mimirRoutes(ctx: Ctx): Router {
     requireRole(ctx.db, 'admin'),
     limit(ctx.limiter, 'write'),
     async (req, res, next) => {
+      // Kept out here so the catch can name where nothing answered.
+      let endpoint = 'the engine';
       try {
         const body = parse(mimirChatSchema, req.body);
         const cfg = loadEngine();
+        endpoint = cfg?.url ?? 'the Anthropic API';
         if (!cfg) {
           res.status(503).json({
             error: {
@@ -659,6 +662,27 @@ ${eventContext(req.event.id)}
         if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
           res.status(424).json({
             error: { message: 'Engine timed out — check the key/URL in Engine settings.', code: 'engine_timeout' },
+          });
+          return;
+        }
+        // Nothing listening at the other end: a local Ollama that is not
+        // running, or an SSH tunnel that has dropped. `fetch` reports this as
+        // a bare TypeError whose cause carries the code, and left to fall
+        // through it reached the terminal handler as a 500 "Something went
+        // wrong" — which is both the least useful sentence available and, on a
+        // deployment behind a proxy that rewrites 5xx bodies, invisible.
+        // Any transport failure, not only the ones that carry an errno: a
+        // mistyped port is rejected by Node before it connects at all, so it
+        // arrives as the same bare TypeError with no code on its cause.
+        const cause = (err as { cause?: { code?: unknown; message?: unknown } }).cause;
+        const code = typeof cause?.code === 'string' ? cause.code : null;
+        const why = code ?? (typeof cause?.message === 'string' ? cause.message : null);
+        if (err instanceof TypeError && err.message === 'fetch failed') {
+          res.status(424).json({
+            error: {
+              message: `Nothing answered at ${endpoint}${why ? ` (${why})` : ''}. If that is a tunnel or a local model, it is not running.`,
+              code: 'engine_unreachable',
+            },
           });
           return;
         }

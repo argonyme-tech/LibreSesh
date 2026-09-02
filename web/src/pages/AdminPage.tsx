@@ -15,6 +15,8 @@ import { TAG_COLORS, nextTagColor, readableInk } from '@shared/tagColors';
 import { ColorPicker } from '../components/ColorPicker';
 import { windowLabel } from '@shared/trackHours';
 import { ApiError, api, type BreakWrite, type TrackWrite, type TrashDto } from '../lib/api';
+import { notesForPerson } from '../lib/mimirNotes';
+import { MimirAside } from '../components/MimirAside';
 import { fmtMin, minutesOf, relativeTime, rowId, snapMinute, uid } from '../lib/format';
 import { useEventData } from '../lib/useEventData';
 import { auditKeepField, parseNumberField, weekRailFromField } from '../lib/numberField';
@@ -860,6 +862,17 @@ export function AdminPage() {
                   key={person.id}
                   className="flex flex-wrap items-center gap-2 rounded-lg bg-stone-50 dark:bg-stone-800 px-3 py-2"
                 >
+                  {/* Mimir add-on: the note goes on the row that fixes it.
+                      "Cannot edit their own session" is invisible everywhere
+                      else in the app, and this is the one screen where the
+                      speaker code that repairs it is one click away. */}
+                  <div className="order-last w-full">
+                    <MimirAside
+                      notes={notesForPerson(person, bundle)}
+                      scope={`person-${person.id}`}
+                      compact
+                    />
+                  </div>
                   <span className="min-w-32 flex-1 text-sm font-medium">
                     {person.name}
                     <span className="ml-1.5 font-mono text-xs font-normal text-stone-400 dark:text-stone-500">

@@ -9,6 +9,8 @@ import type {
   SessionDto,
   TagDto,
 } from '@shared/types';
+import { MimirAside } from './MimirAside';
+import type { Note } from '../lib/mimirNotes';
 import { readableInk } from '@shared/tagColors';
 import { fmtMin, place, relativeTime } from '../lib/format';
 import { renderMarkdown } from '../lib/markdown';
@@ -55,6 +57,9 @@ export interface SessionDetailProps {
   /** Sits at the top right of the header — the sheet's close button, the
    *  page's link back to the grid. */
   headerActions?: ReactNode;
+  /** Mimir add-on: computed by the page holding the bundle, since this
+   *  component is handed a session and not the event around it. */
+  mimirNotes?: Note[];
   onToggleStar: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -82,6 +87,7 @@ export function SessionDetail({
   layout,
   collapseAt,
   headerActions,
+  mimirNotes = [],
   onToggleStar,
   onEdit,
   onDelete,
@@ -190,6 +196,11 @@ export function SessionDetail({
       {headerActions}
     </div>
   );
+
+  const aside =
+    mimirNotes.length > 0 ? (
+      <MimirAside notes={mimirNotes} scope={`session-${session.id}`} slug={slug} />
+    ) : null;
 
   // The primary way to star from the grid — the calendar blocks stay
   // display-only because their pointer handling is drag-sensitive.
@@ -426,6 +437,7 @@ export function SessionDetail({
       <>
         {header}
         {starButton}
+        {aside}
         {descriptionBlock}
         {livestream}
         {ownerActions}
@@ -447,6 +459,7 @@ export function SessionDetail({
         <div className="lg:order-2 lg:col-span-1">
           <div className="lg:sticky lg:top-20 space-y-4">
             {starButton}
+            {aside}
             {ownerActions}
             {composer}
           </div>

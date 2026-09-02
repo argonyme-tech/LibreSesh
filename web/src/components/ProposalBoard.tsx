@@ -7,6 +7,8 @@ import { ApiError, api, type PlaceWrite, type ProposalWrite } from '../lib/api';
 import { dayLabel, todayInZone } from '../lib/format';
 import { renderMarkdown } from '../lib/markdown';
 import { useMe } from '../lib/useMe';
+import { notesForPitch, type Note } from '../lib/mimirNotes';
+import { MimirAside } from './MimirAside';
 import { PlaceProposalModal } from './PlaceProposalModal';
 import { ProposalModal } from './ProposalModal';
 import { EmptyState, PrimaryButton, SecondaryButton, Spinner, useToast } from './ui';
@@ -241,6 +243,7 @@ export function ProposalBoard() {
                 proposal={proposal}
                 slug={slug}
                 tags={bundle.tags}
+                notes={notesForPitch(proposal, bundle)}
                 interestBusy={busyInterest === proposal.id}
                 canPlace={role === 'admin' && !event.archived}
                 canManage={mayManage(proposal)}
@@ -290,6 +293,8 @@ interface ProposalCardProps {
   proposal: ProposalDto;
   slug: string;
   tags: BundleDto['tags'];
+  /** Mimir add-on: what she has to say about this pitch, or []. */
+  notes: Note[];
   interestBusy: boolean;
   canPlace: boolean;
   canManage: boolean;
@@ -303,6 +308,7 @@ function ProposalCard({
   proposal,
   slug,
   tags,
+  notes,
   interestBusy,
   canPlace,
   canManage,
@@ -361,6 +367,12 @@ function ProposalCard({
           // Markdown is escaped before parsing, so no author markup survives.
           dangerouslySetInnerHTML={{ __html: description }}
         />
+      )}
+
+      {notes.length > 0 && (
+        <div className="mt-2">
+          <MimirAside notes={notes} scope={`pitch-${proposal.id}`} compact />
+        </div>
       )}
 
       {proposal.tagIds.length > 0 && (

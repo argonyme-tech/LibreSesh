@@ -26,6 +26,7 @@ import { matchesQuery } from "../lib/search";
 // rather than in the account chrome, because they are ways of looking at
 // the programme.
 import { MimirFab } from "../components/MimirChat";
+import { notesForSession } from "../lib/mimirNotes";
 import { RhythmCheck } from "../components/RhythmCheck";
 import { useFilters } from "../lib/useFilters";
 import { roomHasInfo, roomNote, seatsLabel } from "../lib/rooms";
@@ -1408,6 +1409,7 @@ export function SchedulePage() {
             slug={slug}
             rooms={bundle.rooms}
             tags={bundle.tags}
+            mimirNotes={notesForSession(selected, bundle)}
             contributions={data.contributions[selected.id]}
             role={role}
             me={me}
