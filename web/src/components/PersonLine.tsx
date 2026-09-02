@@ -1,6 +1,7 @@
-import type { PersonDto, Role } from '@shared/types';
+import type { PersonDto } from '@shared/types';
 import { relativeTime, uid } from '../lib/format';
 import { personStatus } from '../lib/people';
+import { ROLE_HELP } from './RoleControl';
 import { RoleBadge } from './ui';
 
 /**
@@ -42,7 +43,7 @@ export function PersonStatusBadge({
           signed out
         </span>
       )}
-      {person.codePending === true && (
+      {person.codeState === 'pending' && (
         <span
           title="A speaker code was minted for them and has never been redeemed — the phrase is still sitting in an unread message."
           className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
@@ -53,16 +54,6 @@ export function PersonStatusBadge({
     </>
   );
 }
-
-/** What each role is allowed to do here, in the words the gate uses. Every
- *  badge says what it means on hover; "signed out" is the one nobody can
- *  guess, so it gets the longest sentence. */
-const ROLE_HELP: Record<Role, string> = {
-  admin: 'an organiser: full control of this event',
-  speaker: 'a speaker: they can rewrite the talks they are giving',
-  user: 'here to take part: they can post, and book open rooms',
-  viewer: 'here to read the schedule and star sessions, nothing more',
-};
 
 /**
  * One person, as the facts that tell two people apart: full name, username,

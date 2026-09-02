@@ -54,8 +54,9 @@ import {
   SecondaryButton,
   Spinner,
   inputClass,
+  useConfirm,
   useToast,
-} from "../components/ui";
+} from '../components/ui';
 
 const NOW_TICK_MS = 30_000;
 
@@ -140,6 +141,7 @@ export function SchedulePage() {
   const { slug = "", sessionId } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const confirm = useConfirm();
   const { me } = useMe();
   const data = useEventData(slug);
   const filters = useFilters();
@@ -812,7 +814,11 @@ export function SchedulePage() {
 
   const deleteSession = useCallback(
     async (session: SessionDto) => {
-      if (!window.confirm(`Delete “${session.title}”?`)) return;
+      const ok = await confirm({
+        title: `Delete “${session.title}”?`,
+        body: 'It moves to the bin, with its notes and questions. An organiser can put it back from Manage Event, under Trash.',
+      });
+      if (!ok) return;
       try {
         await api.deleteSession(slug, session.id);
         data.apply({ type: "session.deleted", entity: { id: session.id } });
@@ -823,7 +829,7 @@ export function SchedulePage() {
         reportError(err);
       }
     },
-    [closeSession, data, reportError, slug, toast],
+    [closeSession, confirm, data, reportError, slug, toast],
   );
 
   const addContribution = useCallback(

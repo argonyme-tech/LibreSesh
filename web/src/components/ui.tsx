@@ -166,16 +166,38 @@ export function NumberField({
 }
 
 /** `userLabel` is the event's own word for the middle role, e.g. "attendee". */
+/**
+ * The colour each role wears, and the pill it wears it in.
+ *
+ * Split out from `RoleBadge` so the editable tag in the People list can be the
+ * same object as the badge everywhere else. A role that is a plain select in
+ * one place and a coloured pill in another reads as two different facts; an
+ * organiser scanning the list should recognise "organiser" by colour before
+ * they have read the word.
+ */
+export const roleTagColor: Record<Role, string> = {
+  admin: 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900',
+  speaker: 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300',
+  user: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
+  viewer: 'bg-stone-200 text-stone-600 dark:bg-stone-700 dark:text-stone-300',
+};
+
+/** The pill itself, without the colour — shared with the "signed out" tag,
+ *  which is not a role and so has no entry above. The `capitalize` that used
+ *  to live here does not: "signed out" is a sentence about somebody, not a
+ *  role's name, and "Signed Out" beside a lowercase "speaker" reads as a
+ *  different kind of thing. Whoever renders a role word adds it. */
+export const roleTagShape = 'rounded-full px-2 py-0.5 text-xs font-semibold';
+
+/** What this event calls the role. `user` is the one an organiser may rename,
+ *  which is why nothing hard-codes "attendee" but this. */
+export const roleWord = (role: Role, userLabel?: string): string =>
+  role === 'user' ? (userLabel ?? 'attendee') : role;
+
 export function RoleBadge({ role, userLabel }: { role: Role; userLabel?: string }) {
-  const style = {
-    admin: 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900',
-    speaker: 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300',
-    user: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
-    viewer: 'bg-stone-200 text-stone-600 dark:bg-stone-700 dark:text-stone-300',
-  }[role];
   return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${style}`}>
-      {role === 'user' ? (userLabel ?? 'attendee') : role}
+    <span className={`${roleTagShape} ${roleTagColor[role]} capitalize`}>
+      {roleWord(role, userLabel)}
     </span>
   );
 }
@@ -654,6 +676,84 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     </ToastContext.Provider>
   );
 }
+
+export interface ConfirmRequest {
+  title: string;
+  /** What will actually happen. Where the thing goes, and whether it can be
+   *  brought back — those are the two questions, and a browser alert could
+   *  answer neither because it cannot hold a sentence worth reading. */
+  body: ReactNode;
+  confirmLabel?: string;
+  /** Red button. Default true: nearly everything that asks is a removal. */
+  danger?: boolean;
+}
+
+const ConfirmContext = createContext<(request: ConfirmRequest) => Promise<boolean>>(() =>
+  Promise.resolve(false),
+);
+
+/**
+ * Ask before doing something that cannot be taken back, in the app's own
+ * voice rather than the browser's.
+ *
+ * `window.confirm` was doing this job and doing it badly: it renders as an
+ * alert from the *browser*, unstyled, untranslatable, one line, and it says
+ * "Delete X?" without ever saying what deleting means here — that a session
+ * goes to the bin and can be restored, while a room or a tag simply goes. It
+ * also freezes the page's JavaScript, which on a phone at a conference is
+ * indistinguishable from a hang.
+ *
+ * Shaped as a promise so it drops straight into the place a `confirm()` call
+ * used to sit, rather than turning every caller into a state machine.
+ */
+export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const [pending, setPending] = useState<{
+    request: ConfirmRequest;
+    settle: (ok: boolean) => void;
+  } | null>(null);
+
+  const ask = useCallback(
+    (request: ConfirmRequest) =>
+      new Promise<boolean>((settle) => setPending({ request, settle })),
+    [],
+  );
+
+  const close = (ok: boolean) => {
+    pending?.settle(ok);
+    setPending(null);
+  };
+
+  const danger = pending?.request.danger !== false;
+  const label = pending?.request.confirmLabel ?? 'Delete';
+
+  return (
+    <ConfirmContext.Provider value={ask}>
+      {children}
+      {pending && (
+        <Modal
+          title={pending.request.title}
+          onClose={() => close(false)}
+          onSubmit={() => close(true)}
+          footer={
+            <>
+              <SecondaryButton onClick={() => close(false)}>Cancel</SecondaryButton>
+              {danger ? (
+                <DangerButton type="submit">{label}</DangerButton>
+              ) : (
+                <PrimaryButton type="submit">{label}</PrimaryButton>
+              )}
+            </>
+          }
+        >
+          <p className="text-sm text-stone-600 dark:text-stone-300">{pending.request.body}</p>
+        </Modal>
+      )}
+    </ConfirmContext.Provider>
+  );
+}
+
+export const useConfirm = (): ((request: ConfirmRequest) => Promise<boolean>) =>
+  useContext(ConfirmContext);
 
 export function EmptyState({ children }: { children: ReactNode }) {
   return <div className="py-16 text-center text-sm text-stone-500 dark:text-stone-400">{children}</div>;

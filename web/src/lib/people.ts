@@ -52,19 +52,95 @@ export function matchesSearch(person: PersonDto, query: string): boolean {
   );
 }
 
-export type PeopleSort = 'name' | 'seen';
+/** Every column of the People table that answers a question about order.
+ *  Actions is not one of them: it holds three buttons, not a fact. */
+export type PeopleSortColumn = 'name' | 'username' | 'uid' | 'role' | 'seen';
+
+export interface PeopleSort {
+  column: PeopleSortColumn;
+  dir: 'asc' | 'desc';
+}
 
 /**
- * By name, or by who was here most recently. A profile nobody holds has never
- * been seen, so it sorts last under `seen` rather than first — it is not new,
- * it is absent.
+ * Which way round a column goes when it is first clicked.
+ *
+ * Not all ascending. A date column opened oldest-first is nobody's question —
+ * "who is actually still here" is, and that is the newest end. The role ladder
+ * is the same: an organiser sorting by role is looking for the organisers.
+ * Clicking again reverses whichever way it started, so both ends stay one
+ * click away.
  */
-export function sortPeople(people: PersonDto[], sort: PeopleSort): PersonDto[] {
-  const rows = [...people];
-  if (sort === 'name') {
-    return rows.sort((a, b) => a.name.localeCompare(b.name));
-  }
-  return rows.sort((a, b) => (b.lastSeenAt ?? '').localeCompare(a.lastSeenAt ?? ''));
+export const NATURAL_DIR: Record<PeopleSortColumn, PeopleSort['dir']> = {
+  name: 'asc',
+  username: 'asc',
+  uid: 'asc',
+  role: 'desc',
+  seen: 'desc',
+};
+
+/** The default: alphabetical, which is how you find a name you already know. */
+export const BY_NAME: PeopleSort = { column: 'name', dir: 'asc' };
+
+/**
+ * How much of the event somebody holds, weakest first. A ladder rather than
+ * the alphabet, because "admin, speaker, user, viewer" happens to be
+ * alphabetical backwards and that is a coincidence, not the meaning — and an
+ * event that renames `user` to "participant" would break the coincidence
+ * while the ladder stays true.
+ *
+ * The two non-roles sit below the four: an unclaimed shell holds nothing at
+ * all, and somebody signed out holds a profile but no permission.
+ */
+const ROLE_RANK: Record<Role, number> = { viewer: 2, user: 3, speaker: 4, admin: 5 };
+
+const roleRank = (person: PersonDto): number => {
+  const status = personStatus(person);
+  if (status.kind === 'unclaimed') return 0;
+  if (status.kind === 'signed-out') return 1;
+  return ROLE_RANK[status.role];
+};
+
+/**
+ * What a column compares, and what counts as having nothing to compare.
+ *
+ * `null` is not a value that sorts low — it is the absence of one, and it is
+ * pinned to the bottom in both directions below. A column of em dashes at the
+ * top is noise whichever way the arrow points, and reversing the order to
+ * escape it would be an odd thing to have to learn.
+ */
+const KEY: Record<PeopleSortColumn, (person: PersonDto) => string | number | null> = {
+  name: (p) => p.name,
+  username: (p) => p.username,
+  uid: (p) => p.holderUid ?? null,
+  role: (p) => roleRank(p),
+  seen: (p) => p.lastSeenAt ?? null,
+};
+
+const compare = (a: string | number, b: string | number): number =>
+  typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b));
+
+/**
+ * One column, one direction, with the rows that have nothing in that column
+ * last either way and full name breaking every tie.
+ *
+ * The tie-break matters more than it looks: without it the order of two people
+ * with the same role is whatever the bundle happened to send, so a role change
+ * anywhere in the event could shuffle rows that did not change.
+ */
+export function sortPeople(people: PersonDto[], sort: PeopleSort = BY_NAME): PersonDto[] {
+  const key = KEY[sort.column];
+  const sign = sort.dir === 'asc' ? 1 : -1;
+  return [...people].sort((a, b) => {
+    const left = key(a);
+    const right = key(b);
+    if (left === null || right === null) {
+      if (left !== right) return left === null ? 1 : -1;
+    } else {
+      const by = compare(left, right);
+      if (by !== 0) return sign * by;
+    }
+    return a.name.localeCompare(b.name);
+  });
 }
 
 /**
@@ -81,7 +157,7 @@ export function filterPeople(
   people: PersonDto[],
   filter: PeopleFilter,
   query: string,
-  sort: PeopleSort = 'name',
+  sort: PeopleSort = BY_NAME,
 ): PersonDto[] {
   const shown = sortPeople(
     people.filter((p) => matchesFilter(p, filter) && matchesSearch(p, query)),

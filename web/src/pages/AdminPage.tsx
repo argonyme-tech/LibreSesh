@@ -19,13 +19,17 @@ import { ApiError, api, type BreakWrite, type TrackWrite, type TrashDto } from '
 import { fmtMin, minutesOf, relativeTime, snapMinute } from '../lib/format';
 import { useEventData } from '../lib/useEventData';
 import {
+  BY_NAME,
+  NATURAL_DIR,
   PEOPLE_FILTERS,
   filterCounts,
   filterPeople,
   type PeopleFilter,
   type PeopleSort,
+  type PeopleSortColumn,
 } from '../lib/people';
 import { PersonStatusBadge } from '../components/PersonLine';
+import { RoleControl } from '../components/RoleControl';
 
 /**
  * The People table's columns, shared by the header and every row so the two
@@ -44,6 +48,59 @@ const PEOPLE_COL = {
   actions: 'w-40 shrink-0',
 };
 
+/**
+ * One column heading, which is also the control that orders by it.
+ *
+ * The arrow is drawn only on the column in force. A row of five arrows all
+ * pointing somewhere would say every column is sorted, and only one ever is;
+ * a hover arrow on the rest would be invisible to a finger. So the affordance
+ * is the heading being a button at all — it underlines on hover — and the
+ * arrow is the state, not the invitation.
+ *
+ * The accessible name carries the whole thing, because "Name ▲" read aloud is
+ * "Name" and nothing else: `aria-sort` belongs on a real `columnheader`, and
+ * this table is a flex list rather than a `<table>`.
+ */
+function PeopleHeader({
+  column,
+  label,
+  sort,
+  onSort,
+  className,
+}: {
+  column: PeopleSortColumn;
+  label: string;
+  sort: PeopleSort;
+  onSort: (column: PeopleSortColumn) => void;
+  className: string;
+}) {
+  const active = sort.column === column;
+  const dir = active ? sort.dir : NATURAL_DIR[column];
+  return (
+    <span className={className}>
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        aria-label={
+          active
+            ? `${label}, sorted ${sort.dir === 'asc' ? 'ascending' : 'descending'}. Reverse it`
+            : `Sort by ${label}`
+        }
+        className={`flex max-w-full items-center gap-0.5 uppercase tracking-wide hover:text-stone-600 hover:underline dark:hover:text-stone-300 ${
+          active ? 'text-stone-700 dark:text-stone-200' : ''
+        }`}
+      >
+        <span className="truncate">{label}</span>
+        {active && (
+          <span aria-hidden="true" className="shrink-0 text-[0.6rem]">
+            {dir === 'asc' ? '▲' : '▼'}
+          </span>
+        )}
+      </button>
+    </span>
+  );
+}
+
 /** One size for every action, so the column is a column. */
 const peopleActionClass =
   'w-[4.25rem] rounded-lg border border-stone-300 bg-white px-1 py-1 text-xs font-semibold ' +
@@ -59,7 +116,6 @@ import { AdminAudit } from './AdminAudit';
 import { AdminInvite } from './AdminInvite';
 import {
   DangerButton,
-  Modal,
   EmptyState,
   Field,
   FormError,
@@ -67,6 +123,7 @@ import {
   FormRow,
   FormStack,
   IconButton,
+  Modal,
   NumberField,
   PrimaryButton,
   SecondaryButton,
@@ -75,6 +132,7 @@ import {
   Toggle,
   inputClass,
   linkClass,
+  useConfirm,
   useToast,
 } from '../components/ui';
 
@@ -106,6 +164,7 @@ export function AdminPage() {
   const { slug = '' } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const confirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
   const data = useEventData(slug);
 
@@ -122,7 +181,7 @@ export function AdminPage() {
   const [personName, setPersonName] = useState('');
   const [peopleFilter, setPeopleFilter] = useState<PeopleFilter>('all');
   const [peopleQuery, setPeopleQuery] = useState('');
-  const [peopleSort, setPeopleSort] = useState<PeopleSort>('name');
+  const [peopleSort, setPeopleSort] = useState<PeopleSort>(BY_NAME);
   const [merging, setMerging] = useState<PersonDto | null>(null);
 
   const bundle = data.bundle;
@@ -259,6 +318,19 @@ export function AdminPage() {
   const peopleCounts = filterCounts(bundle.people);
   const shownPeople = filterPeople(bundle.people, peopleFilter, peopleQuery, peopleSort);
 
+  /**
+   * Click a column to order by it; click the one you are already on to turn it
+   * round. A fresh column starts whichever way that column is usually asked —
+   * see `NATURAL_DIR` — rather than always ascending, so "who was here last"
+   * and "who runs this event" are one click each rather than two.
+   */
+  const sortBy = (column: PeopleSortColumn) =>
+    setPeopleSort((s) =>
+      s.column === column
+        ? { column, dir: s.dir === 'asc' ? 'desc' : 'asc' }
+        : { column, dir: NATURAL_DIR[column] },
+    );
+
   const addRoom = async (draft: RoomDraft) => {
     try {
       const created = await api.createRoom(slug, {
@@ -307,7 +379,11 @@ export function AdminPage() {
   };
 
   const removeRoom = async (room: RoomDto) => {
-    if (!window.confirm(`Delete “${room.name}”?`)) return;
+    const ok = await confirm({
+      title: `Delete the room “${room.name}”?`,
+      body: 'A room with sessions still in it cannot be deleted — move those first. The bin does not hold rooms, so this cannot be undone.',
+    });
+    if (!ok) return;
     try {
       await api.deleteRoom(slug, room.id);
       data.apply({ type: 'room.deleted', entity: { id: room.id } });
@@ -384,13 +460,11 @@ export function AdminPage() {
   };
 
   const removeTrack = async (track: TrackDto): Promise<boolean> => {
-    if (
-      !window.confirm(
-        `Delete the “${track.name}” track? Its sessions keep their room and lose the track.`,
-      )
-    ) {
-      return false;
-    }
+    const ok = await confirm({
+      title: `Delete the “${track.name}” track?`,
+      body: 'Its sessions keep their room and their time, and lose the track. The bin does not hold tracks, so this cannot be undone.',
+    });
+    if (!ok) return false;
     try {
       await api.deleteTrack(slug, track.id);
       data.apply({ type: 'track.deleted', entity: { id: track.id } });
@@ -435,9 +509,11 @@ export function AdminPage() {
   };
 
   const removeTag = async (tag: TagDto): Promise<boolean> => {
-    if (!window.confirm(`Delete the “${tag.name}” tag? It will be removed from every session.`)) {
-      return false;
-    }
+    const ok = await confirm({
+      title: `Delete the “${tag.name}” tag?`,
+      body: 'It comes off every session and pitch that wears it. The bin does not hold tags, so this cannot be undone.',
+    });
+    if (!ok) return false;
     try {
       await api.deleteTag(slug, tag.id);
       data.apply({ type: 'tag.deleted', entity: { id: tag.id } });
@@ -464,10 +540,9 @@ export function AdminPage() {
    * organiser — an event nobody can administer has no way back — so that
    * refusal arrives as a toast rather than being predicted here.
    */
-  const changeRole = async (person: PersonDto, role: string) => {
-    if (role === '') return;
+  const changeRole = async (person: PersonDto, role: Role) => {
     try {
-      const updated = await api.setPersonRole(slug, person.id, role as Role);
+      const updated = await api.setPersonRole(slug, person.id, role);
       data.apply({ type: 'person.updated', entity: updated });
     } catch (err) {
       fail(err);
@@ -475,13 +550,11 @@ export function AdminPage() {
   };
 
   const removePerson = async (person: PersonDto) => {
-    if (
-      !window.confirm(
-        `Delete ${person.name}? Their sessions keep their slot but lose the speaker.`,
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: `Delete ${person.name}?`,
+      body: 'Their sessions keep their slot and lose the speaker. The bin does not hold profiles, so this cannot be undone — to fold a duplicate into another profile, use Merge instead.',
+    });
+    if (!ok) return;
     try {
       await api.deletePerson(slug, person.id);
       data.apply({ type: 'person.deleted', entity: { id: person.id } });
@@ -639,7 +712,15 @@ export function AdminPage() {
   };
 
   const setArchived = async (archived: boolean) => {
-    if (archived && !window.confirm('Archive this event? It becomes read-only for everyone.')) {
+    if (
+      archived &&
+      !(await confirm({
+        title: 'Archive this event?',
+        body: 'It becomes read-only for everyone: nobody can add, edit or delete anything until it is un-archived here. Nothing is deleted, and it can be turned off again.',
+        confirmLabel: 'Archive',
+        danger: false,
+      }))
+    ) {
       return;
     }
     try {
@@ -1000,30 +1081,39 @@ export function AdminPage() {
                 placeholder="Name, @username or UID"
                 className="ml-auto w-48 rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs text-stone-700 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-200"
               />
-              {/* Two orders, because there are two questions: "where is
-                  so-and-so in the list" and "who is actually still here". */}
-              <button
-                type="button"
-                onClick={() => setPeopleSort((s) => (s === 'name' ? 'seen' : 'name'))}
-                className="rounded-lg border border-stone-300 px-2 py-1 text-xs font-medium text-stone-600 hover:border-stone-500 dark:border-stone-600 dark:text-stone-300"
-              >
-                {peopleSort === 'name' ? 'By name' : 'By last seen'}
-              </button>
             </div>
 
             {/* A header, because this is a table now: six facts about a
                 person, the same six on every row, and an organiser reading
                 down one column should not have to work out which is which.
-                The widths are shared with the rows below. */}
-            <div
-              aria-hidden="true"
-              className="flex items-center gap-2 border-b border-stone-200 pb-1 text-[0.65rem] font-semibold uppercase tracking-wide text-stone-400 dark:border-stone-700 dark:text-stone-500"
-            >
-              <span className={PEOPLE_COL.name}>Name</span>
-              <span className={PEOPLE_COL.username}>Username</span>
-              <span className={PEOPLE_COL.uid}>UID</span>
-              <span className={PEOPLE_COL.role}>Role</span>
-              <span className={PEOPLE_COL.seen}>Last seen</span>
+                The widths are shared with the rows below.
+
+                Every column that holds a fact also orders by it. It used to
+                be one button offering two of the five, which meant the
+                question "who has no username yet" or "who is still only a
+                viewer" had no answer but reading the whole list. The header
+                was `aria-hidden` while it was decoration; now that it is the
+                control, it is not. */}
+            <div className="flex items-center gap-2 border-b border-stone-200 pb-1 text-[0.65rem] font-semibold uppercase tracking-wide text-stone-400 dark:border-stone-700 dark:text-stone-500">
+              {(
+                [
+                  ['name', 'Name'],
+                  ['username', 'Username'],
+                  ['uid', 'UID'],
+                  ['role', 'Role'],
+                  ['seen', 'Last seen'],
+                ] as [PeopleSortColumn, string][]
+              ).map(([column, label]) => (
+                <PeopleHeader
+                  key={column}
+                  column={column}
+                  label={label}
+                  sort={peopleSort}
+                  onSort={sortBy}
+                  className={PEOPLE_COL[column]}
+                />
+              ))}
+              {/* Three buttons, not a fact — nothing to order by. */}
               <span className={`${PEOPLE_COL.actions} text-right`}>Actions</span>
             </div>
 
@@ -1051,7 +1141,7 @@ export function AdminPage() {
                         you
                       </span>
                     )}
-                    {person.codePending === true && (
+                    {person.codeState === 'pending' && (
                       <span
                         title="A speaker code was minted for them and has never been redeemed."
                         className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[0.65rem] font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
@@ -1079,31 +1169,17 @@ export function AdminPage() {
                     {person.holderUid == null ? '—' : person.holderUid.toUpperCase()}
                   </span>
 
-                  {/* The role *is* the status: a select for anyone who holds
-                      the profile, a badge for a profile nobody holds. */}
+                  {/* The role *is* the status: the badge everyone else sees,
+                      with a pencil in it for anyone who holds the profile, and
+                      a plain badge for a profile nobody holds. */}
                   <span className={PEOPLE_COL.role}>
                     {person.claimed ? (
-                      <select
-                        value={person.role ?? ''}
-                        onChange={(e) => void changeRole(person, e.target.value)}
-                        aria-label={`Role for ${person.name}`}
-                        title={
-                          person.role == null
-                            ? 'They hold no role here now, so they cannot see the event. Pick one to let them back in.'
-                            : 'What they may do here. Changing it takes effect at once.'
-                        }
-                        className="w-full rounded-lg border border-stone-300 bg-white px-1.5 py-1 text-xs font-medium text-stone-700 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-200"
-                      >
-                        {person.role == null && (
-                          <option value="" disabled>
-                            signed out
-                          </option>
-                        )}
-                        <option value="viewer">Viewer</option>
-                        <option value="user">{event.userRoleLabel || 'Attendee'}</option>
-                        <option value="speaker">Speaker</option>
-                        <option value="admin">Organiser</option>
-                      </select>
+                      <RoleControl
+                        role={person.role ?? null}
+                        userLabel={event.userRoleLabel}
+                        personName={person.name}
+                        onChange={(role) => void changeRole(person, role)}
+                      />
                     ) : (
                       <PersonStatusBadge person={person} userLabel={event.userRoleLabel} />
                     )}

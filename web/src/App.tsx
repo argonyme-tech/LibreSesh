@@ -1,6 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ProposalBoard } from './components/ProposalBoard';
-import { ToastProvider } from './components/ui';
+import { ConfirmProvider, ToastProvider } from './components/ui';
 import { AdminPage } from './pages/AdminPage';
 import { AgendaPage } from './pages/AgendaPage';
 import { EventListPage } from './pages/EventListPage';
@@ -17,6 +17,7 @@ export function App() {
     <BrowserRouter>
       <MeProvider>
       <ToastProvider>
+        <ConfirmProvider>
         <Routes>
           {/* `/` says what this is; the list of every event on the instance
               is a page you choose to open, not the front door. A public box
@@ -47,6 +48,7 @@ export function App() {
               event link than by a list of events that are not yours. */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </ConfirmProvider>
       </ToastProvider>
       </MeProvider>
     </BrowserRouter>

@@ -8,6 +8,16 @@ All notable changes to this project are documented here.
 
 ### Changed
 
+- **Deleting asks in the app's own voice, and says where things go.** Every
+  confirmation was a `window.confirm`: an alert drawn by the browser rather
+  than the app, one line, unstyled, and it freezes the page while it is up,
+  which on a phone in a hallway is indistinguishable from a hang. Worse, it
+  could not answer the question a person deleting something actually has.
+  "Delete X?" never said that a session goes to the bin and an organiser can
+  put it back, while a room, a tag, a track, a profile or a pitch simply
+  goes. Each dialog now says which of those two it is, and the archive
+  prompt no longer wears a red button for something that deletes nothing.
+
 - **A link no longer has to be on the web.** The rule was an allow-list of
   two schemes, http and https, which refused a session streamed over IPFS
   or Swarm, a magnet link, an RTMP feed from a room's own camera, and
@@ -40,6 +50,47 @@ All notable changes to this project are documented here.
   the day it goes to. Only under a day that had something in it: on an
   empty day the page already says so, and a lone button under nothing
   reads as the day's entire content.
+
+- **A role is the badge everyone already knows, with a pencil in it.** In
+  the People list the role was the one thing on the row rendered as a bare
+  `<select>`, so the column an organiser scans to answer "who runs this
+  event" was four identical grey boxes whose text had to be read one at a
+  time — while the header chip, the merge dialog and the invite page all
+  showed the same fact as a coloured badge. It is that badge now, in the
+  same colours, with a small pencil inside the pill and a menu that spells
+  out what each role may do rather than listing four bare words. The colour
+  map lives in one place, so the badge and the control cannot drift apart.
+
+- **A role can be changed from the profile page.** An organiser who opened
+  a profile usually came for the reason the profile was worth opening —
+  the role is wrong — and the only place to change it was the row they had
+  just left. The role now sits under the name, organisers only, as the same
+  editable badge; a profile nobody holds shows why it has none instead.
+
+- **Every column of the People table sorts, both ways.** One button offered
+  two of the five orders — by name, or by last seen — so "who has no
+  username yet", "who is still only a viewer" and "whose device is this
+  UID" could only be answered by reading the whole list. Each heading is
+  now the control that orders by it, with an arrow on the one in force.
+
+  A column opens the way that column is usually asked rather than always
+  ascending: last seen starts at the most recent, role starts at the
+  organisers, names start at A. The second click reverses it. Rows with
+  nothing in the column — no username, no UID, never seen — stay at the
+  bottom either way, and full name breaks every tie, so a role change
+  somewhere else in the event cannot shuffle rows that did not change.
+
+- **The profile page says whether a speaker code was ever generated.**
+  Speaker access knew only about a phrase minted in that page's own
+  lifetime, so an organiser returning the next day was offered "Generate
+  phrase" whether they had already sent one or not — and the only way to
+  find out was to mint a second, which silently invalidates the first. The
+  section now reads the code's state off the person: **code unused** for a
+  phrase still sitting in an unread message, **code used** once it has been
+  typed at the gate, and nothing when none exists, with Revoke switched off
+  rather than hidden. `PersonDto.codePending` became `codeState`, three
+  states, because the boolean could answer "are they still waiting?" but
+  never "did I ever send them one?".
 
 ## [0.2.3] — 2026-09-02
 
