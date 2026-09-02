@@ -25,7 +25,30 @@ import {
   type PeopleFilter,
   type PeopleSort,
 } from '../lib/people';
-import { PersonLine } from '../components/PersonLine';
+import { PersonStatusBadge } from '../components/PersonLine';
+
+/**
+ * The People table's columns, shared by the header and every row so the two
+ * cannot drift apart. Widths are fixed rather than content-sized because the
+ * point of the column is reading *down* it: two people called Ada Lovelace
+ * are told apart by the username and UID beside them, and those have to line
+ * up to be compared. The page is `max-w-3xl`, so this is the budget — the
+ * session count moved into the name cell's tooltip to make room.
+ */
+const PEOPLE_COL = {
+  name: 'min-w-0 flex-1',
+  username: 'w-20 shrink-0 sm:w-24',
+  uid: 'hidden w-16 shrink-0 sm:block',
+  role: 'w-24 shrink-0',
+  seen: 'hidden w-14 shrink-0 sm:block',
+  actions: 'w-40 shrink-0',
+};
+
+/** One size for every action, so the column is a column. */
+const peopleActionClass =
+  'w-[4.25rem] rounded-lg border border-stone-300 bg-white px-1 py-1 text-xs font-semibold ' +
+  'text-stone-700 hover:border-stone-500 dark:border-stone-600 dark:bg-stone-900 ' +
+  'dark:text-stone-200 dark:hover:border-stone-400';
 import { MergeModal } from '../components/MergeModal';
 import { auditKeepField, parseNumberField, weekRailFromField } from '../lib/numberField';
 import { AdminBreaks, dayName } from './AdminBreaks';
@@ -923,24 +946,89 @@ export function AdminPage() {
               </button>
             </div>
 
+            {/* A header, because this is a table now: six facts about a
+                person, the same six on every row, and an organiser reading
+                down one column should not have to work out which is which.
+                The widths are shared with the rows below. */}
+            <div
+              aria-hidden="true"
+              className="flex items-center gap-2 border-b border-stone-200 pb-1 text-[0.65rem] font-semibold uppercase tracking-wide text-stone-400 dark:border-stone-700 dark:text-stone-500"
+            >
+              <span className={PEOPLE_COL.name}>Name</span>
+              <span className={PEOPLE_COL.username}>Username</span>
+              <span className={PEOPLE_COL.uid}>UID</span>
+              <span className={PEOPLE_COL.role}>Role</span>
+              <span className={PEOPLE_COL.seen}>Last seen</span>
+              <span className={`${PEOPLE_COL.actions} text-right`}>Actions</span>
+            </div>
+
             <ul className="mb-4">
               {shownPeople.map((person) => (
                 <li
                   key={person.id}
-                  className="flex flex-wrap items-center gap-2 border-b border-stone-100 py-1.5 last:border-0 dark:border-stone-800"
+                  className="flex items-center gap-2 border-b border-stone-100 py-1.5 last:border-0 dark:border-stone-800"
                 >
-                  <PersonLine person={person} userLabel={event.userRoleLabel} />
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    {person.claimed && (
+                  <span
+                    className={`${PEOPLE_COL.name} flex items-baseline gap-1.5`}
+                    title={
+                      (person.sessionCount ?? 0) === 0
+                        ? 'Not credited on any session'
+                        : `Credited on ${person.sessionCount} session${person.sessionCount === 1 ? '' : 's'}`
+                    }
+                  >
+                    <span className="truncate text-sm font-medium">{person.name}</span>
+                    {/* Your own row, pinned to the top by `filterPeople`. */}
+                    {person.isMine && (
+                      <span
+                        title="This device — the profile you are signed in as"
+                        className="shrink-0 rounded-full bg-stone-200 px-1.5 py-0.5 text-[0.65rem] font-semibold text-stone-600 dark:bg-stone-700 dark:text-stone-300"
+                      >
+                        you
+                      </span>
+                    )}
+                    {person.codePending === true && (
+                      <span
+                        title="A speaker code was minted for them and has never been redeemed."
+                        className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[0.65rem] font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                      >
+                        code
+                      </span>
+                    )}
+                  </span>
+
+                  <span
+                    className={`${PEOPLE_COL.username} truncate text-xs text-stone-500 dark:text-stone-400`}
+                    title={
+                      person.username === null
+                        ? 'Nobody holds this profile, so it has no username'
+                        : 'Their username in this event — what they post under'
+                    }
+                  >
+                    {person.username === null ? '—' : `@${person.username}`}
+                  </span>
+
+                  <span
+                    className={`${PEOPLE_COL.uid} truncate font-mono text-xs text-stone-400 dark:text-stone-500`}
+                    title="The identity holding this profile — the code the audit log names, and the same one at every event on this instance"
+                  >
+                    {person.holderUid == null ? '—' : person.holderUid.toUpperCase()}
+                  </span>
+
+                  {/* The role *is* the status: a select for anyone who holds
+                      the profile, a badge for a profile nobody holds. */}
+                  <span className={PEOPLE_COL.role}>
+                    {person.claimed ? (
                       <select
                         value={person.role ?? ''}
                         onChange={(e) => void changeRole(person, e.target.value)}
                         aria-label={`Role for ${person.name}`}
-                        className="rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs font-medium text-stone-700 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-200"
+                        title={
+                          person.role == null
+                            ? 'They hold no role here now, so they cannot see the event. Pick one to let them back in.'
+                            : 'What they may do here. Changing it takes effect at once.'
+                        }
+                        className="w-full rounded-lg border border-stone-300 bg-white px-1.5 py-1 text-xs font-medium text-stone-700 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-200"
                       >
-                        {/* Only reachable for somebody who left, or whose role
-                            an organiser took away; picking a real one lets
-                            them back in. */}
                         {person.role == null && (
                           <option value="" disabled>
                             signed out
@@ -951,37 +1039,55 @@ export function AdminPage() {
                         <option value="speaker">Speaker</option>
                         <option value="admin">Organiser</option>
                       </select>
+                    ) : (
+                      <PersonStatusBadge person={person} userLabel={event.userRoleLabel} />
                     )}
-                    {/* The survivor is the row you start from, which is why
-                        it is per-row rather than one button above the list. */}
-                    <SecondaryButton
-                      className="px-2.5 py-1 text-xs"
+                  </span>
+
+                  <span
+                    className={`${PEOPLE_COL.seen} truncate text-xs text-stone-400 dark:text-stone-500`}
+                    title={
+                      person.lastSeenAt == null
+                        ? 'Nobody holds this profile, so it has never been used'
+                        : `Last seen ${new Date(person.lastSeenAt).toLocaleString()}`
+                    }
+                  >
+                    {person.lastSeenAt == null ? '—' : relativeTime(person.lastSeenAt)}
+                  </span>
+
+                  {/* Three buttons the same size on every row, so the column
+                      reads as a column. Delete stays put rather than
+                      disappearing, and says why it is off. */}
+                  <span className={`${PEOPLE_COL.actions} flex justify-end gap-1`}>
+                    <button
+                      type="button"
                       onClick={() => setMerging(person)}
+                      title={`Fold a duplicate of ${person.name} into this profile`}
+                      className={peopleActionClass}
                     >
-                      Merge…
-                    </SecondaryButton>
+                      Merge
+                    </button>
                     <Link
                       to={`/e/${slug}/p/${person.id}`}
-                      // So the profile page sends them back to this tab rather
-                      // than out to the schedule they never came from.
                       state={{ back: { to: `/e/${slug}/admin?tab=people`, label: 'People' } }}
-                      className="rounded-lg border border-stone-300 bg-white px-2.5 py-1 text-xs font-semibold text-stone-700 hover:border-stone-500 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-stone-400"
+                      className={`${peopleActionClass} text-center`}
                     >
                       Edit
                     </Link>
-                    {/* Only for a profile nobody holds. Deleting one somebody
-                        holds would take away the profile they are credited
-                        and post under while they are still in the room; two
-                        rows for one human is what Merge is for. */}
-                    {!person.claimed && (
-                      <DangerButton
-                        className="px-2.5 py-1 text-xs"
-                        onClick={() => void removePerson(person)}
-                      >
-                        Delete
-                      </DangerButton>
-                    )}
-                  </div>
+                    <button
+                      type="button"
+                      disabled={person.claimed}
+                      onClick={() => void removePerson(person)}
+                      title={
+                        person.claimed
+                          ? 'They are in this event, so their profile cannot be deleted. Fold a duplicate in with Merge, or change their role.'
+                          : 'Remove this profile. Its sessions keep their slot and lose the speaker.'
+                      }
+                      className={`${peopleActionClass} enabled:text-red-700 enabled:hover:border-red-400 disabled:opacity-40 dark:enabled:text-red-400`}
+                    >
+                      Delete
+                    </button>
+                  </span>
                 </li>
               ))}
               {shownPeople.length === 0 && (

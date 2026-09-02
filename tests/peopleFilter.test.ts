@@ -142,6 +142,32 @@ describe('the People list', () => {
     });
   });
 
+  /** You are the row you most often want and the one you can identify
+   *  without reading it, so hunting for yourself alphabetically in a room of
+   *  two hundred is friction with nothing to show for it. */
+  it('puts you first, whatever the order or segment', () => {
+    const me = { ...attendee, isMine: true };
+    const withMe = [organiser, speaker, me, departed, shell];
+    expect(filterPeople(withMe, 'all', '', 'name')[0]?.id).toBe(me.id);
+    expect(filterPeople(withMe, 'all', '', 'seen')[0]?.id).toBe(me.id);
+    expect(filterPeople(withMe, 'arrived', '', 'name')[0]?.id).toBe(me.id);
+    // And keeps the rest in the order they asked for.
+    expect(filterPeople(withMe, 'all', '', 'name').map((p) => p.name)).toEqual([
+      'Sam Chen',
+      'Ada Lovelace',
+      'Alan Turing',
+      'Grace Hopper',
+      'Jo Park',
+    ]);
+  });
+
+  it('leaves you out when the segment does not hold you', () => {
+    const me = { ...attendee, isMine: true };
+    expect(filterPeople([organiser, me, shell], 'unclaimed', '', 'name').map((p) => p.id)).toEqual([
+      shell.id,
+    ]);
+  });
+
   it('applies the segment, the search and the order together', () => {
     expect(filterPeople(everyone, 'arrived', 'a', 'name').map((p) => p.name)).toEqual([
       'Ada Lovelace',

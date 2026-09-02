@@ -2,21 +2,9 @@ import { useMemo, useState } from 'react';
 import type { PersonDto } from '@shared/types';
 import { api } from '../lib/api';
 import { relativeTime, uid } from '../lib/format';
-import {
-  matchesSearch,
-  mergeConsequence,
-  personStatus,
-  sortPeople,
-  suggestDuplicates,
-} from '../lib/people';
-import { PersonLine } from './PersonLine';
-import {
-  Modal,
-  PrimaryButton,
-  RoleBadge,
-  SecondaryButton,
-  useToast,
-} from './ui';
+import { matchesSearch, mergeConsequence, sortPeople, suggestDuplicates } from '../lib/people';
+import { PersonLine, PersonStatusBadge } from './PersonLine';
+import { Modal, PrimaryButton, SecondaryButton, useToast } from './ui';
 
 /**
  * Fold a duplicate profile into this one (identity spec, B2).
@@ -168,8 +156,20 @@ export function MergeModal({
       title="Merge a duplicate"
       description={
         <>
-          Pick the profile to fold into <span className="font-medium">{survivor.name}</span>. You
-          will see what it does before anything happens.
+          Pick the profile to fold into <span className="font-medium">{survivor.name}</span>
+          {survivor.username !== null && (
+            <>
+              {' '}
+              <span className="text-stone-500 dark:text-stone-400">
+                @{survivor.username}
+                {survivor.holderUid != null && ` · ${survivor.holderUid.toUpperCase()}`}
+              </span>
+            </>
+          )}
+          {survivor.username === null && (
+            <span className="text-stone-500 dark:text-stone-400"> (nobody holds it yet)</span>
+          )}
+          . You will see what it does before anything happens.
         </>
       }
       wide
@@ -234,7 +234,6 @@ function PersonCard({
   caption: string;
   userLabel?: string;
 }) {
-  const status = personStatus(person);
   const sessions = person.sessionCount ?? 0;
   return (
     <div className="rounded-xl border border-stone-200 p-3 dark:border-stone-700">
@@ -251,17 +250,7 @@ function PersonCard({
         </p>
       )}
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        {status.kind === 'role' && <RoleBadge role={status.role} userLabel={userLabel} />}
-        {status.kind === 'unclaimed' && (
-          <span className="rounded-full border border-dashed border-stone-300 px-2 py-0.5 text-xs text-stone-500 dark:border-stone-600 dark:text-stone-400">
-            unclaimed
-          </span>
-        )}
-        {status.kind === 'signed-out' && (
-          <span className="rounded-full bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-600 dark:bg-stone-700 dark:text-stone-300">
-            signed out
-          </span>
-        )}
+        <PersonStatusBadge person={person} userLabel={userLabel} />
         <span className="text-xs text-stone-500 dark:text-stone-400">
           {sessions === 0 ? 'no sessions' : `${sessions} session${sessions === 1 ? '' : 's'}`}
         </span>
