@@ -119,6 +119,128 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
 ## High Priority
 
+- **Publishing a session: a link that works without the gate.** Every read
+  under `/api/e/:slug` sits behind `event.use(requireRole(db, 'viewer'))`
+  (`server/src/app.ts:69`), so today there is no way to show one session to
+  someone who has not been given a password. Sharing a session means sharing
+  the event, and the only link that exists — the invite QR — hands over a
+  role, which is the opposite of what "here is the talk I am giving" wants.
+
+  There is one precedent for reading before the gate and it is worth copying
+  the shape of, not the substance: `calendarRoutes` is mounted _above_ the
+  role check (`app.ts:66`, route at `routes/agenda.ts:71`) and authenticates
+  by `identities.ics_token` in `?token=` instead of a cookie. It still
+  refuses unless that token's owner holds a role, so it is not public — a
+  published session would be the first genuinely unauthenticated read in the
+  app, and the first place a wrong decision leaks a real event.
+
+  Two shapes to choose between, and this is the decision the item is waiting
+  on. **Live, flagged**: a `published_at` on `sessions`, plus a route above
+  the gate that reads the row now and strips what must not travel. Edits show
+  up immediately; the stripping is a filter that has to stay correct as
+  `SessionDto` grows. **Snapshot, copied**: publishing writes a frozen row
+  into a table nothing else joins to — the "unprotected DB area" — and the
+  public route reads only that table. Nothing private can leak by omission
+  because nothing private is in there, at the cost of a re-publish after
+  every edit and a second place a session's text lives.
+
+  What must not travel, either way: contributions are this app's comments —
+  `ContributionDto` (`shared/types.ts:273`) carries `kind` (`note` / `link` /
+  `question`), a `body`, `createdBy`, `createdByName` and a `hidden` flag —
+  and none of them go on a public page. Nor do stars, agendas, `createdBy` /
+  `createdByName` on the session itself, or anything about who is in the
+  room. Speakers are the exception a programme exists to show, but a
+  `PersonRef` leads to a profile carrying a bio, links and a claim state, so
+  decide what a public page renders for a speaker rather than linking to the
+  profile page and finding out. Anonymised contributions are a later
+  question, not this one.
+
+  Also to settle: who may publish (organiser only, or a speaker for their own
+  session), whether unpublishing is real revocation or only a hidden link,
+  whether the URL is guessable (`/s/:id`) or a capability (a random token
+  like the ics one), and what an unpublished-but-linked page says. And the
+  event's own visibility bounds it — a session inside an archived event
+  should not stay readable because a link was minted once.
+
+- **A session has no format, only who placed it.** `SessionType` already
+  exists (`shared/types.ts:4`) and it is `'official' | 'open'` — provenance,
+  not kind. Nothing anywhere says a session is a talk, a workshop or a panel,
+  so a reader cannot tell a five-minute lightning slot from a three-hour
+  hands-on one except by reading the description and the block height. Name
+  the new concept something other than "type" before writing a line of it, or
+  the two meanings will be one word in the DTO, the form and the filter.
+  **Format** is the honest word.
+
+  The candidate list, from the organiser's side: keynote (one speaker, large
+  room, sets the theme); talk (20–45 minutes plus Q&A); lightning talks (5
+  minutes, back to back — Ignite and Pecha Kucha are stricter variants with
+  auto-advancing slides); panel (3–5 people and a moderator); fireside chat
+  or interview (one guest, one interviewer, looser than a talk); workshop or
+  tutorial (hands-on, longer, participants bring laptops); poster session
+  (presenters stand by their work, attendees roam); demo or showcase (short
+  live walkthroughs in a shared room); hackathon or sprint (collaborative
+  building over hours or days); field trip, site visit or excursion; walk &
+  talk; jam. That list is a seed for `seed.ts`, not a fixed enum — an
+  unconference invents formats, so they are event-defined and editable in
+  Manage Event, beside rooms, tracks and tags.
+
+  Which makes the real question whether this is a new table or a tag with a
+  flag. The shape is identical to `tags` (`001_baseline.sql:114`): per-event,
+  named, coloured, soft-deleted, `UNIQUE (event_id, name)`. The difference is
+  arity — a session carries many tags and exactly _one_ format — and that is
+  what argues for `session_formats` plus a nullable `format_id` column rather
+  than a reserved tag, because a tag that must be unique per session is a
+  rule the tag UI cannot express. Decide it explicitly; picking tags is
+  defensible if the constraint moves into the session form instead.
+
+  Downstream, once it exists: the format is the obvious second filter after
+  tags, the obvious thing to show on a block that has room for one more word,
+  and something the importer should accept by name the way it takes rooms and
+  tracks. Formats also want a default duration if they are to be more than a
+  label — a talk pre-filling 30 minutes and a workshop 120 is most of their
+  value in the session form.
+
+- **Mentioning a person, and somewhere for a mention to land.** Nothing in the
+  app addresses anyone. A `@name` typed into a description, a contribution, a
+  pitch or a bio is plain text that renders as plain text, so the way to tell
+  a co-host their room moved is to find them in the hallway. Two halves, and
+  the second is the larger one: resolving `@name`, and having a place a
+  resolved mention shows up.
+
+  Resolution is the cheap half and the app is already shaped for it. Display
+  names are unique per event (migration 009) and `people` rows are per event
+  (010), so `@ada` means exactly one person inside one event and means
+  nothing outside it — no global user table to consult, no ambiguity to
+  disambiguate. `NameResolver` (`server/src/eventIdentity.ts`) already turns
+  an identity into the name to show. Mentions belong in the same shared
+  renderer the links went into (`shared/links.ts`), so a mention written in a
+  bio and one written in a session description cannot disagree about what
+  parses — and so the parse happens once, on the server, rather than in each
+  of the four places markdown is rendered.
+
+  Delivery is the half with nothing built. There is no notification concept
+  at all: `sse.ts` is an in-process broker per event slug that carries
+  schedule changes to open tabs, which is the right transport and not the
+  storage — a mention has to survive a closed tab. That wants a
+  `notifications` table (recipient, event, source, read-at), a panel in the
+  header with an unread count, and answers to the questions such a table
+  always raises: what else creates one besides a mention (being added as a
+  speaker, a session you starred moving, a pitch of yours scheduled), whether
+  anything leaves the app by mail (nothing does today, and adding it changes
+  what this project stores about people), and pruning, since `pruneAudit`
+  already exists as the precedent for a table that would otherwise grow
+  forever.
+
+  Two edges that are specific to this app, and both are the reason to design
+  before building. **Merging**: identities merge (`mergePeople.ts`) and
+  profiles archive (migration 013), so notifications must follow a person
+  through a merge the way authorship does, or an organiser tidying up
+  duplicates silently deletes someone's inbox. **Unclaimed profiles**: an
+  organiser can type a speaker's name onto a session before that person ever
+  arrives, so a mention can be addressed to a profile with no identity behind
+  it. It should wait and be delivered on adoption (`adoptProfile` in
+  `people.ts`), not be dropped for having nowhere to go.
+
 - **A production event export is sitting untracked in a directory git will
   happily commit.** Noticed 2026-09-02 when a `git add -A` swept
   `_planning/valley-2026-09-02.json` (72 KB, 2447 lines), its `.import.json`
