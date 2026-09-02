@@ -7,26 +7,15 @@ Last updated: 2026-09-02
 
 ## In Progress
 
-- **Everyone who enters is a person — all six steps landed, none seen in a
-  browser.** Spec `_planning/specs/self-as-speaker-and-merge-ux.md`, plan
-  `_planning/plans/2026-09-02-everyone-is-a-person.md`, all of it written up
-  in CHANGELOG `[Unreleased]`. On `dev` 2026-09-02: `5142d10` (a `people`
-  row for every identity at the gate, required username, non-unique full
-  name, the "is that you?" prompt, migration 010), `79e5044` (the picker
-  offers you first; viewers are not creditable), `39003b5`
-  (`session.credit_others`, open by default), `2c913e3` (one People list
-  with a role control; `/attendees` removed), `3f353a0` (the merge dialog),
-  `3d19d74` (the way back from a profile). 730 tests, lint clean.
-
-  **What is left is looking at it.** Four screens changed and none has been
-  opened: the gate (required username, the "is that you?" prompt), Manage →
-  People (one dense list, segments, search, role select), the merge dialog
-  (suggestions, search, confirm step), and the profile page (two names, the
-  back link). The gate is the one to check first — it is the only screen
-  every attendee must get through, and it now refuses an empty name.
-
-Working on `dev`; `main` is the released line and only takes merges. The
-breaks rework has landed — `feat/event-level-breaks` (`5e53811`) is an
+Working on `dev`; `main` is the released line and only takes merges.
+**`dev` is seven commits ahead of `origin/dev`, which is still at
+`5142d10`** — the identity and People work from `79e5044` to `354fc6b` has
+not been pushed. That whole spec
+(`_planning/specs/self-as-speaker-and-merge-ux.md`, six steps, plan at
+`_planning/plans/2026-09-02-everyone-is-a-person.md`) is code-complete as
+of 2026-09-02 and written up in CHANGELOG `[Unreleased]`; 730 tests, lint
+clean, build clean. What is left of it is the browser pass under Blockers.
+The breaks rework has landed — `feat/event-level-breaks` (`5e53811`) is an
 ancestor of `dev` — so its code half is done and written up in CHANGELOG
 `[Unreleased]` and ARCHITECTURE §Breaks; what is left of it is the browser
 confirmation under Blockers. 0.2.0 was tagged 2026-08-30; what shipped is in
@@ -58,10 +47,43 @@ lives in `_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
 
 ## Blockers
 
-None. The breaks band was confirmed working in a browser on 2026-09-01, and
-the identity design question that sat here is decided and shipped — see
-`_planning/specs/identity-and-people.md` §Decisions and CHANGELOG
-`[Unreleased]`.
+- **Nobody has opened the identity work in a browser.** Four screens changed
+  on 2026-09-02 and none has been looked at: the **gate** (a username is now
+  required, and arriving under the name of an unclaimed profile asks "is that
+  you?"), **Manage → People** (one dense list with segments, search, a role
+  select and Merge on every row), the **merge dialog** (suggestions, search,
+  a confirm step naming what this merge does), and the **profile page** (full
+  name with `@username` under it, and a back link that returns to the People
+  tab). Start at the gate: it is the only screen every attendee has to get
+  through, and it now refuses an empty name, so a mistake there locks
+  everyone out rather than merely looking wrong. Restart the dev stack
+  first — see the port note below.
+
+- **Waiting on a decision: whether to purge the local dangling objects from
+  the accidental commit.** Verified across every ref, both worktrees,
+  stashes and the whole object store on 2026-09-02: the Valley event export
+  is **in no commit on any branch or tag and was never pushed**. `origin/dev`
+  was pushed at 11:22 UTC; the accidental commit `d096fec` was made at 11:58
+  UTC and amended away a minute later, so nothing between those two moments
+  left the machine. No reachable blob anywhere in history contains
+  export-shaped JSON.
+
+  What remains is local only: Git keeps `d096fec` in this clone's reflog, so
+  the file contents sit in `.git` as unreachable objects until the reflog
+  expires in ninety days. This removes them now:
+
+  ```
+  git reflog expire --expire-unreachable=now --all && git gc --prune=now
+  ```
+
+  It is irreversible and indiscriminate — it drops every unreachable object,
+  not only these. Nothing of value is in that set today, since both earlier
+  versions of the commit were superseded by `2c913e3`.
+
+  Also noticed while checking: `_planning/valley-2026-09-02.json` and its
+  `.import.json` twin are **no longer on disk**, though
+  `export-to-import.py` still is. If nobody deleted them deliberately, an
+  editor buffer may be the last copy.
 
 **Kept from the breaks investigation, because it will happen again: when the
 UI looks stale, check `ss -tlnp | grep 3000` and the start time of whatever
@@ -79,6 +101,46 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
 ## High Priority
 
+- **A person cannot claim the shell an organiser left for them.** Asked for
+  2026-09-02. Three routes exist from "an organiser added *Marcel Jackisch*
+  as a speaker" to "that profile is mine", and all three need somebody else
+  or an exact coincidence: an organiser mints a **speaker code** and sends
+  it; an organiser **merges** two profiles, having to work out which way
+  round; or the **gate prompt** fires, which it only does when the username
+  you type matches the shell's full name case-insensitively — so entering as
+  `marcel` against a shell called *Marcel Jackisch* misses it entirely. What
+  is missing is the direct one: you are in, you can see the shell, you say
+  "that is me".
+
+  **The reason it is not just an endpoint.** A shell is usually credited on
+  sessions, and claiming it makes `speaksFor` true, which is the right to
+  rewrite those talks. Unguarded, anyone holding the event password could
+  claim the keynote speaker's profile and edit their description. Each of the
+  three routes above is gated for exactly that reason. So this needs a
+  decision before it needs code:
+
+  1. **A capability, `person.claim_listed`, off by default.** Cheapest, and
+     it fits the matrix that already exists. An organiser running an event
+     where the speakers are all pre-entered turns it on and stops answering
+     emails. Recommended.
+  2. **A claim that waits for approval.** Safe under any setting, and the
+     People list is the natural inbox — a "2 waiting" segment beside the
+     others. More to build, and the app has no notifications, so an organiser
+     only sees it when they look.
+  3. **Restrict to shells with nothing on them.** Safe and nearly useless:
+     the case people actually hit is a shell that already has the sessions.
+
+  Whichever way, three things come with it: audit the claim, since it is a
+  privilege change; give an organiser a way to take it back, which nothing
+  can do today except a merge; and leave the role alone, per the standing
+  decision that role changes stay explicit.
+
+  Most of the parts exist. `suggestDuplicates` (`web/src/lib/people.ts`)
+  already ranks profiles by name against a person and would put the right
+  shell first; `PersonLine` renders the row; `adoptProfile`
+  (`server/src/people.ts`) does the write, and the gate already calls it.
+  The UI is an "Is one of these you?" section on your own profile page.
+
 - **A production event export is sitting untracked in a directory git will
   happily commit.** Noticed 2026-09-02 when a `git add -A` swept
   `_planning/valley-2026-09-02.json` (72 KB, 2447 lines), its `.import.json`
@@ -90,12 +152,15 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   attendees' names, in a repo whose upstream is public
   (`Valley-of-the-Commons/LibreSesh`).
 
-  The fix is a line or two: ignore `_planning/*.json` and
-  `_planning/*.import.json` (or invert it — ignore `_planning/` and
-  un-ignore `specs/`, `plans/` and the files meant to be shared). Decide
-  which way round, because the inverted form is the one that stays safe as
-  new working files appear. Nothing has leaked: the files have never been
-  committed, on any ref.
+  **Nothing leaked** — verified 2026-09-02 across every ref, both worktrees,
+  stashes and the object store; details under Blockers. The hole is still
+  open, though, and that is what this item is: the next `git add -A` in that
+  directory does the same thing again.
+
+  The fix is a line or two: ignore `_planning/*.json`, or invert it and
+  ignore `_planning/` while un-ignoring `specs/`, `plans/` and anything else
+  meant to be shared. Decide which way round, because the inverted form is
+  the one that stays safe as new working files appear.
 
 - **An event this app exported cannot be imported back.** Found 2026-09-02
   restoring a production event onto a fresh staging box: the export downloads,

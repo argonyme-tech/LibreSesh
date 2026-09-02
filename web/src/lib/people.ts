@@ -67,16 +67,27 @@ export function sortPeople(people: PersonDto[], sort: PeopleSort): PersonDto[] {
   return rows.sort((a, b) => (b.lastSeenAt ?? '').localeCompare(a.lastSeenAt ?? ''));
 }
 
+/**
+ * The People list: what the segment and the search box leave, in order, with
+ * **you first**.
+ *
+ * You are the one row an organiser can always identify without reading it,
+ * and the one they most often want — checking their own role, opening their
+ * own profile, or working out which of two similar names is the device they
+ * are sitting at. Hunting for yourself alphabetically in a room of two
+ * hundred is the kind of small friction that makes a list feel hostile.
+ */
 export function filterPeople(
   people: PersonDto[],
   filter: PeopleFilter,
   query: string,
   sort: PeopleSort = 'name',
 ): PersonDto[] {
-  return sortPeople(
+  const shown = sortPeople(
     people.filter((p) => matchesFilter(p, filter) && matchesSearch(p, query)),
     sort,
   );
+  return [...shown.filter((p) => p.isMine), ...shown.filter((p) => !p.isMine)];
 }
 
 /** How many each segment would show, for the counts on the control. Ignores
