@@ -27,6 +27,14 @@ All notable changes to this project are documented here.
   takes it only on a yes. Spec:
   `_planning/specs/self-as-speaker-and-merge-ux.md`.
 
+- **The speaker field offers you.** Your own row is pinned to the top of
+  the picker as "· you", claimed rows show `@username` so two namesakes can
+  be told apart, and a new session or pitch by anyone but an organiser
+  starts credited to its author, one click to remove. A viewer's person is
+  visible like anyone's — they star and post — but is not on offer as a
+  speaker (`PersonDto.creditable`), and the server refuses a non-organiser
+  crediting one. Organisers may still credit anyone.
+
 - **A session can be given by more than one person.** `sessions.speaker_id`
   held exactly one, which is wrong for most of what an unconference actually
   runs: a panel, a pair, a workshop with two facilitators, a talk and its

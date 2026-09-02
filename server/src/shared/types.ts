@@ -141,6 +141,19 @@ export interface PersonDto {
   isMine: boolean;
   /** True when some attendee owns it, so only they and organisers may edit. */
   claimed: boolean;
+  /** The holder's username in this event — what the room calls them — or
+   *  null for a profile nobody has claimed. Public: it is on everything
+   *  they post already. */
+  username: string | null;
+  /**
+   * Whether this person may be credited as a speaker by someone who is not
+   * an organiser: true for an unclaimed profile and for a holder with the
+   * attendee role or above, false for a viewer's — a livestream audience
+   * did not come to give a talk. One boolean, not the role, so nothing
+   * else about who runs the event is disclosed. Organisers may credit
+   * anyone.
+   */
+  creditable: boolean;
   /**
    * Organisers only — absent for everyone else, who have no business knowing
    * who runs the event. The role held by the identity that claims this

@@ -258,6 +258,7 @@ export function ProposalBoard() {
         <ProposalModal
           proposal={editing.proposal}
           people={bundle.people}
+          role={bundle.role}
           tags={bundle.tags}
           saving={saving}
           onCancel={() => setEditing(null)}

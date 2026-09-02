@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { PersonDto, ProposalDto, TagDto } from '@shared/types';
+import type { PersonDto, ProposalDto, Role, TagDto } from '@shared/types';
 import type { ProposalWrite } from '../lib/api';
 import { SpeakerCombobox, type SpeakerChoice } from './SpeakerCombobox';
 import {
@@ -17,6 +17,7 @@ import {
 export interface ProposalModalProps {
   proposal?: ProposalDto;
   people: PersonDto[];
+  role: Role;
   tags: TagDto[];
   saving: boolean;
   onCancel: () => void;
@@ -29,6 +30,7 @@ export interface ProposalModalProps {
 export function ProposalModal({
   proposal,
   people,
+  role,
   tags,
   saving,
   onCancel,
@@ -39,9 +41,14 @@ export function ProposalModal({
   const [description, setDescription] = useState(proposal?.description ?? '');
   // A pitch is by one person, so this is a list of at most one — the control
   // is shared with the session form, which takes as many as are giving it.
-  const [speaker, setSpeaker] = useState<SpeakerChoice[]>(
-    () => (proposal?.speakerId === null || proposal === undefined ? [] : [proposal.speakerId]),
-  );
+  // A new pitch by anyone but an organiser starts as their own: a pitch is
+  // "I would give this", and it is one click to say otherwise.
+  const isAdmin = role === 'admin';
+  const [speaker, setSpeaker] = useState<SpeakerChoice[]>(() => {
+    if (proposal) return proposal.speakerId === null ? [] : [proposal.speakerId];
+    const mine = people.find((p) => p.isMine);
+    return !isAdmin && mine ? [mine.id] : [];
+  });
   const [tagIds, setTagIds] = useState<number[]>(proposal?.tagIds ?? []);
   const [error, setError] = useState<string | null>(null);
 
@@ -94,7 +101,13 @@ export function ProposalModal({
         />
       </Field>
       <Field label="Speaker or host">
-        <SpeakerCombobox people={people} value={speaker} onChange={setSpeaker} max={1} />
+        <SpeakerCombobox
+          people={people}
+          value={speaker}
+          onChange={setSpeaker}
+          max={1}
+          isAdmin={isAdmin}
+        />
       </Field>
       <Field label="Description" hint="Markdown is supported.">
         <textarea

@@ -90,7 +90,10 @@ export function proposalRoutes(ctx: Ctx): Router {
 
       const now = new Date().toISOString();
       const id = ctx.db.transaction((): number => {
-        const speakerId = resolveSpeaker(ctx.db, req.event.id, body, null);
+        const speakerId = resolveSpeaker(ctx.db, req.event.id, body, null, {
+          identityId: req.identity.id,
+          role: req.role,
+        });
         const newId = Number(
           ctx.db
             .prepare(
@@ -143,7 +146,10 @@ export function proposalRoutes(ctx: Ctx): Router {
       if (body.tagIds) assertTagsBelong(ctx.db, req.event.id, body.tagIds);
 
       ctx.db.transaction(() => {
-        const speakerId = resolveSpeaker(ctx.db, req.event.id, body, row.speaker_id);
+        const speakerId = resolveSpeaker(ctx.db, req.event.id, body, row.speaker_id, {
+          identityId: req.identity.id,
+          role: req.role,
+        });
         ctx.db
           .prepare(
             `UPDATE proposals SET title = ?, description = ?, speaker_id = ?, updated_at = ?

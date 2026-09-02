@@ -240,6 +240,48 @@ describe('speaker profiles', () => {
   });
 
   /**
+   * Who may be put on a session by someone who is not an organiser. A
+   * viewer's person is visible like anyone's — they star and post — but is
+   * not on offer as a speaker, and the server says so too.
+   */
+  describe('who may be credited', () => {
+    it('marks a viewer’s person, and only theirs, as not creditable', async () => {
+      await admin.post('/api/e/testconf/people').send({ name: 'Shell' }).expect(201);
+      const bundle = await user.get('/api/e/testconf/bundle').expect(200);
+      const people = bundle.body.people as {
+        name: string;
+        username: string | null;
+        creditable: boolean;
+        isMine: boolean;
+      }[];
+      const viewers = people.filter((p) => !p.creditable);
+      expect(viewers).toHaveLength(1);
+      expect(viewers[0]?.username).not.toBeNull();
+      expect(people.find((p) => p.name === 'Shell')).toMatchObject({
+        username: null,
+        creditable: true,
+      });
+      const mine = people.find((p) => p.isMine);
+      expect(mine).toMatchObject({ creditable: true, username: bundle.body.displayName });
+    });
+
+    it('refuses an attendee crediting a viewer, and lets an organiser', async () => {
+      const bundle = await viewer.get('/api/e/testconf/bundle').expect(200);
+      const viewersPerson = bundle.body.people.find((p: { isMine: boolean }) => p.isMine);
+      const refused = await makeSession(user, { speakers: [viewersPerson.id] }).expect(403);
+      expect(refused.body.error.code).toBe('forbidden');
+      // By name too: the lookup lands on the same person.
+      await makeSession(user, { speakers: [viewersPerson.name] }).expect(403);
+      await makeSession(admin, { speakers: [viewersPerson.id] }).expect(201);
+      // A viewer may still be credited on a pitch by an organiser, not by an attendee.
+      await user
+        .post('/api/e/testconf/proposals')
+        .send({ title: 'Pitch', speakerId: viewersPerson.id })
+        .expect(403);
+    });
+  });
+
+  /**
    * An organiser types "Ada Lovelace" onto a talk before Ada arrives. When she
    * enters under that name the gate must not hand the profile over silently —
    * the same name can be a different person — but it must offer it.

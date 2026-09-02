@@ -10,7 +10,7 @@ import {
 import type { PersonRow, SessionRow } from '../db.js';
 import { badRequest, forbidden, notFound } from '../errors.js';
 import { rekeyIdentityWork } from '../mergeIdentityWork.js';
-import { loadProposalDtos, loadSessionDto, toPersonDto } from '../mappers.js';
+import { factsFor, loadProposalDtos, loadSessionDto, toPersonDto } from '../mappers.js';
 import { ensureOwnProfile } from '../people.js';
 import { requireCapability } from '../permissions.js';
 import { limit } from '../ratelimit.js';
@@ -30,6 +30,10 @@ import type { PersonDetailDto } from '../shared/types.js';
  */
 export function peopleRoutes(ctx: Ctx): Router {
   const router = Router({ mergeParams: true });
+
+  /** The public DTO for one row — what the response and the broadcast carry. */
+  const personDto = (req: { event: { id: number }; identity: { id: number } }, id: number) =>
+    toPersonDto(load(req.event.id, id), req.identity.id, factsFor(ctx.db, req.event.id, id));
 
   const load = (eventId: number, id: number): PersonRow => {
     const row = ctx.db
@@ -65,7 +69,7 @@ export function peopleRoutes(ctx: Ctx): Router {
       .all(req.event.id, person.id);
 
     const detail: PersonDetailDto = {
-      person: toPersonDto(person, req.identity.id),
+      person: personDto(req, person.id),
       sessions: sessions.map((s) => loadSessionDto(ctx.db, s)),
     };
     res.json(detail);
@@ -101,7 +105,7 @@ export function peopleRoutes(ctx: Ctx): Router {
         );
       write(row, body);
 
-      const dto = toPersonDto(load(req.event.id, row.id), req.identity.id);
+      const dto = personDto(req, row.id);
       audit(ctx.db, {
         identityId: req.identity.id,
         eventId: req.event.id,
@@ -137,7 +141,7 @@ export function peopleRoutes(ctx: Ctx): Router {
             now,
           ).lastInsertRowid,
       );
-      const dto = toPersonDto(load(req.event.id, id), req.identity.id);
+      const dto = personDto(req, id);
       audit(ctx.db, {
         identityId: req.identity.id,
         eventId: req.event.id,
@@ -166,7 +170,7 @@ export function peopleRoutes(ctx: Ctx): Router {
       const body = parse(personPatchSchema, req.body);
       write(person, body);
 
-      const dto = toPersonDto(load(req.event.id, person.id), req.identity.id);
+      const dto = personDto(req, person.id);
       audit(ctx.db, {
         identityId: req.identity.id,
         eventId: req.event.id,
@@ -261,7 +265,7 @@ export function peopleRoutes(ctx: Ctx): Router {
         }
       })();
 
-      const dto = toPersonDto(load(req.event.id, survivor.id), req.identity.id);
+      const dto = personDto(req, survivor.id);
       audit(ctx.db, {
         identityId: req.identity.id,
         eventId: req.event.id,
@@ -315,7 +319,7 @@ export function peopleRoutes(ctx: Ctx): Router {
       ctx.broker.publish(
         req.event.slug,
         'person.updated',
-        toPersonDto(load(req.event.id, person.id), req.identity.id),
+        personDto(req, person.id),
       );
       res.json({ phrase });
     },

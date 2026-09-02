@@ -83,9 +83,15 @@ export function SessionModal({
 
   const existing = session ? place(session, timezone) : null;
   const [title, setTitle] = useState(session?.title ?? '');
-  const [speakers, setSpeakers] = useState<SpeakerChoice[]>(
-    () => session?.speakers.map((p) => p.id) ?? [],
-  );
+  // A new session by anyone but an organiser starts credited to them: at an
+  // unconference you mostly host what you book, and it is one click to
+  // remove. An organiser's starts empty — they are usually placing someone
+  // else's talk.
+  const [speakers, setSpeakers] = useState<SpeakerChoice[]>(() => {
+    if (session) return session.speakers.map((p) => p.id);
+    const mine = people.find((p) => p.isMine);
+    return !isAdmin && mine ? [mine.id] : [];
+  });
   const [description, setDescription] = useState(session?.description ?? '');
   const [livestreamUrl, setLivestreamUrl] = useState(session?.livestreamUrl ?? '');
   const [roomId, setRoomId] = useState<number>(session?.roomId ?? allowedRooms[0]?.id ?? 0);
@@ -233,7 +239,12 @@ export function SessionModal({
             />
           </Field>
           <Field label="Speaker or host">
-            <SpeakerCombobox people={people} value={speakers} onChange={setSpeakers} />
+            <SpeakerCombobox
+              people={people}
+              value={speakers}
+              onChange={setSpeakers}
+              isAdmin={isAdmin}
+            />
           </Field>
           <Field label="Description" hint="Markdown is supported.">
             <textarea

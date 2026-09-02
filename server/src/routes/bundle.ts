@@ -18,8 +18,9 @@ import {
   toBreakDto,
   toContributionDto,
   toEventDto,
+  NOBODY,
+  personFacts,
   toPersonDto,
-  personRosterFacts,
   toRoomDto,
   toSessionDto,
   toTagDto,
@@ -32,7 +33,6 @@ import { limit } from '../ratelimit.js';
 import { trackWindowsFor } from '../trackHours.js';
 import { getSession } from '../sessionRules.js';
 
-const UNCLAIMED = { role: null, holderUid: null, codePending: false } as const;
 
 /** Read endpoints. The whole event fits comfortably in one JSON payload, so the
  *  client fetches a bundle once and patches it from the SSE stream. */
@@ -89,7 +89,7 @@ export function bundleRoutes(ctx: Ctx): Router {
       ctx.db,
       sessions.map((s) => s.id),
     );
-    const roster = req.role === 'admin' ? personRosterFacts(ctx.db, eventId) : undefined;
+    const facts = personFacts(ctx.db, eventId);
 
     // Admins see hidden contributions in the count; everyone else does not.
     const counts = ctx.db
@@ -119,15 +119,12 @@ export function bundleRoutes(ctx: Ctx): Router {
           speakers.get(s.id) ?? [],
         ),
       ),
-      // Who holds each profile, and whether they have ever used it, is for
-      // organisers: an attendee has no business being handed a list of who
-      // runs the event. `roster` is undefined for everyone else, and the
-      // fields are then absent rather than null — "not disclosed to you", not
-      // "nobody holds this". A person the query missed simply has no identity.
+      // Who holds each profile, at what role, and whether they have ever
+      // used it is for organisers only — an attendee has no business being
+      // handed a list of who runs the event. Username and whether a person
+      // may be credited are public: the picker needs them.
       people: people.map((p) =>
-        roster === undefined
-          ? toPersonDto(p, req.identity.id)
-          : toPersonDto(p, req.identity.id, roster.get(p.id) ?? UNCLAIMED),
+        toPersonDto(p, req.identity.id, facts.get(p.id) ?? NOBODY, req.role === 'admin'),
       ),
       proposals: loadProposalDtos(ctx.db, eventId, req.identity.id),
       starredSessionIds: ctx.db

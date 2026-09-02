@@ -1,5 +1,32 @@
 import type { Db } from './db.js';
-import { badRequest } from './errors.js';
+import { badRequest, forbidden } from './errors.js';
+import type { Role } from './shared/types.js';
+
+/** Who is doing the crediting. Organisers may credit anyone; everyone else
+ *  is held to `creditable` (see `PersonDto`). */
+export interface Actor {
+  identityId: number;
+  role: Role;
+}
+
+/**
+ * May a non-organiser put this person on a session? Not when the person is
+ * a viewer's: a livestream audience did not come to give a talk, and the
+ * picker never offers them — this is the server saying the same thing.
+ */
+function assertCreditable(db: Db, eventId: number, personId: number, actor?: Actor): void {
+  if (!actor || actor.role === 'admin') return;
+  const row = db
+    .prepare<[number, number], { identity_id: number | null; role: Role | null }>(
+      `SELECT p.identity_id, r.role
+         FROM people p
+    LEFT JOIN roles r ON r.identity_id = p.identity_id AND r.event_id = p.event_id
+        WHERE p.id = ? AND p.event_id = ?`,
+    )
+    .get(personId, eventId);
+  if (row?.identity_id === actor.identityId) return;
+  if (row?.role === 'viewer') throw forbidden('That person is here to watch, not to speak');
+}
 
 /** Collapse the whitespace people paste in: `" ada   lovelace "` → `"ada lovelace"`. */
 export const normalizeSpeakerName = (raw: string): string => raw.trim().replace(/\s+/g, ' ');
@@ -19,6 +46,7 @@ export function resolveSpeaker(
   eventId: number,
   body: { speakerId?: number | null; speakerName?: string },
   current: number | null,
+  actor?: Actor,
 ): number | null {
   if (body.speakerId !== undefined) {
     if (body.speakerId === null) return null;
@@ -28,6 +56,7 @@ export function resolveSpeaker(
       )
       .get(body.speakerId, eventId);
     if (!found) throw badRequest('Unknown speaker');
+    assertCreditable(db, eventId, found.id, actor);
     return found.id;
   }
 
@@ -42,7 +71,10 @@ export function resolveSpeaker(
         ORDER BY (identity_id IS NULL), id LIMIT 1`,
     )
     .get(eventId, name);
-  if (existing) return existing.id;
+  if (existing) {
+    assertCreditable(db, eventId, existing.id, actor);
+    return existing.id;
+  }
 
   const now = new Date().toISOString();
   return Number(
@@ -68,13 +100,14 @@ export function resolveSpeakers(
   db: Db,
   eventId: number,
   entries: readonly (number | string)[],
+  actor?: Actor,
 ): number[] {
   const out: number[] = [];
   for (const entry of entries) {
     const id =
       typeof entry === 'number'
-        ? resolveSpeaker(db, eventId, { speakerId: entry }, null)
-        : resolveSpeaker(db, eventId, { speakerName: entry }, null);
+        ? resolveSpeaker(db, eventId, { speakerId: entry }, null, actor)
+        : resolveSpeaker(db, eventId, { speakerName: entry }, null, actor);
     if (id !== null && !out.includes(id)) out.push(id);
   }
   return out;

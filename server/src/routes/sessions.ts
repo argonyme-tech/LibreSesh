@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireRole, requireWritable } from '../auth.js';
 import { audit } from '../audit.js';
 import type { Ctx } from '../context.js';
+import type { Role } from '../shared/types.js';
 import type { SessionRow } from '../db.js';
 import { badRequest, forbidden } from '../errors.js';
 import { loadSessionDto } from '../mappers.js';
@@ -25,7 +26,14 @@ import {
 import { MAX_REPEAT_DAYS, repeatDays, repeatSchema } from '../repeat.js';
 import { addDays, dateToUtcMs, DAY_MS } from '../shared/repeat.js';
 import { localDate, localMinuteOfDay, zonedTimeToUtc } from '../shared/time.js';
-import { resolveSpeakers, setSessionSpeakers, speaksFor } from '../speakers.js';
+import { resolveSpeakers, setSessionSpeakers, speaksFor, type Actor } from '../speakers.js';
+
+/** Who is crediting: organisers may name anyone, everyone else is held to
+ *  who may be credited. */
+const actor = (req: { identity: { id: number }; role: Role }): Actor => ({
+  identityId: req.identity.id,
+  role: req.role,
+});
 import { parse, sessionPatchSchema, sessionSchema } from '../validation.js';
 
 /** The session form's fields, plus the run of days to put them on. */
@@ -70,7 +78,7 @@ export function sessionRoutes(ctx: Ctx): Router {
 
     const now = new Date().toISOString();
     const id = ctx.db.transaction((): number => {
-      const speakerIds = resolveSpeakers(ctx.db, req.event.id, body.speakers ?? []);
+      const speakerIds = resolveSpeakers(ctx.db, req.event.id, body.speakers ?? [], actor(req));
       const info = ctx.db
         .prepare(
           `INSERT INTO sessions
@@ -184,7 +192,7 @@ export function sessionRoutes(ctx: Ctx): Router {
 
       const now = new Date().toISOString();
       const ids = ctx.db.transaction((): number[] => {
-        const speakerIds = resolveSpeakers(ctx.db, req.event.id, body.speakers ?? []);
+        const speakerIds = resolveSpeakers(ctx.db, req.event.id, body.speakers ?? [], actor(req));
         const insert = ctx.db.prepare(
           `INSERT INTO sessions
             (event_id, room_id, track_id, type, blocks_open_booking, title,
@@ -332,7 +340,7 @@ export function sessionRoutes(ctx: Ctx): Router {
         setSessionSpeakers(
           ctx.db,
           existing.id,
-          resolveSpeakers(ctx.db, req.event.id, body.speakers),
+          resolveSpeakers(ctx.db, req.event.id, body.speakers, actor(req)),
         );
       }
     })();

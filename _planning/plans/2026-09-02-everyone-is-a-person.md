@@ -29,12 +29,12 @@ One commit per step, tests with each. Steps 0–2 in the main session on
 
 ## Step 1 — "You" in the speaker picker
 
-- [ ] `PersonDto.creditable`; server refuses a non-organiser crediting a
+- [x] `PersonDto.creditable`; server refuses a non-organiser crediting a
       non-creditable person.
-- [ ] `SpeakerCombobox`: own row pinned as "· you", `@username` on claimed
+- [x] `SpeakerCombobox`: own row pinned as "· you", `@username` on claimed
       rows, non-creditable rows hidden for non-organisers.
-- [ ] Non-admin new session / pitch starts credited to self.
-- [ ] Tests.
+- [x] Non-admin new session / pitch starts credited to self.
+- [x] Tests.
 
 ## Step 2 — `session.credit_others` capability
 
