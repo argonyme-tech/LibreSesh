@@ -185,7 +185,7 @@ export const api = {
 
   // Formats — what kind of thing a session is. Managed like tags; the list is
   // whatever this event runs.
-  createFormat: (slug: string, body: { name: string; color?: string; defaultMin?: number | null }) =>
+  createFormat: (slug: string, body: { name: string; color?: string }) =>
     request<FormatDto>('POST', `/e/${encode(slug)}/formats`, body),
   updateFormat: (slug: string, id: number, body: Partial<Omit<FormatDto, 'id'>>) =>
     request<FormatDto>('PATCH', `/e/${encode(slug)}/formats/${id}`, body),

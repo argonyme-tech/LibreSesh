@@ -266,21 +266,12 @@ export const tagSchema = z.object({
 export const tagPatchSchema = tagSchema.partial();
 
 /**
- * A format — what kind of session it is. Same name-and-colour shape as a tag,
- * plus how long one usually runs. `defaultMin` is nullable and not merely
- * optional: "this format says nothing about length" is a setting an organiser
- * chooses, so clearing it has to be sendable.
+ * A format — what kind of session it is. Exactly a tag's shape: a name and a
+ * colour. Deliberately no length; see migration 015.
  */
 export const formatSchema = z.object({
   name: trimmed(40),
   color: colorSchema.optional(),
-  defaultMin: z
-    .number()
-    .int()
-    .min(5)
-    .max(24 * 60)
-    .nullable()
-    .optional(),
 });
 export const formatPatchSchema = formatSchema.partial();
 

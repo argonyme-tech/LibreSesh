@@ -142,8 +142,8 @@ export function eventRoutes(ctx: Ctx): Router {
       // same kinds of session, even though none of the sessions come along.
       ctx.db
         .prepare(
-          `INSERT INTO session_formats (event_id, name, color, default_min, sort_order)
-           SELECT ?, name, color, default_min, sort_order
+          `INSERT INTO session_formats (event_id, name, color, sort_order)
+           SELECT ?, name, color, sort_order
              FROM session_formats WHERE event_id = ? AND deleted_at IS NULL`,
         )
         .run(id, source.id);

@@ -116,16 +116,7 @@ const importTagSchema = z.object({ name: trimmed(40), color: colorSchema.optiona
 
 /** What kinds of session this event runs. Declared once, like rooms and tags,
  *  and referred to by name from each session. */
-const importFormatSchema = z.object({
-  name: trimmed(40),
-  color: colorSchema.optional(),
-  defaultMin: z
-    .number()
-    .int()
-    .min(5)
-    .max(24 * 60)
-    .nullish(),
-});
+const importFormatSchema = z.object({ name: trimmed(40), color: colorSchema.optional() });
 
 /**
  * Lunch, dinner, coffee. Wall-clock times like everything else in this
@@ -516,18 +507,12 @@ export function importEvent(
     assertNamesDistinct(formats, 'formats');
     const formatIds = new Map<string, number>();
     const insertFormat = db.prepare(
-      `INSERT INTO session_formats (event_id, name, color, default_min, sort_order)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO session_formats (event_id, name, color, sort_order) VALUES (?, ?, ?, ?)`,
     );
     // Document order is the running order, the way it is for rooms.
     formats.forEach((format, i) => {
-      const id = insertFormat.run(
-        eventId,
-        format.name,
-        format.color ?? '#6B7280',
-        format.defaultMin ?? null,
-        i,
-      ).lastInsertRowid;
+      const id = insertFormat.run(eventId, format.name, format.color ?? '#6B7280', i)
+        .lastInsertRowid;
       formatIds.set(key(format.name), Number(id));
     });
 

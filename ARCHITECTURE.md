@@ -60,7 +60,7 @@ every failure as `{ error: { code, message } }`.
 | `event_identities` | `(event, identity) → display name`, unique within the event |
 | `roles` | `(identity, event) → viewer\|user\|speaker\|admin` |
 | `rooms`, `tags` | Per event, soft-deleted |
-| `session_formats` | What kind of thing a session is — talk, workshop, panel. Per event, soft-deleted, ordered by the organiser's running order rather than by name. A session wears one (`sessions.format_id`, nullable); deleting a format clears it from them (migration 014) |
+| `session_formats` | What kind of thing a session is — talk, workshop, panel. A name and a colour, nothing else. Per event, soft-deleted, in the organiser's running order rather than by name. A session wears one (`sessions.format_id`, nullable); deleting a format clears it from them (migrations 014, 015) |
 | `breaks` | Lunch and friends: a label and local minutes of day, `date` null meaning every day. No room, no author, hard-deleted |
 | `sessions` | Scheduled: always has a room and a time; `blocks_open_booking` holds the floor against attendees |
 | `proposals` | Pitched: no room, no time, until an organiser places it |
@@ -115,10 +115,15 @@ fields called Type at opposite ends of one form would be indistinguishable.
 
 Formats are event-defined rather than an enum because an unconference invents
 them; `shared/formats.ts` ships a dozen suggestions the organiser clicks to
-create, and creates none of them on its own. The shape is the tags table plus
-`default_min`, the length the session form prefills when a format is picked on
-a *new* session — never on an existing one, where the length is a slot people
-may already have planned around.
+create, and creates none of them on its own. The shape is exactly the tags
+table: a name and a colour.
+
+**A format carries no length.** Migration 014 gave it one, which the session
+form prefilled, and migration 015 took it away again — it made one field answer
+two questions, the same mistake "type" made. A workshop is a workshop at ninety
+minutes or at a whole afternoon, and picking a format to *describe* a session
+should not silently retime it. How long a session runs is the session's, bounded
+by `shared/sessionLimits.ts`: five minutes to a day, in five-minute steps.
 
 ### Sessions that hold the floor
 

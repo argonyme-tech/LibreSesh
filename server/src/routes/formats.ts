@@ -44,8 +44,8 @@ export function formatRoutes(ctx: Ctx): Router {
     let id: number;
     if (clash && clash.deleted_at !== null) {
       ctx.db
-        .prepare('UPDATE session_formats SET color = ?, default_min = ?, deleted_at = NULL WHERE id = ?')
-        .run(body.color ?? clash.color, body.defaultMin ?? clash.default_min, clash.id);
+        .prepare('UPDATE session_formats SET color = ?, deleted_at = NULL WHERE id = ?')
+        .run(body.color ?? clash.color, clash.id);
       id = clash.id;
     } else if (clash) {
       throw conflict('A format with that name already exists', 'format_exists');
@@ -65,14 +65,13 @@ export function formatRoutes(ctx: Ctx): Router {
         .get(req.event.id);
       const info = ctx.db
         .prepare(
-          `INSERT INTO session_formats (event_id, name, color, default_min, sort_order)
-           VALUES (?, ?, ?, ?, ?)`,
+          `INSERT INTO session_formats (event_id, name, color, sort_order)
+           VALUES (?, ?, ?, ?)`,
         )
         .run(
           req.event.id,
           body.name,
           body.color ?? nextTagColor(live.map((f) => f.color)),
-          body.defaultMin ?? null,
           (last?.max ?? -1) + 1,
         );
       id = Number(info.lastInsertRowid);
@@ -96,14 +95,8 @@ export function formatRoutes(ctx: Ctx): Router {
       throw conflict('A format with that name already exists', 'format_exists');
     }
     ctx.db
-      .prepare('UPDATE session_formats SET name = ?, color = ?, default_min = ? WHERE id = ?')
-      .run(
-        body.name ?? existing.name,
-        body.color ?? existing.color,
-        // `undefined` leaves the default alone; an explicit `null` clears it.
-        body.defaultMin === undefined ? existing.default_min : body.defaultMin,
-        existing.id,
-      );
+      .prepare('UPDATE session_formats SET name = ?, color = ? WHERE id = ?')
+      .run(body.name ?? existing.name, body.color ?? existing.color, existing.id);
     const dto = toFormatDto(load(req.event.id, existing.id));
     audit(ctx.db, {
       identityId: req.identity.id,

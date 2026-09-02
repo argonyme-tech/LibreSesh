@@ -38,8 +38,8 @@
   "tags": [{ "name": "beginner" }, { "name": "hands-on", "color": "#E2A03F" }],
 
   "formats": [
-    { "name": "Keynote", "defaultMin": 60 },
-    { "name": "Workshop", "defaultMin": 120 },
+    { "name": "Keynote" },
+    { "name": "Workshop" },
     { "name": "Jam" }
   ],
 

@@ -5,10 +5,17 @@ import type { Db, EventRow, RoomRow, SessionRow, TrackRow } from './db.js';
 import { badRequest, conflict, forbidden, notFound } from './errors.js';
 import { durationMinutes, localDate, localMinuteOfDay } from './shared/time.js';
 import { trackWindows, windowLabel, windowOn } from './trackHours.js';
+import {
+  MAX_DURATION_MINUTES,
+  MIN_DURATION_MINUTES,
+  SNAP_MINUTES,
+} from './shared/sessionLimits.js';
 
-export const SNAP_MINUTES = 5;
-export const MIN_DURATION_MINUTES = 5;
-export const MAX_DURATION_MINUTES = 480;
+export {
+  MAX_DURATION_MINUTES,
+  MIN_DURATION_MINUTES,
+  SNAP_MINUTES,
+} from './shared/sessionLimits.js';
 
 export interface TimeWindow {
   startsAt: Date;

@@ -89,7 +89,7 @@ describe('event import from JSON', () => {
     const doc = document();
     const result = await post({
       ...doc,
-      formats: [{ name: 'Keynote', defaultMin: 60 }, { name: 'Workshop' }],
+      formats: [{ name: 'Keynote' }, { name: 'Workshop' }],
       sessions: [{ ...doc.sessions[0], format: 'Keynote' }, doc.sessions[1]],
     });
     expect(result.counts.formats).toBe(2);
@@ -100,13 +100,11 @@ describe('event import from JSON', () => {
       result.generatedPasswords.adminPassword!,
     );
     const bundle = (await admin.get('/api/e/photoconf/bundle').expect(200)).body as {
-      formats: { id: number; name: string; defaultMin: number | null }[];
+      formats: { id: number; name: string }[];
       sessions: { title: string; formatId: number | null }[];
     };
     // Document order is the running order, the way it is for rooms.
     expect(bundle.formats.map((f) => f.name)).toEqual(['Keynote', 'Workshop']);
-    expect(bundle.formats[0]!.defaultMin).toBe(60);
-    expect(bundle.formats[1]!.defaultMin).toBeNull();
 
     const keynote = bundle.sessions.find((x) => x.title === 'Opening keynote');
     expect(keynote!.formatId).toBe(bundle.formats[0]!.id);

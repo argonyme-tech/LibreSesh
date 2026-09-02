@@ -43,13 +43,10 @@ describe('session formats', () => {
 
   it('creates one with a colour nothing else is using, in the order made', async () => {
     const a = await admin.post('/api/e/testconf/formats').send({ name: 'Talk' }).expect(201);
-    const b = await admin
-      .post('/api/e/testconf/formats')
-      .send({ name: 'Workshop', defaultMin: 120 })
-      .expect(201);
+    const b = await admin.post('/api/e/testconf/formats').send({ name: 'Workshop' }).expect(201);
     expect(a.body.color).not.toBe(b.body.color);
-    expect(a.body.defaultMin).toBeNull();
-    expect(b.body.defaultMin).toBe(120);
+    // A format carries no length: see migration 015.
+    expect(a.body).not.toHaveProperty('defaultMin');
 
     // The organiser's running order, not alphabetical — Workshop after Talk.
     const bundle = await admin.get('/api/e/testconf/bundle').expect(200);
@@ -61,31 +58,18 @@ describe('session formats', () => {
     await admin.post('/api/e/testconf/formats').send({ name: 'Panel' }).expect(409);
 
     await admin.delete(`/api/e/testconf/formats/${made.body.id}`).expect(204);
-    const revived = await admin
-      .post('/api/e/testconf/formats')
-      .send({ name: 'Panel', defaultMin: 45 })
-      .expect(201);
+    const revived = await admin.post('/api/e/testconf/formats').send({ name: 'Panel' }).expect(201);
     expect(revived.body.id).toBe(made.body.id);
-    expect(revived.body.defaultMin).toBe(45);
   });
 
-  it('clears the usual length on an explicit null, and leaves it alone otherwise', async () => {
-    const made = await admin
-      .post('/api/e/testconf/formats')
-      .send({ name: 'Talk', defaultMin: 30 })
-      .expect(201);
+  it('renames and recolours, and carries no length to change', async () => {
+    const made = await admin.post('/api/e/testconf/formats').send({ name: 'Talk' }).expect(201);
 
     const renamed = await admin
       .patch(`/api/e/testconf/formats/${made.body.id}`)
-      .send({ name: 'Short talk' })
+      .send({ name: 'Short talk', color: '#123456' })
       .expect(200);
-    expect(renamed.body.defaultMin).toBe(30);
-
-    const cleared = await admin
-      .patch(`/api/e/testconf/formats/${made.body.id}`)
-      .send({ defaultMin: null })
-      .expect(200);
-    expect(cleared.body.defaultMin).toBeNull();
+    expect(renamed.body).toEqual({ id: made.body.id, name: 'Short talk', color: '#123456' });
   });
 
   it('is admin-only to manage, like rooms and tags', async () => {
@@ -132,10 +116,7 @@ describe('session formats', () => {
   });
 
   it('gives every session of a repeat the same format', async () => {
-    const format = await admin
-      .post('/api/e/testconf/formats')
-      .send({ name: 'Standup', defaultMin: 15 })
-      .expect(201);
+    const format = await admin.post('/api/e/testconf/formats').send({ name: 'Standup' }).expect(201);
     const res = await admin
       .post('/api/e/testconf/sessions/repeat')
       .send({
@@ -152,7 +133,7 @@ describe('session formats', () => {
   });
 
   it('carries formats into a clone, and no sessions with them', async () => {
-    await admin.post('/api/e/testconf/formats').send({ name: 'Talk', defaultMin: 30 }).expect(201);
+    await admin.post('/api/e/testconf/formats').send({ name: 'Talk' }).expect(201);
     await admin
       .post('/api/events/testconf/clone')
       .send({
@@ -170,7 +151,6 @@ describe('session formats', () => {
     const bundle = await clone.get('/api/e/testconf-2/bundle').expect(200);
     expect(bundle.body.formats).toHaveLength(1);
     expect(bundle.body.formats[0].name).toBe('Talk');
-    expect(bundle.body.formats[0].defaultMin).toBe(30);
     expect(bundle.body.sessions).toEqual([]);
   });
 
@@ -180,7 +160,7 @@ describe('session formats', () => {
 
     const res = await admin.get('/api/e/testconf/export.json').expect(200);
     expect(res.body.formats).toEqual([
-      { id: format.body.id, name: 'Talk', color: expect.any(String), defaultMin: null },
+      { id: format.body.id, name: 'Talk', color: expect.any(String) },
     ]);
     expect(res.body.sessions[0].formatId).toBe(format.body.id);
   });

@@ -73,9 +73,13 @@ describe('session write rules', () => {
     await create(admin, { startsAt: at(DAY_ONE, 600).replace(':00:00', ':03:00') }).expect(400);
   });
 
-  it('rejects a duration below 5 or above 480 minutes', async () => {
+  it('rejects a duration below 5 minutes or longer than a day', async () => {
     await create(admin, { endsAt: at(DAY_ONE, 600) }).expect(400);
-    await create(admin, { endsAt: at(DAY_ONE, 600 + 485) }).expect(400);
+    await create(admin, { endsAt: at(DAY_ONE, 600 + 1445) }).expect(400);
+  });
+
+  it('takes a full-day session, which the old eight-hour cap refused', async () => {
+    await create(admin, { startsAt: at(DAY_ONE, 540), endsAt: at(DAY_ONE, 1140) }).expect(201);
   });
 
   it('keeps a user inside the event dates and day viewport', async () => {

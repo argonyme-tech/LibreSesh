@@ -256,10 +256,6 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]['id'];
 
-/** Lengths a format can claim. The session form's own list plus the shorter
- *  end, because a lightning slot and a demo live down there. */
-const FORMAT_LENGTHS = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240];
-
 const plural = (n: number, one: string, many = `${one}s`): string =>
   `${n} ${n === 1 ? one : many}`;
 
@@ -645,16 +641,13 @@ export function AdminPage() {
     }
   };
 
-  const addFormat = async (name: string, defaultMin?: number | null) => {
+  const addFormat = async (name: string) => {
     if (!name.trim()) return;
     try {
       // No colour sent: the server picks the first the event is not using,
       // the same rule tags follow, so a list of formats is legible without
       // anyone choosing colours by hand.
-      const created = await api.createFormat(slug, {
-        name: name.trim(),
-        ...(defaultMin === undefined ? {} : { defaultMin }),
-      });
+      const created = await api.createFormat(slug, { name: name.trim() });
       data.apply({ type: 'format.created', entity: created });
       setFormatName('');
     } catch (err) {
@@ -1172,7 +1165,7 @@ export function AdminPage() {
 
           <Section
             title="Formats"
-            description="What kind of thing a session is — a talk, a workshop, a panel. Picked at the top of the session form, where it also sets a starting length."
+            description="What kind of thing a session is — a talk, a workshop, a panel. Picked at the top of the session form. It says what a session is, never how long it runs."
             className="mb-6"
           >
             <ul className="mb-4 flex flex-wrap gap-2">
@@ -1186,9 +1179,6 @@ export function AdminPage() {
                     className="rounded-full px-2.5 py-1 text-xs font-medium ring-offset-2 ring-offset-white hover:ring-2 hover:ring-stone-400 dark:ring-offset-stone-900"
                   >
                     {format.name}
-                    {format.defaultMin !== null && (
-                      <span className="ml-1 opacity-70">{format.defaultMin} min</span>
-                    )}
                     <span className="sr-only">— edit this format</span>
                   </button>
                 </li>
@@ -1215,13 +1205,10 @@ export function AdminPage() {
                       <button
                         type="button"
                         title={s.hint}
-                        onClick={() => void addFormat(s.name, s.defaultMin ?? null)}
+                        onClick={() => void addFormat(s.name)}
                         className="rounded-full border border-dashed border-stone-300 px-2.5 py-1 text-xs text-stone-600 hover:border-stone-500 hover:text-stone-900 dark:border-stone-600 dark:text-stone-300 dark:hover:border-stone-400 dark:hover:text-stone-100"
                       >
                         + {s.name}
-                        {s.defaultMin !== undefined && (
-                          <span className="ml-1 opacity-60">{s.defaultMin} min</span>
-                        )}
                       </button>
                     </li>
                   ))}
@@ -1865,9 +1852,9 @@ export function AdminPage() {
  * to be reported — tag names are unique per event.
  */
 /**
- * Rename, recolour, retime or delete one format. Same shape as the tag editor,
- * plus the one thing a format has that a tag does not: how long a session of
- * this kind usually runs, which is what the session form prefills.
+ * Rename, recolour or delete one format. Exactly the tag editor's shape,
+ * because a format is exactly a tag's data — a name and a colour. It carries
+ * no length: see migration 015.
  */
 function FormatEditor({
   format,
@@ -1885,17 +1872,15 @@ function FormatEditor({
 }) {
   const [name, setName] = useState(format.name);
   const [color, setColor] = useState(format.color);
-  const [defaultMin, setDefaultMin] = useState<number | null>(format.defaultMin);
   const [busy, setBusy] = useState(false);
 
-  const dirty =
-    name.trim() !== format.name || color !== format.color || defaultMin !== format.defaultMin;
+  const dirty = name.trim() !== format.name || color !== format.color;
 
   const save = async () => {
     if (!name.trim() || busy) return;
     setBusy(true);
     try {
-      if (await onPatch(format, { name: name.trim(), color, defaultMin })) onClose();
+      if (await onPatch(format, { name: name.trim(), color })) onClose();
     } finally {
       setBusy(false);
     }
@@ -1937,23 +1922,6 @@ function FormatEditor({
             className={inputClass}
             autoFocus
           />
-        </Field>
-        <Field
-          label="Usual length"
-          hint="Prefilled into a new session when this format is picked. Changing it here never moves a session that already exists."
-        >
-          <select
-            value={defaultMin ?? ''}
-            onChange={(e) => setDefaultMin(e.target.value === '' ? null : Number(e.target.value))}
-            className={inputClass}
-          >
-            <option value="">No usual length</option>
-            {FORMAT_LENGTHS.map((d) => (
-              <option key={d} value={d}>
-                {d} min
-              </option>
-            ))}
-          </select>
         </Field>
         <ColorPicker
           value={color}

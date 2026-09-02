@@ -24,6 +24,13 @@ import {
   type Weekday,
 } from '@shared/repeat';
 import { zonedTimeToUtc } from '@shared/time';
+import {
+  DURATION_CHOICES,
+  MAX_DURATION_MINUTES,
+  MIN_DURATION_MINUTES,
+  SNAP_MINUTES,
+  durationLabel,
+} from '@shared/sessionLimits';
 import { RemoveIcon } from './icons';
 import { SpeakerCombobox, type SpeakerChoice } from './SpeakerCombobox';
 import {
@@ -43,7 +50,7 @@ import {
   inputClass,
 } from './ui';
 
-const DURATIONS = [15, 30, 45, 60, 90, 120, 180];
+
 
 export interface SessionModalProps {
   session?: SessionDto;
@@ -122,6 +129,13 @@ export function SessionModal({
   const [day, setDay] = useState(existing?.date ?? defaultDay);
   const [start, setStart] = useState(fmtMin(existing?.startMin ?? Math.max(dayStartMin, 14 * 60)));
   const [durMin, setDurMin] = useState(existing?.durMin ?? 30);
+  // A session already 40 minutes long has no chip in the list, and a select
+  // whose value matches no option silently shows the first one — so the form
+  // would have offered to shorten it to 15 the moment anything else was saved.
+  // Opening straight into the typed field is what stops that.
+  const [customDur, setCustomDur] = useState(
+    () => existing !== null && !(DURATION_CHOICES as readonly number[]).includes(existing.durMin),
+  );
   const [tagIds, setTagIds] = useState<number[]>(session?.tagIds ?? []);
   const [formatId, setFormatId] = useState<number | null>(session?.formatId ?? null);
   const [typeHelp, setTypeHelp] = useState(false);
@@ -138,24 +152,10 @@ export function SessionModal({
   // takes the hold with it, visibly, while the box is still on screen.
   const holdsFloor = isAdmin && type === 'official' && blocksOpenBooking;
 
-  /**
-   * Picking a format on a *new* session sets the duration to what that format
-   * usually runs — the whole reason a format carries one. Only on a new
-   * session, and only when the duration is still the one the form opened with:
-   * on an existing session the length is a fact about a slot people may
-   * already have planned around, and silently rewriting it while someone
-   * corrects the kind of session it is would be a worse bug than the
-   * convenience is worth. Clicking the active chip clears the format and
-   * leaves the duration alone.
-   */
-  const pickFormat = (next: FormatDto) => {
-    if (formatId === next.id) {
-      setFormatId(null);
-      return;
-    }
-    setFormatId(next.id);
-    if (!session && next.defaultMin !== null && durMin === 30) setDurMin(next.defaultMin);
-  };
+  /** Clicking the active chip clears the format: "unspecified" is a real
+   *  answer, and it is the one every session starts with. A format never
+   *  touches the times — how long a session runs is the session's business. */
+  const pickFormat = (next: FormatDto) => setFormatId(formatId === next.id ? null : next.id);
 
   // Repeating is for building a programme, so it belongs to organisers and to
   // sessions that do not exist yet. Editing one day of a run edits that day:
@@ -196,6 +196,17 @@ export function SessionModal({
     }
     if (!roomId) {
       setError('There is no room you can place this in');
+      return;
+    }
+    if (
+      !Number.isInteger(durMin) ||
+      durMin < MIN_DURATION_MINUTES ||
+      durMin > MAX_DURATION_MINUTES ||
+      durMin % SNAP_MINUTES !== 0
+    ) {
+      setError(
+        `A session runs between ${MIN_DURATION_MINUTES} minutes and ${durationLabel(MAX_DURATION_MINUTES)}, in ${SNAP_MINUTES}-minute steps`,
+      );
       return;
     }
     const [h, m] = start.split(':').map(Number);
@@ -280,20 +291,24 @@ export function SessionModal({
 
       <div className="space-y-5">
         <FieldGroup title="What it is">
-          {/* First, because it is the choice that shapes the rest: a lightning
-              talk is five minutes and a workshop is two hours, and picking it
-              before the times are typed is what makes the duration below
-              arrive already right. Absent when the event defines no formats,
-              which is where every event starts. */}
+          {/* An organiser who defines none would otherwise see the row simply
+              missing, which reads as "this app has no formats" rather than
+              "this event has none yet" — the two are indistinguishable from
+              inside the form, and the second is where every event starts.
+              Attendees are spared it: they cannot add one. */}
+          {formats.length === 0 && isAdmin && (
+            <Field label="Format">
+              <p className="text-xs text-stone-500 dark:text-stone-400">
+                This event defines none yet. Add them under Manage Event →
+                Programme and they appear here, at the top of this form.
+              </p>
+            </Field>
+          )}
+
+          {/* First in the form, because it is what the thing is. It sets
+              nothing else: the times below are the session's own. */}
           {formats.length > 0 && (
-            <Field
-              label="Format"
-              hint={
-                session
-                  ? 'What kind of session this is.'
-                  : 'What kind of session this is. Sets a starting length you can still change.'
-              }
-            >
+            <Field label="Format" hint="What kind of session this is.">
               <div className="flex flex-wrap gap-1.5">
                 {formats.map((f) => (
                   <Chip
@@ -306,6 +321,99 @@ export function SessionModal({
                   </Chip>
                 ))}
               </div>
+            </Field>
+          )}
+
+          {/* Second, directly under Format and above the title, not down in
+              Extras where it used to sit. An organiser who never scrolls to it
+              places everything as official — the default — and official is the
+              one choice that locks a session against the person who put it up.
+              A decision with that consequence has to be visible before the
+              form is filled in, not after.
+
+              Called "Placement" and not "Type": it says who put the session up
+              and whether it is the published programme, while the field above
+              says what kind of session it is. */}
+          {isAdmin && (
+            <Field label="Placement">
+              <div className="flex items-center gap-1.5">
+                {(['official', 'open'] as const).map((t) => (
+                  <Chip key={t} active={type === t} onClick={() => setType(t)}>
+                    <span className="capitalize">{t}</span>
+                  </Chip>
+                ))}
+                <HelpButton
+                  open={typeHelp}
+                  onClick={() => setTypeHelp(!typeHelp)}
+                  label="how a session is placed"
+                />
+              </div>
+              {typeHelp && (
+                <HelpNote>
+                  <p>
+                    <strong className="font-semibold text-stone-800 dark:text-stone-100">
+                      Official
+                    </strong>{' '}
+                    is the published programme. Only organisers can add one or change it.
+                  </p>
+                  <p>
+                    <strong className="font-semibold text-stone-800 dark:text-stone-100">
+                      Open
+                    </strong>{' '}
+                    is attendee-placed. Whoever created it can keep editing it, and it can only
+                    go in a room that allows booking.
+                  </p>
+                  <p>
+                    Making a session official therefore locks it against the person who put it
+                    up. Neither type affects timing: organisers may double-book a room, everyone
+                    else may not, whichever type it is.
+                  </p>
+                </HelpNote>
+              )}
+            </Field>
+          )}
+
+          {isAdmin && type === 'official' && (
+            <Field label="Attendance">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                <Toggle
+                  checked={blocksOpenBooking}
+                  onChange={setBlocksOpenBooking}
+                  label="Everyone should be at this"
+                />
+                <HelpButton
+                  open={blockHelp}
+                  onClick={() => setBlockHelp(!blockHelp)}
+                  label="holding the floor"
+                />
+              </div>
+              {blockHelp && (
+                <HelpNote>
+                  <p>
+                    While this session runs, attendees cannot add a session anywhere — not even
+                    in a room that allows booking. For a keynote or a closing plenary that is
+                    the point: there is nowhere else to be.
+                  </p>
+                  <p>
+                    It holds only its own hours, so leave it off for registration, coffee and
+                    anything that runs all day. Organisers and speakers can still place sessions
+                    against it, and those show on the schedule as{' '}
+                    <strong className="font-semibold text-stone-800 dark:text-stone-100">
+                      competing
+                    </strong>
+                    .
+                  </p>
+                  <p>
+                    Sessions already booked in these hours stay where they are — ticking this
+                    afterwards moves and cancels nobody.
+                  </p>
+                  <p>
+                    Lunch, dinner and coffee are not sessions at all — they are breaks, set
+                    up once in Manage Event → Programme and drawn quietly behind every day
+                    they apply to.
+                  </p>
+                </HelpNote>
+              )}
             </Field>
           )}
 
@@ -421,18 +529,49 @@ export function SessionModal({
                 className={inputClass}
               />
             </Field>
+            {/* A list plus a way past it. The list used to stop at three
+                hours, which quietly said no session runs longer — and a
+                full-day excursion, an all-afternoon poster hall and a
+                hackathon all do. "Other" takes any multiple of five up to a
+                day, which is what the server accepts. */}
             <Field label="Duration">
               <select
-                value={durMin}
-                onChange={(e) => setDurMin(Number(e.target.value))}
+                value={customDur ? 'other' : durMin}
+                onChange={(e) => {
+                  if (e.target.value === 'other') {
+                    setCustomDur(true);
+                    return;
+                  }
+                  setCustomDur(false);
+                  setDurMin(Number(e.target.value));
+                }}
                 className={inputClass}
               >
-                {DURATIONS.map((d) => (
+                {DURATION_CHOICES.map((d) => (
                   <option key={d} value={d}>
-                    {d} min
+                    {durationLabel(d)}
                   </option>
                 ))}
+                <option value="other">Other…</option>
               </select>
+              {customDur && (
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    value={durMin}
+                    onChange={(e) => setDurMin(Number(e.target.value))}
+                    min={MIN_DURATION_MINUTES}
+                    max={MAX_DURATION_MINUTES}
+                    step={SNAP_MINUTES}
+                    aria-label="Duration in minutes"
+                    autoFocus
+                    className={`${inputClass} w-24`}
+                  />
+                  <span className="text-xs text-stone-500 dark:text-stone-400">
+                    minutes{durMin >= 60 ? ` · ${durationLabel(durMin)}` : ''}
+                  </span>
+                </div>
+              )}
             </Field>
           </FormGrid>
 
@@ -544,93 +683,6 @@ export function SessionModal({
             </div>
           </Field>
 
-          {/* Called "Placement" rather than "Type": what it says is who put the
-              session up and whether it is the published programme, and the
-              field at the top of this form is the one that answers what kind of
-              session it is. Two fields labelled Type, at opposite ends of one
-              form, would be indistinguishable. */}
-          {isAdmin && (
-            <Field label="Placement">
-              <div className="flex items-center gap-1.5">
-                {(['official', 'open'] as const).map((t) => (
-                  <Chip key={t} active={type === t} onClick={() => setType(t)}>
-                    <span className="capitalize">{t}</span>
-                  </Chip>
-                ))}
-                <HelpButton
-                  open={typeHelp}
-                  onClick={() => setTypeHelp(!typeHelp)}
-                  label="how a session is placed"
-                />
-              </div>
-              {typeHelp && (
-                <HelpNote>
-                  <p>
-                    <strong className="font-semibold text-stone-800 dark:text-stone-100">
-                      Official
-                    </strong>{' '}
-                    is the published programme. Only organisers can add one or change it.
-                  </p>
-                  <p>
-                    <strong className="font-semibold text-stone-800 dark:text-stone-100">
-                      Open
-                    </strong>{' '}
-                    is attendee-placed. Whoever created it can keep editing it, and it can only
-                    go in a room that allows booking.
-                  </p>
-                  <p>
-                    Making a session official therefore locks it against the person who put it
-                    up. Neither type affects timing: organisers may double-book a room, everyone
-                    else may not, whichever type it is.
-                  </p>
-                </HelpNote>
-              )}
-            </Field>
-          )}
-
-          {isAdmin && type === 'official' && (
-            <Field label="Attendance">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                <Toggle
-                  checked={blocksOpenBooking}
-                  onChange={setBlocksOpenBooking}
-                  label="Everyone should be at this"
-                />
-                <HelpButton
-                  open={blockHelp}
-                  onClick={() => setBlockHelp(!blockHelp)}
-                  label="holding the floor"
-                />
-              </div>
-              {blockHelp && (
-                <HelpNote>
-                  <p>
-                    While this session runs, attendees cannot add a session anywhere — not even
-                    in a room that allows booking. For a keynote or a closing plenary that is
-                    the point: there is nowhere else to be.
-                  </p>
-                  <p>
-                    It holds only its own hours, so leave it off for registration, coffee and
-                    anything that runs all day. Organisers and speakers can still place sessions
-                    against it, and those show on the schedule as{' '}
-                    <strong className="font-semibold text-stone-800 dark:text-stone-100">
-                      competing
-                    </strong>
-                    .
-                  </p>
-                  <p>
-                    Sessions already booked in these hours stay where they are — ticking this
-                    afterwards moves and cancels nobody.
-                  </p>
-                  <p>
-                    Lunch, dinner and coffee are not sessions at all — they are breaks, set
-                    up once in Manage Event → Programme and drawn quietly behind every day
-                    they apply to.
-                  </p>
-                </HelpNote>
-              )}
-            </Field>
-          )}
         </FieldGroup>
       </div>
     </Modal>

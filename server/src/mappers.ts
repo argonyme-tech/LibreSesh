@@ -87,7 +87,6 @@ export const toFormatDto = (f: FormatRow): FormatDto => ({
   id: f.id,
   name: f.name,
   color: f.color,
-  defaultMin: f.default_min,
 });
 
 /** Links are stored as a JSON string; a malformed row must not break the page. */

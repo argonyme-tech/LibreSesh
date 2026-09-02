@@ -79,8 +79,6 @@ export interface FormatRow {
   event_id: number;
   name: string;
   color: string;
-  /** Minutes this format usually runs; null when it says nothing about length. */
-  default_min: number | null;
   sort_order: number;
   deleted_at: string | null;
 }

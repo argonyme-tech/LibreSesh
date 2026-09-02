@@ -14,32 +14,49 @@ All notable changes to this project are documented here.
 
   Sessions now carry a **format**: a talk, a workshop, a panel, a jam. It is
   the first control in the session form, above the title, because it is the
-  choice that shapes the fields under it — picking one sets the duration to
-  what that kind of session usually runs, on a new session only, where
-  nobody has planned around the slot yet. It shows as a coloured badge at the
-  head of the session sheet, and it is the first thing named there: what the
-  session *is* comes before who placed it.
+  first thing anyone asks about a session. It carries no length — what a
+  session *is* and how long it runs are two different facts, and a workshop
+  is a workshop at ninety minutes or at a whole afternoon. It shows as a
+  coloured badge at the head of the session sheet, and it is named first
+  there too: what the session is comes before who placed it.
 
   Formats are defined per event in Manage Event → Programme, beside rooms,
   tracks and tags, because an unconference invents them. Nothing is created
   by default; the section offers a dozen common ones — keynote, lightning
-  talks, poster session, excursion — as one-click suggestions, each with the
-  length it usually runs, and an event that runs none of them can type its
-  own and never see the list again. Deleting a format leaves its sessions
-  where they are, without a kind.
+  talks, poster session, excursion — as one-click suggestions, and an event
+  that runs none of them can type its own and never see the list again. An
+  organiser who has defined none is told so in the session form rather than
+  shown nothing, which was indistinguishable from the feature not existing.
+  Deleting a format leaves its sessions where they are, without a kind.
 
   Its own table rather than a reserved tag: a session wears many tags and
   exactly one format, and a uniqueness rule the tag UI cannot express is a
   rule that gets broken. Clones carry formats over with the rooms and tags,
   the export carries them, and an import document declares them by name the
-  way it already declares rooms and tracks. Migration 014.
+  way it already declares rooms and tracks. Migrations 014 and 015.
 
-  One rename came with it: the official/open control in the session form is
-  labelled **Placement** now. It was labelled Type, and a second field called
-  Type at the other end of the same form would have been indistinguishable
-  from it.
+  The official/open control moved and was renamed in the same pass. It is
+  **Placement** now — a second field called Type would have been
+  indistinguishable from the format — and it sits at the top of the form
+  beside it rather than at the bottom under Extras. Official is the default
+  and the one choice that locks a session against whoever put it up; an
+  organiser who never scrolled that far made everything official without
+  ever being asked.
 
 ### Changed
+
+- **A session can run longer than three hours, and for any number of minutes.**
+  The duration picker offered seven fixed choices ending at 180, and the server
+  refused anything over 480 — so a full-day excursion, an all-afternoon poster
+  hall and a hackathon were unplaceable, and the workaround was to chop one
+  thing into three blocks that lied about what was happening. The list now runs
+  to eight hours and ends in **Other…**, which takes any multiple of five up to
+  a day; a day is the real limit, because a session already has to start and
+  end on one. Editing a session whose length is not on the list opens straight
+  into that field — before, the select silently showed the first option
+  instead, so saving anything else would have quietly shortened the session to
+  15 minutes. Both dialogs that place a session share one list now, so they
+  cannot disagree about how long one may run.
 
 - **Deleting asks in the app's own voice, and says where things go.** Every
   confirmation was a `window.confirm`: an alert drawn by the browser rather

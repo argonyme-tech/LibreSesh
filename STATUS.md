@@ -183,9 +183,11 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   should not stay readable because a link was minted once.
 
 - **The format exists; three places still do not use it.** Landed 2026-09-02
-  (migration 014, `session_formats`): defined per event in Manage Event, picked
-  at the top of the session form where it prefills the duration, shown on the
-  session sheet, carried by clones, the export and the importer. What was left
+  (migrations 014 and 015, `session_formats`): defined per event in Manage
+  Event, picked at the top of the session form, shown on the session sheet,
+  carried by clones, the export and the importer. It carries no length —
+  migration 014 gave it one and 015 took it away, because a format that
+  retimes the session it describes makes one field answer two questions. What was left
   out on purpose, because none of it is needed for a format to be worth
   having, and each is a separate decision:
 
@@ -201,6 +203,12 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
     never said what kind of thing it was — but it means the one path that
     creates a session outside the form always creates a formatless one. Either
     the pitch form gains the picker, or placing one asks.
+
+  Also from the same pass, and not backlog because they are done: the
+  official/open control is **Placement** now and sits at the top beside the
+  format rather than under Extras, and the duration picker runs to eight hours
+  with an **Other…** field behind it (any multiple of five up to a day —
+  `shared/sessionLimits.ts`, `MAX_DURATION_MINUTES` raised from 480).
 
   Two smaller notes from building it. The import document now has `format` at
   the top meaning "this is a LibreSesh document" **and** `format` on a session

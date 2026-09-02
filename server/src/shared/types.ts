@@ -143,10 +143,6 @@ export interface FormatDto {
   id: number;
   name: string;
   color: string;
-  /** Minutes a session of this format usually runs, prefilled into the form
-   *  when it is picked on a new session. Null when the format says nothing
-   *  about length. */
-  defaultMin: number | null;
 }
 
 /** A label and an http(s) link. Profiles have carried a few since §4;
@@ -454,7 +450,7 @@ export interface EventExport {
   }[];
   tags: { id: number; name: string; color: string }[];
   /** What kinds of session this event runs, in the organiser's order. */
-  formats: { id: number; name: string; color: string; defaultMin: number | null }[];
+  formats: { id: number; name: string; color: string }[];
   /** Local minutes of day; `date` null means every day of the event. */
   breaks: { id: number; label: string; startMin: number; endMin: number; date: string | null }[];
   people: {

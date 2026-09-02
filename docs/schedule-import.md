@@ -176,10 +176,13 @@ declared here or not at all.
 | --- | --- | --- |
 | `name` | ✓ | Up to 40 characters. Unique within the list |
 | `color` | | `#RRGGBB`. Defaults to grey |
-| `defaultMin` | | Minutes a session of this kind usually runs, 5–1440. Only ever a *default* in the session form; it never resizes a session this document places |
 
 Document order is the order an organiser sees them in, so declare them in the
 order they run: keynote, talk, lightning, workshop.
+
+A format carries no length. What a session *is* and how long it runs are two
+different facts, and a workshop is a workshop at ninety minutes or at a whole
+afternoon.
 
 A format is not `type`. `type` is `official` or `open` and says who put the
 session up; a format says what the session *is*, and the two are independent —

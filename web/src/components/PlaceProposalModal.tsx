@@ -4,6 +4,13 @@ import type { PlaceWrite } from '../lib/api';
 import { fmtMin } from '../lib/format';
 import { zonedTimeToUtc } from '@shared/time';
 import {
+  DURATION_CHOICES,
+  MAX_DURATION_MINUTES,
+  MIN_DURATION_MINUTES,
+  SNAP_MINUTES,
+  durationLabel,
+} from '@shared/sessionLimits';
+import {
   Field,
   FormError,
   FormGrid,
@@ -13,7 +20,6 @@ import {
   inputClass,
 } from './ui';
 
-const DURATIONS = [15, 30, 45, 60, 90, 120, 180];
 
 export interface PlaceProposalModalProps {
   proposal: ProposalDto;
@@ -46,6 +52,7 @@ export function PlaceProposalModal({
   const [day, setDay] = useState(defaultDay);
   const [start, setStart] = useState(fmtMin(Math.max(dayStartMin, 14 * 60)));
   const [durMin, setDurMin] = useState(30);
+  const [customDur, setCustomDur] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const place = () => {
@@ -111,18 +118,42 @@ export function PlaceProposalModal({
             className={inputClass}
           />
         </Field>
+        {/* Same list and same escape hatch as the session form: a pitch being
+            placed is a session, and two dialogs that disagree about how long
+            one may run would be a bug found at the worst moment. */}
         <Field label="Duration">
           <select
-            value={durMin}
-            onChange={(e) => setDurMin(Number(e.target.value))}
+            value={customDur ? 'other' : durMin}
+            onChange={(e) => {
+              if (e.target.value === 'other') {
+                setCustomDur(true);
+                return;
+              }
+              setCustomDur(false);
+              setDurMin(Number(e.target.value));
+            }}
             className={inputClass}
           >
-            {DURATIONS.map((d) => (
+            {DURATION_CHOICES.map((d) => (
               <option key={d} value={d}>
-                {d} min
+                {durationLabel(d)}
               </option>
             ))}
+            <option value="other">Other…</option>
           </select>
+          {customDur && (
+            <input
+              type="number"
+              value={durMin}
+              onChange={(e) => setDurMin(Number(e.target.value))}
+              min={MIN_DURATION_MINUTES}
+              max={MAX_DURATION_MINUTES}
+              step={SNAP_MINUTES}
+              aria-label="Duration in minutes"
+              autoFocus
+              className={`${inputClass} mt-1.5`}
+            />
+          )}
         </Field>
       </FormGrid>
     </Modal>

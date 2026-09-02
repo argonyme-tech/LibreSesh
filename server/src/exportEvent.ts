@@ -181,12 +181,7 @@ export function exportEvent(db: Db, event: EventRow): EventExport {
       windows: trackWindows.get(t.id) ?? [],
     })),
     tags: tags.map((t) => ({ id: t.id, name: t.name, color: t.color })),
-    formats: formats.map((f) => ({
-      id: f.id,
-      name: f.name,
-      color: f.color,
-      defaultMin: f.default_min,
-    })),
+    formats: formats.map((f) => ({ id: f.id, name: f.name, color: f.color })),
     breaks: breaks.map((b) => ({
       id: b.id,
       label: b.label,
