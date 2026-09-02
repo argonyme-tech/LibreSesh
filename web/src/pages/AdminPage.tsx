@@ -19,11 +19,14 @@ import { ApiError, api, type BreakWrite, type TrackWrite, type TrashDto } from '
 import { fmtMin, minutesOf, relativeTime, snapMinute } from '../lib/format';
 import { useEventData } from '../lib/useEventData';
 import {
+  BY_NAME,
+  NATURAL_DIR,
   PEOPLE_FILTERS,
   filterCounts,
   filterPeople,
   type PeopleFilter,
   type PeopleSort,
+  type PeopleSortColumn,
 } from '../lib/people';
 import { PersonStatusBadge } from '../components/PersonLine';
 import { RoleControl } from '../components/RoleControl';
@@ -44,6 +47,59 @@ const PEOPLE_COL = {
   seen: 'hidden w-14 shrink-0 sm:block',
   actions: 'w-40 shrink-0',
 };
+
+/**
+ * One column heading, which is also the control that orders by it.
+ *
+ * The arrow is drawn only on the column in force. A row of five arrows all
+ * pointing somewhere would say every column is sorted, and only one ever is;
+ * a hover arrow on the rest would be invisible to a finger. So the affordance
+ * is the heading being a button at all — it underlines on hover — and the
+ * arrow is the state, not the invitation.
+ *
+ * The accessible name carries the whole thing, because "Name ▲" read aloud is
+ * "Name" and nothing else: `aria-sort` belongs on a real `columnheader`, and
+ * this table is a flex list rather than a `<table>`.
+ */
+function PeopleHeader({
+  column,
+  label,
+  sort,
+  onSort,
+  className,
+}: {
+  column: PeopleSortColumn;
+  label: string;
+  sort: PeopleSort;
+  onSort: (column: PeopleSortColumn) => void;
+  className: string;
+}) {
+  const active = sort.column === column;
+  const dir = active ? sort.dir : NATURAL_DIR[column];
+  return (
+    <span className={className}>
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        aria-label={
+          active
+            ? `${label}, sorted ${sort.dir === 'asc' ? 'ascending' : 'descending'}. Reverse it`
+            : `Sort by ${label}`
+        }
+        className={`flex max-w-full items-center gap-0.5 uppercase tracking-wide hover:text-stone-600 hover:underline dark:hover:text-stone-300 ${
+          active ? 'text-stone-700 dark:text-stone-200' : ''
+        }`}
+      >
+        <span className="truncate">{label}</span>
+        {active && (
+          <span aria-hidden="true" className="shrink-0 text-[0.6rem]">
+            {dir === 'asc' ? '▲' : '▼'}
+          </span>
+        )}
+      </button>
+    </span>
+  );
+}
 
 /** One size for every action, so the column is a column. */
 const peopleActionClass =
@@ -125,7 +181,7 @@ export function AdminPage() {
   const [personName, setPersonName] = useState('');
   const [peopleFilter, setPeopleFilter] = useState<PeopleFilter>('all');
   const [peopleQuery, setPeopleQuery] = useState('');
-  const [peopleSort, setPeopleSort] = useState<PeopleSort>('name');
+  const [peopleSort, setPeopleSort] = useState<PeopleSort>(BY_NAME);
   const [merging, setMerging] = useState<PersonDto | null>(null);
 
   const bundle = data.bundle;
@@ -261,6 +317,19 @@ export function AdminPage() {
 
   const peopleCounts = filterCounts(bundle.people);
   const shownPeople = filterPeople(bundle.people, peopleFilter, peopleQuery, peopleSort);
+
+  /**
+   * Click a column to order by it; click the one you are already on to turn it
+   * round. A fresh column starts whichever way that column is usually asked —
+   * see `NATURAL_DIR` — rather than always ascending, so "who was here last"
+   * and "who runs this event" are one click each rather than two.
+   */
+  const sortBy = (column: PeopleSortColumn) =>
+    setPeopleSort((s) =>
+      s.column === column
+        ? { column, dir: s.dir === 'asc' ? 'desc' : 'asc' }
+        : { column, dir: NATURAL_DIR[column] },
+    );
 
   const addRoom = async (draft: RoomDraft) => {
     try {
@@ -1012,30 +1081,39 @@ export function AdminPage() {
                 placeholder="Name, @username or UID"
                 className="ml-auto w-48 rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs text-stone-700 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-200"
               />
-              {/* Two orders, because there are two questions: "where is
-                  so-and-so in the list" and "who is actually still here". */}
-              <button
-                type="button"
-                onClick={() => setPeopleSort((s) => (s === 'name' ? 'seen' : 'name'))}
-                className="rounded-lg border border-stone-300 px-2 py-1 text-xs font-medium text-stone-600 hover:border-stone-500 dark:border-stone-600 dark:text-stone-300"
-              >
-                {peopleSort === 'name' ? 'By name' : 'By last seen'}
-              </button>
             </div>
 
             {/* A header, because this is a table now: six facts about a
                 person, the same six on every row, and an organiser reading
                 down one column should not have to work out which is which.
-                The widths are shared with the rows below. */}
-            <div
-              aria-hidden="true"
-              className="flex items-center gap-2 border-b border-stone-200 pb-1 text-[0.65rem] font-semibold uppercase tracking-wide text-stone-400 dark:border-stone-700 dark:text-stone-500"
-            >
-              <span className={PEOPLE_COL.name}>Name</span>
-              <span className={PEOPLE_COL.username}>Username</span>
-              <span className={PEOPLE_COL.uid}>UID</span>
-              <span className={PEOPLE_COL.role}>Role</span>
-              <span className={PEOPLE_COL.seen}>Last seen</span>
+                The widths are shared with the rows below.
+
+                Every column that holds a fact also orders by it. It used to
+                be one button offering two of the five, which meant the
+                question "who has no username yet" or "who is still only a
+                viewer" had no answer but reading the whole list. The header
+                was `aria-hidden` while it was decoration; now that it is the
+                control, it is not. */}
+            <div className="flex items-center gap-2 border-b border-stone-200 pb-1 text-[0.65rem] font-semibold uppercase tracking-wide text-stone-400 dark:border-stone-700 dark:text-stone-500">
+              {(
+                [
+                  ['name', 'Name'],
+                  ['username', 'Username'],
+                  ['uid', 'UID'],
+                  ['role', 'Role'],
+                  ['seen', 'Last seen'],
+                ] as [PeopleSortColumn, string][]
+              ).map(([column, label]) => (
+                <PeopleHeader
+                  key={column}
+                  column={column}
+                  label={label}
+                  sort={peopleSort}
+                  onSort={sortBy}
+                  className={PEOPLE_COL[column]}
+                />
+              ))}
+              {/* Three buttons, not a fact — nothing to order by. */}
               <span className={`${PEOPLE_COL.actions} text-right`}>Actions</span>
             </div>
 

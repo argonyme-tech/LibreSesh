@@ -55,7 +55,6 @@ export function MergeModal({
     () =>
       sortPeople(
         candidates.filter((p) => matchesSearch(p, query) && (searching || !suggested.has(p.id))),
-        'name',
       ),
     // `suggested` is derived from `suggestions` on every render; listing it
     // would defeat the memo without changing the result.

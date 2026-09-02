@@ -67,6 +67,19 @@ All notable changes to this project are documented here.
   just left. The role now sits under the name, organisers only, as the same
   editable badge; a profile nobody holds shows why it has none instead.
 
+- **Every column of the People table sorts, both ways.** One button offered
+  two of the five orders — by name, or by last seen — so "who has no
+  username yet", "who is still only a viewer" and "whose device is this
+  UID" could only be answered by reading the whole list. Each heading is
+  now the control that orders by it, with an arrow on the one in force.
+
+  A column opens the way that column is usually asked rather than always
+  ascending: last seen starts at the most recent, role starts at the
+  organisers, names start at A. The second click reverses it. Rows with
+  nothing in the column — no username, no UID, never seen — stay at the
+  bottom either way, and full name breaks every tie, so a role change
+  somewhere else in the event cannot shuffle rows that did not change.
+
 - **The profile page says whether a speaker code was ever generated.**
   Speaker access knew only about a phrase minted in that page's own
   lifetime, so an organiser returning the next day was offered "Generate

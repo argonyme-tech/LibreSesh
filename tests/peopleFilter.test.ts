@@ -1,6 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { PersonDto } from '../server/src/shared/types.js';
 import {
+  BY_NAME,
+  NATURAL_DIR,
   PEOPLE_FILTERS,
   filterCounts,
   filterPeople,
@@ -8,6 +12,7 @@ import {
   matchesSearch,
   personStatus,
   sortPeople,
+  type PeopleSortColumn,
 } from '../web/src/lib/people.js';
 
 /**
@@ -120,9 +125,17 @@ describe('the People list', () => {
     });
   });
 
+  /**
+   * Every column of the table orders by itself, both ways. One button used to
+   * offer two of the five orders, so "who has no username yet" and "who is
+   * still only a viewer" could only be answered by reading the whole list.
+   */
   describe('order', () => {
+    const ids = (column: PeopleSortColumn, dir: 'asc' | 'desc') =>
+      sortPeople(everyone, { column, dir }).map((p) => p.id);
+
     it('sorts by full name by default', () => {
-      expect(sortPeople(everyone, 'name').map((p) => p.name)).toEqual([
+      expect(sortPeople(everyone).map((p) => p.name)).toEqual([
         'Ada Lovelace',
         'Alan Turing',
         'Grace Hopper',
@@ -132,13 +145,53 @@ describe('the People list', () => {
     });
 
     it('sorts by who was here most recently, leaving the never-seen last', () => {
-      expect(sortPeople(everyone, 'seen').map((p) => p.id)).toEqual([1, 3, 2, 4, 5]);
+      expect(ids('seen', 'desc')).toEqual([1, 3, 2, 4, 5]);
+    });
+
+    it('reverses every column, and keeps the empty rows at the bottom of both', () => {
+      // The shell (5) has no username, no UID and no last-seen. It stays last
+      // whichever way the arrow points: a column of em dashes at the top is
+      // noise either way, and reversing to escape it would be odd to learn.
+      expect(ids('username', 'asc')).toEqual([1, 2, 4, 3, 5]);
+      expect(ids('username', 'desc')).toEqual([3, 4, 2, 1, 5]);
+      expect(ids('uid', 'asc')).toEqual([3, 4, 1, 2, 5]);
+      expect(ids('uid', 'desc')).toEqual([2, 1, 4, 3, 5]);
+      expect(ids('seen', 'asc')).toEqual([4, 2, 3, 1, 5]);
+    });
+
+    /**
+     * By what they hold, not by the word: "admin, speaker, user, viewer" is
+     * alphabetical backwards by coincidence, and an event that renames `user`
+     * to "participant" breaks the coincidence while the ladder holds.
+     */
+    it('sorts roles as a ladder, with the two non-roles at the bottom', () => {
+      expect(ids('role', 'desc')).toEqual([1, 2, 3, 4, 5]);
+      expect(ids('role', 'asc')).toEqual([5, 4, 3, 2, 1]);
+    });
+
+    it('breaks every tie by name, so an unrelated change cannot shuffle rows', () => {
+      const zoe = person({ id: 6, name: 'Zoe Adams', claimed: true, username: 'zoe', role: 'admin' });
+      const abe = person({ id: 7, name: 'Abe Bell', claimed: true, username: 'abe', role: 'admin' });
+      const sorted = sortPeople([zoe, organiser, abe], { column: 'role', dir: 'desc' });
+      expect(sorted.map((p) => p.name)).toEqual(['Abe Bell', 'Ada Lovelace', 'Zoe Adams']);
     });
 
     it('does not reorder the list it was given', () => {
       const before = everyone.map((p) => p.id);
-      sortPeople(everyone, 'seen');
+      sortPeople(everyone, { column: 'seen', dir: 'desc' });
       expect(everyone.map((p) => p.id)).toEqual(before);
+    });
+
+    /** A date read oldest-first is nobody's question, and a role column is
+     *  opened to find the organisers. Both reverse on the second click. */
+    it('opens each column the way that column is usually asked', () => {
+      expect(NATURAL_DIR).toEqual({
+        name: 'asc',
+        username: 'asc',
+        uid: 'asc',
+        role: 'desc',
+        seen: 'desc',
+      });
     });
   });
 
@@ -148,11 +201,11 @@ describe('the People list', () => {
   it('puts you first, whatever the order or segment', () => {
     const me = { ...attendee, isMine: true };
     const withMe = [organiser, speaker, me, departed, shell];
-    expect(filterPeople(withMe, 'all', '', 'name')[0]?.id).toBe(me.id);
-    expect(filterPeople(withMe, 'all', '', 'seen')[0]?.id).toBe(me.id);
-    expect(filterPeople(withMe, 'arrived', '', 'name')[0]?.id).toBe(me.id);
+    expect(filterPeople(withMe, 'all', '', BY_NAME)[0]?.id).toBe(me.id);
+    expect(filterPeople(withMe, 'all', '', { column: 'seen', dir: 'desc' })[0]?.id).toBe(me.id);
+    expect(filterPeople(withMe, 'arrived', '', BY_NAME)[0]?.id).toBe(me.id);
     // And keeps the rest in the order they asked for.
-    expect(filterPeople(withMe, 'all', '', 'name').map((p) => p.name)).toEqual([
+    expect(filterPeople(withMe, 'all', '', BY_NAME).map((p) => p.name)).toEqual([
       'Sam Chen',
       'Ada Lovelace',
       'Alan Turing',
@@ -163,19 +216,44 @@ describe('the People list', () => {
 
   it('leaves you out when the segment does not hold you', () => {
     const me = { ...attendee, isMine: true };
-    expect(filterPeople([organiser, me, shell], 'unclaimed', '', 'name').map((p) => p.id)).toEqual([
+    expect(filterPeople([organiser, me, shell], 'unclaimed', '', BY_NAME).map((p) => p.id)).toEqual([
       shell.id,
     ]);
   });
 
   it('applies the segment, the search and the order together', () => {
-    expect(filterPeople(everyone, 'arrived', 'a', 'name').map((p) => p.name)).toEqual([
+    expect(filterPeople(everyone, 'arrived', 'a', BY_NAME).map((p) => p.name)).toEqual([
       'Ada Lovelace',
       'Grace Hopper',
       'Jo Park',
       'Sam Chen',
     ]);
-    expect(filterPeople(everyone, 'unclaimed', 'ada', 'name')).toEqual([]);
+    expect(filterPeople(everyone, 'unclaimed', 'ada', BY_NAME)).toEqual([]);
+  });
+
+  /**
+   * There is no DOM in this suite, so the ordering above is checked as a
+   * function and the wiring is checked as text: the header is the control,
+   * and it is not hidden from a screen reader any more now that it is one.
+   */
+  describe('the header that drives it', () => {
+    const admin = readFileSync(
+      join(import.meta.dirname, '..', 'web', 'src', 'pages', 'AdminPage.tsx'),
+      'utf8',
+    );
+
+    it('offers every column, and no longer a single two-way toggle', () => {
+      for (const column of ['name', 'username', 'uid', 'role', 'seen']) {
+        expect(admin, column).toContain(`['${column}', '`);
+      }
+      expect(admin).not.toContain("s === 'name' ? 'seen' : 'name'");
+      expect(admin).not.toContain("'By last seen'");
+    });
+
+    it('stopped hiding the header once the header became the control', () => {
+      expect(admin).not.toMatch(/aria-hidden="true"\s*\n\s*className="flex items-center gap-2 border-b/);
+      expect(admin).toContain('function PeopleHeader');
+    });
   });
 
   describe('the badge a row wears', () => {
