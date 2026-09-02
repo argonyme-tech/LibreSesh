@@ -64,4 +64,9 @@ One commit per step, tests with each. Steps 0–2 in the main session on
 - [x] Merge… on every People row, as well as the profile page.
 - [x] Tests: `tests/peopleSuggest.test.ts`.
 
-## Step 5 — a way back from the profile page (hand-off)
+## Step 5 — a way back from the profile page
+
+- [x] The People list passes `back` in router state; `ProfilePage` honours it.
+- [x] Organisers get a "Manage → People" link when they arrived by deep link.
+- [x] The heading is the full name, `@username` beneath; `ID:` gone.
+- [x] Tests: source assertions in `tests/profileFields.test.ts`.

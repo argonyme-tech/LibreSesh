@@ -35,6 +35,15 @@ All notable changes to this project are documented here.
   speaker (`PersonDto.creditable`), and the server refuses a non-organiser
   crediting one. Organisers may still credit anyone.
 
+- **A profile page goes back where you opened it from.** Every profile sent
+  you to the schedule, so an organiser working through Manage → People had
+  to navigate back in for each person they looked at. The link now names
+  where you came from, and an organiser who arrived by deep link gets
+  "Manage → People" outright. The heading is the full name a session is
+  credited to, with the `@username` the room calls them beneath it; the
+  `ID: 00054` under the name has gone, since the profile's row id is in the
+  address bar and needed nowhere else.
+
 - **A merge dialog that shows who is who.** Merging is the only thing an
   organiser cannot undo, and it asked for the decision through a bare
   `<select>` of names — two people called Ada Lovelace look identical in a

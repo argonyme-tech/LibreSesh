@@ -962,6 +962,9 @@ export function AdminPage() {
                     </SecondaryButton>
                     <Link
                       to={`/e/${slug}/p/${person.id}`}
+                      // So the profile page sends them back to this tab rather
+                      // than out to the schedule they never came from.
+                      state={{ back: { to: `/e/${slug}/admin?tab=people`, label: 'People' } }}
                       className="rounded-lg border border-stone-300 bg-white px-2.5 py-1 text-xs font-semibold text-stone-700 hover:border-stone-500 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-200 dark:hover:border-stone-400"
                     >
                       Edit

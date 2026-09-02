@@ -104,6 +104,30 @@ describe('the profile page edits a field at a time', () => {
     expect(page).not.toMatch(/savePerson\(\{\s*displayName/);
   });
 
+  /**
+   * A profile is reached from the schedule and from Manage → People, and
+   * those are nothing like each other. Sending an organiser out to the
+   * schedule made them navigate back in for every person they looked at.
+   */
+  it('goes back where it was opened from, and to the schedule otherwise', () => {
+    expect(page).toMatch(/useLocation\(\)\.state as \{ back\?: /);
+    expect(page).toMatch(/from\?\.to \?\? `\/e\/\$\{slug\}`/);
+    expect(page).toMatch(/from\?\.label \?\? 'Schedule'/);
+    // A deep link arrives with no history, so an organiser is told the tab.
+    expect(page).toContain('Manage → People');
+
+    const admin = readFileSync('web/src/pages/AdminPage.tsx', 'utf8');
+    expect(admin).toMatch(/state=\{\{ back: \{ to: `\/e\/\$\{slug\}\/admin\?tab=people`/);
+  });
+
+  it('names the two names, and shows the row id nowhere', () => {
+    // The heading is the full name a session is credited to; under it the
+    // username the room calls them. The row id is in the address bar.
+    expect(page).toMatch(/aria-label="Full name"/);
+    expect(page).toContain('Username');
+    expect(page).not.toContain('rowId');
+  });
+
   it('opens one field at a time', () => {
     expect(page).toMatch(/type FieldKey = /);
     expect(page).toMatch(/useState<FieldKey \| null>\(null\)/);

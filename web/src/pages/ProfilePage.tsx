@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import type { PersonDetailDto, PersonDto, PersonLink } from '@shared/types';
 import { ApiError, api, type PersonWrite } from '../lib/api';
-import { dayLabel, fmtMin, place, rowId, todayInZone } from '../lib/format';
+import { dayLabel, fmtMin, place, todayInZone } from '../lib/format';
 import { renderMarkdown } from '../lib/markdown';
 import { useEventData } from '../lib/useEventData';
 import { EditIcon } from '../components/icons';
@@ -34,6 +34,14 @@ export function ProfilePage() {
   const { slug = '', personId = '' } = useParams();
   const id = Number(personId);
   const navigate = useNavigate();
+  /**
+   * Where "back" goes. A profile is reached from two places that are nothing
+   * like each other — the schedule, and Manage → People — and sending an
+   * organiser who came from the People tab out to the schedule made them
+   * navigate back in for every person they looked at. Whoever links here says
+   * where here was; anyone who does not gets the schedule, as before.
+   */
+  const from = (useLocation().state as { back?: { to: string; label: string } } | null)?.back;
   // The bundle gives us the viewer's role, the timezone and live edits.
   const data = useEventData(slug);
 
@@ -161,9 +169,25 @@ export function ProfilePage() {
   return (
     <div className="min-h-screen bg-stone-100 dark:bg-stone-950 text-stone-900 dark:text-stone-100">
       <div className="mx-auto max-w-2xl px-4 py-8">
-        <Link to={`/e/${slug}`} className="text-xs text-stone-500 dark:text-stone-400 underline">
-          ← Schedule
-        </Link>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <Link
+            to={from?.to ?? `/e/${slug}`}
+            className="text-xs text-stone-500 dark:text-stone-400 underline"
+          >
+            ← {from?.label ?? 'Schedule'}
+          </Link>
+          {/* A deep link into a profile arrives with no history to speak of,
+              so an organiser gets the tab named outright rather than only as
+              a back arrow they may not have. */}
+          {isAdmin && from === undefined && (
+            <Link
+              to={`/e/${slug}/admin?tab=people`}
+              className="text-xs text-stone-500 dark:text-stone-400 underline"
+            >
+              Manage → People
+            </Link>
+          )}
+        </div>
 
         <div className="mt-4 rounded-2xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-5 shadow-sm">
           <div className="flex items-start gap-3">
@@ -208,13 +232,14 @@ export function ProfilePage() {
                   )}
                 </div>
               )}
-              {/* Profile names are checked for clashes but are not the thing
-                  that identifies anyone — this id is, and it is the one in the
-                  address bar. Per event on purpose: a number that followed a
-                  person between events would tie their names together, which
-                  is exactly what per-event names exist to avoid. */}
-              <p className="mt-0.5 font-mono text-xs text-stone-400 dark:text-stone-500">
-                ({rowId(person.id)})
+              {/* Two names, two jobs: the heading is the full name a session
+                  is credited to, and under it the username the room actually
+                  calls them. The profile's row id used to sit here; it is in
+                  the address bar and nowhere else does anyone need it. */}
+              <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">
+                {person.username === null
+                  ? 'Nobody holds this profile yet'
+                  : `@${person.username}`}
               </p>
             </div>
             {isAdmin && (
