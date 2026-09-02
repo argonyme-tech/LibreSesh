@@ -7,6 +7,7 @@ import type {
   RoomDto,
   Role,
   SessionDto,
+  FormatDto,
   TagDto,
 } from '@shared/types';
 import { readableInk } from '@shared/tagColors';
@@ -39,6 +40,8 @@ export interface SessionDetailProps {
   slug: string;
   rooms: RoomDto[];
   tags: TagDto[];
+  /** Every format the event defines, to name the one this session wears. */
+  formats: FormatDto[];
   contributions: ContributionDto[] | undefined;
   role: Role;
   me: Me | null;
@@ -71,6 +74,7 @@ export function SessionDetail({
   slug,
   rooms,
   tags,
+  formats,
   contributions,
   role,
   me,
@@ -158,6 +162,19 @@ export function SessionDetail({
     <div className={`flex items-start gap-2 ${page ? 'mb-6' : 'mb-3'}`}>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
+          {/* First in the row, because it is what the thing *is*; the
+              official/open badge beside it says who put it there. */}
+          {(() => {
+            const format = formats.find((f) => f.id === session.formatId);
+            return format ? (
+              <span
+                className="rounded-full px-2 py-0.5 text-xs font-semibold"
+                style={{ background: format.color, color: readableInk(format.color) }}
+              >
+                {format.name}
+              </span>
+            ) : null;
+          })()}
           {session.type === 'open' ? (
             <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
               open session

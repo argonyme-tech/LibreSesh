@@ -1413,6 +1413,7 @@ export function SchedulePage() {
             slug={slug}
             rooms={bundle.rooms}
             tags={bundle.tags}
+            formats={bundle.formats}
             contributions={data.contributions[selected.id]}
             role={role}
             me={me}
@@ -1600,6 +1601,7 @@ export function SchedulePage() {
           slug={slug}
           rooms={bundle.rooms}
           tags={bundle.tags}
+          formats={bundle.formats}
           contributions={data.contributions[selected.id]}
           role={role}
           me={me}
@@ -1624,6 +1626,7 @@ export function SchedulePage() {
           session={editing.session}
           rooms={bundle.rooms}
           tags={bundle.tags}
+          formats={bundle.formats}
           tracks={bundle.tracks}
           people={bundle.people}
           role={role}

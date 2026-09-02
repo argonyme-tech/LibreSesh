@@ -7,6 +7,7 @@ import type {
   RoomDto,
   Role,
   SessionDto,
+  FormatDto,
   TagDto,
 } from '@shared/types';
 import { CloseIcon, ExpandIcon } from './icons';
@@ -17,6 +18,7 @@ export interface DetailSheetProps {
   slug: string;
   rooms: RoomDto[];
   tags: TagDto[];
+  formats: FormatDto[];
   contributions: ContributionDto[] | undefined;
   role: Role;
   me: Me | null;

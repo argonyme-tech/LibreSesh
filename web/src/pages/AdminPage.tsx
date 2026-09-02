@@ -3,6 +3,7 @@ import { FloatingFocusManager } from '@floating-ui/react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type {
   BreakDto,
+  FormatDto,
   PersonDto,
   Role,
   RoomDto,
@@ -13,6 +14,7 @@ import type {
 } from '@shared/types';
 import { ROOM_COLORS } from '@shared/roomColors';
 import { TAG_COLORS, nextTagColor, readableInk } from '@shared/tagColors';
+import { SUGGESTED_FORMATS } from '@shared/formats';
 
 import { ColorPicker } from '../components/ColorPicker';
 import { windowLabel } from '@shared/trackHours';
@@ -254,6 +256,10 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]['id'];
 
+/** Lengths a format can claim. The session form's own list plus the shorter
+ *  end, because a lightning slot and a demo live down there. */
+const FORMAT_LENGTHS = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240];
+
 const plural = (n: number, one: string, many = `${one}s`): string =>
   `${n} ${n === 1 ? one : many}`;
 
@@ -276,6 +282,8 @@ export function AdminPage() {
   const [reordering, setReordering] = useState(false);
   const [tagName, setTagName] = useState('');
   const [editingTag, setEditingTag] = useState<TagDto | null>(null);
+  const [formatName, setFormatName] = useState('');
+  const [editingFormat, setEditingFormat] = useState<FormatDto | null>(null);
   const [trackName, setTrackName] = useState('');
   const [editingTrack, setEditingTrack] = useState<TrackDto | null>(null);
   const [movingTracks, setMovingTracks] = useState(false);
@@ -501,6 +509,14 @@ export function AdminPage() {
    *  same one for a tag created without a colour; doing it here as well means
    *  the swatch shows what you are about to get rather than a surprise. */
   const suggestedTagColor = nextTagColor((bundle?.tags ?? []).map((t) => t.color));
+
+  /** The shipped suggestions this event has not defined yet, matched the way
+   *  the server matches names — case-insensitively, since "Workshop" and
+   *  "workshop" are the same format and the second would be refused. */
+  const definedFormats = new Set((bundle?.formats ?? []).map((f) => f.name.toLowerCase()));
+  const suggestedFormats = SUGGESTED_FORMATS.filter(
+    (s) => !definedFormats.has(s.name.toLowerCase()),
+  );
   const newTagColor = tagColor ?? suggestedTagColor;
 
   const addTag = async () => {
@@ -622,6 +638,49 @@ export function AdminPage() {
     try {
       await api.deleteTag(slug, tag.id);
       data.apply({ type: 'tag.deleted', entity: { id: tag.id } });
+      return true;
+    } catch (err) {
+      fail(err);
+      return false;
+    }
+  };
+
+  const addFormat = async (name: string, defaultMin?: number | null) => {
+    if (!name.trim()) return;
+    try {
+      // No colour sent: the server picks the first the event is not using,
+      // the same rule tags follow, so a list of formats is legible without
+      // anyone choosing colours by hand.
+      const created = await api.createFormat(slug, {
+        name: name.trim(),
+        ...(defaultMin === undefined ? {} : { defaultMin }),
+      });
+      data.apply({ type: 'format.created', entity: created });
+      setFormatName('');
+    } catch (err) {
+      fail(err);
+    }
+  };
+
+  const patchFormat = async (format: FormatDto, patch: Partial<FormatDto>): Promise<boolean> => {
+    try {
+      data.apply({ type: 'format.updated', entity: await api.updateFormat(slug, format.id, patch) });
+      return true;
+    } catch (err) {
+      fail(err);
+      return false;
+    }
+  };
+
+  const removeFormat = async (format: FormatDto): Promise<boolean> => {
+    const ok = await confirm({
+      title: `Delete the “${format.name}” format?`,
+      body: 'The sessions that use it keep their slot and simply stop saying what kind of session they are. The bin does not hold formats, so this cannot be undone.',
+    });
+    if (!ok) return false;
+    try {
+      await api.deleteFormat(slug, format.id);
+      data.apply({ type: 'format.deleted', entity: { id: format.id } });
       return true;
     } catch (err) {
       fail(err);
@@ -1110,6 +1169,96 @@ export function AdminPage() {
               />
             </div>
           </Section>
+
+          <Section
+            title="Formats"
+            description="What kind of thing a session is — a talk, a workshop, a panel. Picked at the top of the session form, where it also sets a starting length."
+            className="mb-6"
+          >
+            <ul className="mb-4 flex flex-wrap gap-2">
+              {bundle.formats.map((format) => (
+                <li key={format.id}>
+                  <button
+                    type="button"
+                    onClick={() => setEditingFormat(format)}
+                    title={`Edit ${format.name}`}
+                    style={{ background: format.color, color: readableInk(format.color) }}
+                    className="rounded-full px-2.5 py-1 text-xs font-medium ring-offset-2 ring-offset-white hover:ring-2 hover:ring-stone-400 dark:ring-offset-stone-900"
+                  >
+                    {format.name}
+                    {format.defaultMin !== null && (
+                      <span className="ml-1 opacity-70">{format.defaultMin} min</span>
+                    )}
+                    <span className="sr-only">— edit this format</span>
+                  </button>
+                </li>
+              ))}
+              {bundle.formats.length === 0 && (
+                <li className="text-sm text-stone-400 dark:text-stone-500">No formats yet.</li>
+              )}
+            </ul>
+
+            {/* Suggestions rather than defaults: nothing is created until it is
+                clicked, so an event that runs none of these — or invents its
+                own — is not left deleting a dozen rows it never asked for.
+                Each drops off the list once it exists. */}
+            {suggestedFormats.length > 0 && (
+              <div className="mb-4">
+                <p className="mb-2 text-xs text-stone-500 dark:text-stone-400">
+                  {bundle.formats.length === 0
+                    ? 'Common ones, if any of them fit. Click to add.'
+                    : 'More to add:'}
+                </p>
+                <ul className="flex flex-wrap gap-1.5">
+                  {suggestedFormats.map((s) => (
+                    <li key={s.name}>
+                      <button
+                        type="button"
+                        title={s.hint}
+                        onClick={() => void addFormat(s.name, s.defaultMin ?? null)}
+                        className="rounded-full border border-dashed border-stone-300 px-2.5 py-1 text-xs text-stone-600 hover:border-stone-500 hover:text-stone-900 dark:border-stone-600 dark:text-stone-300 dark:hover:border-stone-400 dark:hover:text-stone-100"
+                      >
+                        + {s.name}
+                        {s.defaultMin !== undefined && (
+                          <span className="ml-1 opacity-60">{s.defaultMin} min</span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <FormRow>
+              <div className="min-w-40 flex-1">
+                <Field label="New format">
+                  <input
+                    value={formatName}
+                    onChange={(e) => setFormatName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && void addFormat(formatName)}
+                    maxLength={40}
+                    className={inputClass}
+                  />
+                </Field>
+              </div>
+              <PrimaryButton
+                onClick={() => void addFormat(formatName)}
+                disabled={!formatName.trim()}
+              >
+                Add format
+              </PrimaryButton>
+            </FormRow>
+          </Section>
+
+          {editingFormat && (
+            <FormatEditor
+              format={editingFormat}
+              sessions={bundle.sessions.filter((x) => x.formatId === editingFormat.id).length}
+              onPatch={patchFormat}
+              onDelete={removeFormat}
+              onClose={() => setEditingFormat(null)}
+            />
+          )}
 
           {editingTag && (
             <TagEditor
@@ -1715,6 +1864,114 @@ export function AdminPage() {
  * nothing and offers no way back out. It also gives the name clash somewhere
  * to be reported — tag names are unique per event.
  */
+/**
+ * Rename, recolour, retime or delete one format. Same shape as the tag editor,
+ * plus the one thing a format has that a tag does not: how long a session of
+ * this kind usually runs, which is what the session form prefills.
+ */
+function FormatEditor({
+  format,
+  sessions,
+  onPatch,
+  onDelete,
+  onClose,
+}: {
+  format: FormatDto;
+  /** How many sessions call themselves this, so deleting is informed. */
+  sessions: number;
+  onPatch: (format: FormatDto, patch: Partial<FormatDto>) => Promise<boolean>;
+  onDelete: (format: FormatDto) => Promise<boolean>;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(format.name);
+  const [color, setColor] = useState(format.color);
+  const [defaultMin, setDefaultMin] = useState<number | null>(format.defaultMin);
+  const [busy, setBusy] = useState(false);
+
+  const dirty =
+    name.trim() !== format.name || color !== format.color || defaultMin !== format.defaultMin;
+
+  const save = async () => {
+    if (!name.trim() || busy) return;
+    setBusy(true);
+    try {
+      if (await onPatch(format, { name: name.trim(), color, defaultMin })) onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (await onDelete(format)) onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      title="Edit format"
+      onClose={onClose}
+      onSubmit={() => void save()}
+      footer={
+        <>
+          <DangerButton className="mr-auto" onClick={() => void remove()} disabled={busy}>
+            Delete
+          </DangerButton>
+          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+          <PrimaryButton type="submit" disabled={!name.trim() || !dirty || busy}>
+            Save
+          </PrimaryButton>
+        </>
+      }
+    >
+      <FormStack>
+        <Field label="Name">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={40}
+            className={inputClass}
+            autoFocus
+          />
+        </Field>
+        <Field
+          label="Usual length"
+          hint="Prefilled into a new session when this format is picked. Changing it here never moves a session that already exists."
+        >
+          <select
+            value={defaultMin ?? ''}
+            onChange={(e) => setDefaultMin(e.target.value === '' ? null : Number(e.target.value))}
+            className={inputClass}
+          >
+            <option value="">No usual length</option>
+            {FORMAT_LENGTHS.map((d) => (
+              <option key={d} value={d}>
+                {d} min
+              </option>
+            ))}
+          </select>
+        </Field>
+        <ColorPicker
+          value={color}
+          onChange={setColor}
+          palette={TAG_COLORS}
+          label="Format colour"
+        />
+      </FormStack>
+
+      <p className="mt-3 text-xs text-stone-500 dark:text-stone-400">
+        {sessions === 0
+          ? 'No session calls itself this yet. Deleting it affects nothing.'
+          : `${plural(sessions, 'session')} call themselves this. Deleting the format leaves them where they are, without a kind.`}
+      </p>
+    </Modal>
+  );
+}
+
 function TagEditor({
   tag,
   sessions,

@@ -7,6 +7,7 @@ import type {
   ContributionRow,
   PersonRow,
   RoomRow,
+  FormatRow,
   SessionRow,
   TagRow,
   TrackRow,
@@ -23,6 +24,7 @@ import {
   toPersonDto,
   toRoomDto,
   toSessionDto,
+  toFormatDto,
   toTagDto,
   toTrackDto,
   loadSessionDto,
@@ -50,6 +52,13 @@ export function bundleRoutes(ctx: Ctx): Router {
     const tags = ctx.db
       .prepare<[number], TagRow>(
         'SELECT * FROM tags WHERE event_id = ? AND deleted_at IS NULL ORDER BY name',
+      )
+      .all(eventId);
+    // The organiser's running order, not alphabetical: keynote before talk
+    // before lightning is the sequence they typed them in.
+    const formats = ctx.db
+      .prepare<[number], FormatRow>(
+        'SELECT * FROM session_formats WHERE event_id = ? AND deleted_at IS NULL ORDER BY sort_order, id',
       )
       .all(eventId);
     const tracks = ctx.db
@@ -110,6 +119,7 @@ export function bundleRoutes(ctx: Ctx): Router {
         eventDisplayName(ctx.db, eventId, req.identity.id) ?? req.identity.display_name,
       rooms: rooms.map(toRoomDto),
       tags: tags.map(toTagDto),
+      formats: formats.map(toFormatDto),
       tracks: tracks.map((t) => toTrackDto(t, trackWindowRows.get(t.id) ?? [])),
       breaks: breaks.map(toBreakDto),
       sessions: sessions.map((s) =>

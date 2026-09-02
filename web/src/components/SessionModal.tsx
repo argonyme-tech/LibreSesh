@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type {
+  FormatDto,
   LabelledLink,
   PersonDto,
   RoomDto,
@@ -48,6 +49,9 @@ export interface SessionModalProps {
   session?: SessionDto;
   rooms: RoomDto[];
   tags: TagDto[];
+  /** What kinds of session this event runs. Empty when the organiser has
+   *  defined none, and the Format row is then absent entirely. */
+  formats: FormatDto[];
   /** Empty when the event defines none; the Track field is then absent. */
   tracks: TrackDto[];
   people: PersonDto[];
@@ -73,6 +77,7 @@ export function SessionModal({
   session,
   rooms,
   tags,
+  formats,
   tracks,
   people,
   role,
@@ -118,6 +123,7 @@ export function SessionModal({
   const [start, setStart] = useState(fmtMin(existing?.startMin ?? Math.max(dayStartMin, 14 * 60)));
   const [durMin, setDurMin] = useState(existing?.durMin ?? 30);
   const [tagIds, setTagIds] = useState<number[]>(session?.tagIds ?? []);
+  const [formatId, setFormatId] = useState<number | null>(session?.formatId ?? null);
   const [typeHelp, setTypeHelp] = useState(false);
   const [trackId, setTrackId] = useState<number | null>(session?.trackId ?? null);
   const [type, setType] = useState<'official' | 'open'>(
@@ -131,6 +137,25 @@ export function SessionModal({
   // it, so the form never offers the combination: switching the type to open
   // takes the hold with it, visibly, while the box is still on screen.
   const holdsFloor = isAdmin && type === 'official' && blocksOpenBooking;
+
+  /**
+   * Picking a format on a *new* session sets the duration to what that format
+   * usually runs — the whole reason a format carries one. Only on a new
+   * session, and only when the duration is still the one the form opened with:
+   * on an existing session the length is a fact about a slot people may
+   * already have planned around, and silently rewriting it while someone
+   * corrects the kind of session it is would be a worse bug than the
+   * convenience is worth. Clicking the active chip clears the format and
+   * leaves the duration alone.
+   */
+  const pickFormat = (next: FormatDto) => {
+    if (formatId === next.id) {
+      setFormatId(null);
+      return;
+    }
+    setFormatId(next.id);
+    if (!session && next.defaultMin !== null && durMin === 30) setDurMin(next.defaultMin);
+  };
 
   // Repeating is for building a programme, so it belongs to organisers and to
   // sessions that do not exist yet. Editing one day of a run edits that day:
@@ -206,6 +231,7 @@ export function SessionModal({
       endsAt: zonedTimeToUtc(day, startMin + durMin, timezone).toISOString(),
       tagIds,
       trackId,
+      formatId,
     }, repeat);
   };
 
@@ -254,6 +280,35 @@ export function SessionModal({
 
       <div className="space-y-5">
         <FieldGroup title="What it is">
+          {/* First, because it is the choice that shapes the rest: a lightning
+              talk is five minutes and a workshop is two hours, and picking it
+              before the times are typed is what makes the duration below
+              arrive already right. Absent when the event defines no formats,
+              which is where every event starts. */}
+          {formats.length > 0 && (
+            <Field
+              label="Format"
+              hint={
+                session
+                  ? 'What kind of session this is.'
+                  : 'What kind of session this is. Sets a starting length you can still change.'
+              }
+            >
+              <div className="flex flex-wrap gap-1.5">
+                {formats.map((f) => (
+                  <Chip
+                    key={f.id}
+                    dot={f.color}
+                    active={formatId === f.id}
+                    onClick={() => pickFormat(f)}
+                  >
+                    {f.name}
+                  </Chip>
+                ))}
+              </div>
+            </Field>
+          )}
+
           <Field label="Title">
             <input
               value={title}
@@ -489,8 +544,13 @@ export function SessionModal({
             </div>
           </Field>
 
+          {/* Called "Placement" rather than "Type": what it says is who put the
+              session up and whether it is the published programme, and the
+              field at the top of this form is the one that answers what kind of
+              session it is. Two fields labelled Type, at opposite ends of one
+              form, would be indistinguishable. */}
           {isAdmin && (
-            <Field label="Type">
+            <Field label="Placement">
               <div className="flex items-center gap-1.5">
                 {(['official', 'open'] as const).map((t) => (
                   <Chip key={t} active={type === t} onClick={() => setType(t)}>
@@ -500,7 +560,7 @@ export function SessionModal({
                 <HelpButton
                   open={typeHelp}
                   onClick={() => setTypeHelp(!typeHelp)}
-                  label="session types"
+                  label="how a session is placed"
                 />
               </div>
               {typeHelp && (

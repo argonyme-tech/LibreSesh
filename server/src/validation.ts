@@ -265,6 +265,25 @@ export const tagSchema = z.object({
 });
 export const tagPatchSchema = tagSchema.partial();
 
+/**
+ * A format — what kind of session it is. Same name-and-colour shape as a tag,
+ * plus how long one usually runs. `defaultMin` is nullable and not merely
+ * optional: "this format says nothing about length" is a setting an organiser
+ * chooses, so clearing it has to be sendable.
+ */
+export const formatSchema = z.object({
+  name: trimmed(40),
+  color: colorSchema.optional(),
+  defaultMin: z
+    .number()
+    .int()
+    .min(5)
+    .max(24 * 60)
+    .nullable()
+    .optional(),
+});
+export const formatPatchSchema = formatSchema.partial();
+
 /** A labelled link. Profiles carry a handful; so does a session, one per
  *  stream. Same rules as a contribution's link — see `safeLink`. */
 const linkSchema = z.object({
@@ -329,6 +348,9 @@ export const sessionSchema = z.object({
   endsAt: isoInstantSchema,
   tagIds: z.array(z.number().int().positive()).max(20).optional(),
   trackId: z.number().int().positive().nullable().optional(),
+  /** What kind of session it is. `null` clears it; absent leaves it alone on
+   *  a PATCH, the way the track does. */
+  formatId: z.number().int().positive().nullable().optional(),
 });
 export const sessionPatchSchema = sessionSchema.partial().extend({
   expectedUpdatedAt: isoInstantSchema.optional(),

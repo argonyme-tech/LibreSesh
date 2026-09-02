@@ -15,6 +15,7 @@ import {
   assertNoOverlap,
   assertNotBlocked,
   assertNotStale,
+  assertFormatBelongs,
   assertTagsBelong,
   assertTrackBelongs,
   assertValidTimes,
@@ -90,6 +91,8 @@ export function sessionRoutes(ctx: Ctx): Router {
     const trackId = body.trackId ?? null;
     assertTrackBelongs(ctx.db, req.event.id, trackId);
     assertWithinTrackHours(ctx.db, req.event, req.role, trackId, window);
+    const formatId = body.formatId ?? null;
+    assertFormatBelongs(ctx.db, req.event.id, formatId);
 
     const now = new Date().toISOString();
     const id = ctx.db.transaction((): number => {
@@ -97,15 +100,16 @@ export function sessionRoutes(ctx: Ctx): Router {
       const info = ctx.db
         .prepare(
           `INSERT INTO sessions
-            (event_id, room_id, track_id, type, blocks_open_booking, title,
+            (event_id, room_id, track_id, format_id, type, blocks_open_booking, title,
              description, speaker, livestreams, starts_at, ends_at,
              created_by, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           req.event.id,
           room.id,
           trackId,
+          formatId,
           type,
           blocks ? 1 : 0,
           body.title,
@@ -170,6 +174,9 @@ export function sessionRoutes(ctx: Ctx): Router {
       assertTagsBelong(ctx.db, req.event.id, tagIds);
       const trackId = body.trackId ?? null;
       assertTrackBelongs(ctx.db, req.event.id, trackId);
+      // Every occurrence is the same kind of thing as the first one.
+      const formatId = body.formatId ?? null;
+      assertFormatBelongs(ctx.db, req.event.id, formatId);
 
       // The run is a claim about the printed clock, so it is the wall-clock
       // start and end that repeat, not the instants. Each day is resolved
@@ -210,10 +217,10 @@ export function sessionRoutes(ctx: Ctx): Router {
         const speakerIds = resolveSpeakers(ctx.db, req.event.id, body.speakers ?? [], actor(req));
         const insert = ctx.db.prepare(
           `INSERT INTO sessions
-            (event_id, room_id, track_id, type, blocks_open_booking, title,
+            (event_id, room_id, track_id, format_id, type, blocks_open_booking, title,
              description, speaker, livestreams, starts_at, ends_at,
              created_by, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?)`,
         );
         return windows.map((window) => {
           const newId = Number(
@@ -221,6 +228,7 @@ export function sessionRoutes(ctx: Ctx): Router {
               req.event.id,
               room.id,
               trackId,
+              formatId,
               type,
               blocks ? 1 : 0,
               body.title,
@@ -325,19 +333,25 @@ export function sessionRoutes(ctx: Ctx): Router {
     if (replaced) {
       assertWithinTrackHours(ctx.db, req.event, req.role, nextTrackId, window);
     }
+    // `undefined` leaves the format alone; an explicit `null` clears it. It is
+    // a description of the session rather than a claim on the grid, so anyone
+    // who may edit the session may change it — no placement rule applies.
+    const nextFormatId = body.formatId === undefined ? existing.format_id : body.formatId;
+    assertFormatBelongs(ctx.db, req.event.id, nextFormatId);
 
     const now = new Date().toISOString();
     ctx.db.transaction(() => {
       ctx.db
         .prepare(
-          `UPDATE sessions SET room_id = ?, track_id = ?, type = ?, blocks_open_booking = ?,
-                  title = ?, description = ?,
+          `UPDATE sessions SET room_id = ?, track_id = ?, format_id = ?, type = ?,
+                  blocks_open_booking = ?, title = ?, description = ?,
                   livestreams = ?, starts_at = ?, ends_at = ?, updated_at = ?
             WHERE id = ?`,
         )
         .run(
           room.id,
           nextTrackId,
+          nextFormatId,
           type,
           blocks ? 1 : 0,
           body.title ?? existing.title,

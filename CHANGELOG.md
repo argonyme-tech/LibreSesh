@@ -6,6 +6,39 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **A session can say what kind of thing it is.** The app had one word for a
+  session — `type`, meaning `official` or `open` — and that says who put it
+  up, not what it is. So nothing anywhere distinguished a five-minute
+  lightning slot from a three-hour hands-on workshop, and a reader had to
+  infer it from the description and the height of the block.
+
+  Sessions now carry a **format**: a talk, a workshop, a panel, a jam. It is
+  the first control in the session form, above the title, because it is the
+  choice that shapes the fields under it — picking one sets the duration to
+  what that kind of session usually runs, on a new session only, where
+  nobody has planned around the slot yet. It shows as a coloured badge at the
+  head of the session sheet, and it is the first thing named there: what the
+  session *is* comes before who placed it.
+
+  Formats are defined per event in Manage Event → Programme, beside rooms,
+  tracks and tags, because an unconference invents them. Nothing is created
+  by default; the section offers a dozen common ones — keynote, lightning
+  talks, poster session, excursion — as one-click suggestions, each with the
+  length it usually runs, and an event that runs none of them can type its
+  own and never see the list again. Deleting a format leaves its sessions
+  where they are, without a kind.
+
+  Its own table rather than a reserved tag: a session wears many tags and
+  exactly one format, and a uniqueness rule the tag UI cannot express is a
+  rule that gets broken. Clones carry formats over with the rooms and tags,
+  the export carries them, and an import document declares them by name the
+  way it already declares rooms and tracks. Migration 014.
+
+  One rename came with it: the official/open control in the session form is
+  labelled **Placement** now. It was labelled Type, and a second field called
+  Type at the other end of the same form would have been indistinguishable
+  from it.
+
 ### Changed
 
 - **Deleting asks in the app's own voice, and says where things go.** Every

@@ -60,6 +60,7 @@ every failure as `{ error: { code, message } }`.
 | `event_identities` | `(event, identity) → display name`, unique within the event |
 | `roles` | `(identity, event) → viewer\|user\|speaker\|admin` |
 | `rooms`, `tags` | Per event, soft-deleted |
+| `session_formats` | What kind of thing a session is — talk, workshop, panel. Per event, soft-deleted, ordered by the organiser's running order rather than by name. A session wears one (`sessions.format_id`, nullable); deleting a format clears it from them (migration 014) |
 | `breaks` | Lunch and friends: a label and local minutes of day, `date` null meaning every day. No room, no author, hard-deleted |
 | `sessions` | Scheduled: always has a room and a time; `blocks_open_booking` holds the floor against attendees |
 | `proposals` | Pitched: no room, no time, until an organiser places it |
@@ -92,6 +93,32 @@ notices `event.slug` differs from the one in its URL and replaces the address
 bar; that is cosmetic, and nothing server-side depends on it happening.
 Uniqueness is checked across both tables (`slugTaken`), so a slug that still
 redirects cannot be handed to a new event.
+
+### A format is not a type
+
+`sessions.type` is `official | open` and answers **who put this here**: the
+published programme, or an attendee booking a room that allows it. It decides
+permissions — who may move the session, whether it can hold the floor — and it
+is the oldest column in the table.
+
+`sessions.format_id` answers **what this is**: a talk, a workshop, a panel, a
+jam. It decides nothing. No rule reads it, no placement check consults it, and
+a session without one is in the state every session in the app was in before
+migration 014. The two are independent: an open session can be a workshop and
+an official one can be a jam.
+
+They are two columns and not one because they are two questions, and the app
+had a word for only the first of them. The visible label on the official/open
+control in the session form is therefore **Placement**, not Type — the field at
+the top of that form is the one that says what kind of session it is, and two
+fields called Type at opposite ends of one form would be indistinguishable.
+
+Formats are event-defined rather than an enum because an unconference invents
+them; `shared/formats.ts` ships a dozen suggestions the organiser clicks to
+create, and creates none of them on its own. The shape is the tags table plus
+`default_min`, the length the session form prefills when a format is picked on
+a *new* session — never on an existing one, where the length is a slot people
+may already have planned around.
 
 ### Sessions that hold the floor
 

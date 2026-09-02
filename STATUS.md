@@ -71,6 +71,17 @@ lives in `_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
     archived profile, which is the one screen the holder is meant to find
     on their own.
 
+  And from later the same day, **formats** (migration 014), none of it seen:
+  the chip row at the top of the session form — whether a dozen formats wrap
+  into three lines above the title, which is the case the design is weakest
+  at, and whether picking one visibly moves the Duration select below it; the
+  **Formats** section in Manage Event → Programme, where the suggestion chips
+  are a dashed row that has never been rendered; and the format badge at the
+  head of the session sheet, which now sits before the official/open badge and
+  may crowd the title on a narrow phone. The official/open control's label
+  changed to **Placement** in the same pass — worth checking it does not now
+  read as a duplicate of the Room and Day fields it sits near.
+
   The **gate** is still the one nobody has opened, and it is the screen
   every attendee must get through: it now refuses an empty username and
   asks "is that you?" when the name matches an unclaimed profile. A
@@ -134,8 +145,17 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   published session would be the first genuinely unauthenticated read in the
   app, and the first place a wrong decision leaks a real event.
 
-  Two shapes to choose between, and this is the decision the item is waiting
-  on. **Live, flagged**: a `published_at` on `sessions`, plus a route above
+  **Decided 2026-09-02: the snapshot.** Publishing copies the session into a
+  table nothing else joins to, and the public route reads only that table.
+  Nothing private can leak by omission, because nothing private is in there —
+  which is the property worth paying for on the app's first unauthenticated
+  read. The costs are known and accepted: a re-publish after every edit (an
+  "update the public copy" button, or a republish on save), and a second place
+  a session's text lives. The rejected alternative is kept here because it is
+  the one to revisit if the re-publish step turns out to annoy people more
+  than the safety is worth.
+
+  Two shapes were on the table. **Live, flagged**: a `published_at` on `sessions`, plus a route above
   the gate that reads the row now and strips what must not travel. Edits show
   up immediately; the stripping is a filter that has to stay correct as
   `SessionDto` grows. **Snapshot, copied**: publishing writes a frozen row
@@ -162,63 +182,32 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   event's own visibility bounds it — a session inside an archived event
   should not stay readable because a link was minted once.
 
-- **A session has no format, only who placed it.** `SessionType` already
-  exists (`shared/types.ts:4`) and it is `'official' | 'open'` — provenance,
-  not kind. Nothing anywhere says a session is a talk, a workshop or a panel,
-  so a reader cannot tell a five-minute lightning slot from a three-hour
-  hands-on one except by reading the description and the block height. Name
-  the new concept something other than "type" before writing a line of it, or
-  the two meanings will be one word in the DTO, the form and the filter.
-  **Format** is the honest word.
+- **The format exists; three places still do not use it.** Landed 2026-09-02
+  (migration 014, `session_formats`): defined per event in Manage Event, picked
+  at the top of the session form where it prefills the duration, shown on the
+  session sheet, carried by clones, the export and the importer. What was left
+  out on purpose, because none of it is needed for a format to be worth
+  having, and each is a separate decision:
 
-  The candidate list, from the organiser's side: keynote (one speaker, large
-  room, sets the theme); talk (20–45 minutes plus Q&A); lightning talks (5
-  minutes, back to back — Ignite and Pecha Kucha are stricter variants with
-  auto-advancing slides); panel (3–5 people and a moderator); fireside chat
-  or interview (one guest, one interviewer, looser than a talk); workshop or
-  tutorial (hands-on, longer, participants bring laptops); poster session
-  (presenters stand by their work, attendees roam); demo or showcase (short
-  live walkthroughs in a shared room); hackathon or sprint (collaborative
-  building over hours or days); field trip, site visit or excursion; walk &
-  talk; jam. That list is a seed for `seed.ts`, not a fixed enum — an
-  unconference invents formats, so they are event-defined and editable in
-  Manage Event, beside rooms, tracks and tags.
+  - **Filtering by format.** It is the obvious second filter after tags, and
+    `useFilters.ts` already carries `rooms`, `tags` and `tracks` in the URL —
+    a fourth is the same shape. Wants a decision about the filter panel on a
+    narrow header before it goes in, since that row already wraps.
+  - **The format on a block.** The grid card has room for about one more word
+    and currently spends it on nothing. A colour dot rather than the name may
+    be the answer at column width; worth looking at a real grid first.
+  - **A placed pitch has no format.** `POST /proposals/:id/place` builds the
+    session without one (`routes/proposals.ts`), which is defensible — a pitch
+    never said what kind of thing it was — but it means the one path that
+    creates a session outside the form always creates a formatless one. Either
+    the pitch form gains the picker, or placing one asks.
 
-  Which makes the real question whether this is a new table or a tag with a
-  flag. The shape is identical to `tags` (`001_baseline.sql:114`): per-event,
-  named, coloured, soft-deleted, `UNIQUE (event_id, name)`. The difference is
-  arity — a session carries many tags and exactly _one_ format — and that is
-  what argues for `session_formats` plus a nullable `format_id` column rather
-  than a reserved tag, because a tag that must be unique per session is a
-  rule the tag UI cannot express. Decide it explicitly; picking tags is
-  defensible if the constraint moves into the session form instead.
-
-  **Where it goes in the form is settled: the top of the session modal.** It
-  is the first control in the `What it is` group, above Title — a mini
-  picker, one row of chips — because the format is the choice that shapes
-  every field beneath it: a lightning talk is five minutes, a workshop is two
-  hours in a room with tables, and picking that first is what lets the rest
-  of the form default sensibly instead of being retyped.
-
-  Two things fall out of that placement. The widget already exists twice in
-  this file — the Tags row (`SessionModal.tsx:284`) is a `flex flex-wrap` of
-  `Chip`s with a colour dot, which is exactly the picker wanted, minus the
-  multi-select. And the collision stops being theoretical: `SessionModal.tsx`
-  already renders a `Field label="Type"` as a row of chips
-  (line 493, admin-only, in the `Extras` group at the _bottom_). Two chip
-  rows in one form, both labelled Type, at opposite ends of it, is not
-  something a rename in the DTO alone fixes — that field's visible label has
-  to change too, or move under the Attendance toggle it actually belongs
-  with. Also decide what the row does when an event defines a dozen formats:
-  Tags wraps and that is fine for a multi-select, but a wrapping three-line
-  single-choice row at the top of the form is worse than a select.
-
-  Downstream, once it exists: the format is the obvious second filter after
-  tags, the obvious thing to show on a block that has room for one more word,
-  and something the importer should accept by name the way it takes rooms and
-  tracks. Formats also want a default duration if they are to be more than a
-  label — a talk pre-filling 30 minutes and a workshop 120 is most of their
-  value in the session form.
+  Two smaller notes from building it. The import document now has `format` at
+  the top meaning "this is a LibreSesh document" **and** `format` on a session
+  meaning what kind of session it is; they are different scopes and both read
+  correctly, but it is a collision worth remembering before either is renamed.
+  And `SUGGESTED_FORMATS` in `shared/formats.ts` is the seed list — suggestions
+  an organiser clicks, never rows created for them — so adding to it is free.
 
 - **Mentioning a person, and somewhere for a mention to land.** Nothing in the
   app addresses anyone. A `@name` typed into a description, a contribution, a

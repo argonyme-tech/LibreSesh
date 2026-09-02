@@ -53,6 +53,7 @@ export interface ImportCounts {
   rooms: number;
   tracks: number;
   tags: number;
+  formats: number;
   breaks: number;
   sessions: number;
   /** Profiles created for speaker names nobody in this event answered to. */
@@ -128,6 +129,24 @@ export interface TagDto {
   id: number;
   name: string;
   color: string;
+}
+
+/**
+ * What kind of session this is: a talk, a workshop, a panel. Defined per event
+ * in Manage Event, so the list is whatever this event runs — the app ships
+ * suggestions (`shared/formats.ts`), not a fixed set.
+ *
+ * Deliberately not `SessionType`, which is `official | open` and says who
+ * placed the session rather than what it is.
+ */
+export interface FormatDto {
+  id: number;
+  name: string;
+  color: string;
+  /** Minutes a session of this format usually runs, prefilled into the form
+   *  when it is picked on a new session. Null when the format says nothing
+   *  about length. */
+  defaultMin: number | null;
 }
 
 /** A label and an http(s) link. Profiles have carried a few since §4;
@@ -242,6 +261,10 @@ export interface SessionDto {
   /** null when the event has no tracks, or the session is not on one. */
   trackId: number | null;
   type: SessionType;
+  /** What kind of session it is, or null when the event defines no formats or
+   *  nobody picked one. Independent of `type`: an open session can be a
+   *  workshop, and an official one can be a jam. */
+  formatId: number | null;
   /** This session holds the floor: while it runs, attendees may not place an
    *  open session anywhere in the event. Official sessions only, and only an
    *  organiser can set it. Speakers and organisers are not stopped by it —
@@ -357,6 +380,9 @@ export interface BundleDto {
   displayName: string;
   rooms: RoomDto[];
   tags: TagDto[];
+  /** In the organiser's running order, not alphabetical. Empty until the
+   *  organiser defines some, which is the state most events start in. */
+  formats: FormatDto[];
   /** Empty unless the organiser has defined any. */
   tracks: TrackDto[];
   /** Lunch and friends, ordered by time. Drawn behind the grid on every day
@@ -427,6 +453,8 @@ export interface EventExport {
     windows: TrackWindowDto[];
   }[];
   tags: { id: number; name: string; color: string }[];
+  /** What kinds of session this event runs, in the organiser's order. */
+  formats: { id: number; name: string; color: string; defaultMin: number | null }[];
   /** Local minutes of day; `date` null means every day of the event. */
   breaks: { id: number; label: string; startMin: number; endMin: number; date: string | null }[];
   people: {
@@ -443,6 +471,7 @@ export interface EventExport {
     id: number;
     roomId: number;
     trackId: number | null;
+    formatId: number | null;
     type: SessionType;
     title: string;
     description: string;
@@ -534,6 +563,9 @@ export type ChangeType =
   | 'tag.created'
   | 'tag.updated'
   | 'tag.deleted'
+  | 'format.created'
+  | 'format.updated'
+  | 'format.deleted'
   | 'track.created'
   | 'track.updated'
   | 'track.deleted'

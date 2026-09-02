@@ -47,6 +47,7 @@ const ENTITIES: Record<string, string> = {
   contribution: 'contribution',
   room: 'room',
   tag: 'tag',
+  format: 'format',
   track: 'track',
   person: 'person',
   proposal: 'pitch',

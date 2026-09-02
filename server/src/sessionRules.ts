@@ -47,6 +47,17 @@ export function assertTagsBelong(db: Db, eventId: number, tagIds: number[]): voi
   if (found.length !== new Set(tagIds).size) throw badRequest('Unknown tag');
 }
 
+/** Reject a format id from another event, or one that has been deleted. */
+export function assertFormatBelongs(db: Db, eventId: number, formatId: number | null): void {
+  if (formatId === null) return;
+  const found = db
+    .prepare<[number, number], { id: number }>(
+      'SELECT id FROM session_formats WHERE event_id = ? AND id = ? AND deleted_at IS NULL',
+    )
+    .get(eventId, formatId);
+  if (!found) throw badRequest('Unknown format');
+}
+
 /** Reject a track id from another event, or one that has been deleted. */
 export function assertTrackBelongs(db: Db, eventId: number, trackId: number | null): void {
   if (trackId === null) return;
