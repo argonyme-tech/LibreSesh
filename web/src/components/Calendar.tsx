@@ -9,6 +9,7 @@ import {
 import type { BreakDto, SessionDto, TagDto } from '@shared/types';
 import { fmtMin, place, speakerLine } from '../lib/format';
 import { InfoIcon } from './icons';
+import { StarTally } from './StarTally';
 import { popoverPanelClass, usePopover } from './Popover';
 
 export const PX_PER_MIN = 1.6;
@@ -777,23 +778,6 @@ export function Calendar({
                       style={{ background: tagColor.get(id) ?? '#6B7280' }}
                     />
                   ))}
-                  {starred && (
-                    // Display only — the block's own pointer handling is
-                    // drag-sensitive, so starring happens from the detail sheet.
-                    <span className="ml-auto text-xs leading-none text-amber-500 dark:text-amber-400" aria-hidden="true">
-                      ★
-                    </span>
-                  )}
-                  {starCount > 0 && (
-                    // Global interest count; announced via the block's aria-label.
-                    <span
-                      className={`${starred ? '' : 'ml-auto '}text-xs leading-none text-stone-400 dark:text-stone-500`}
-                      aria-hidden="true"
-                    >
-                      {starred ? '' : '★ '}
-                      {starCount}
-                    </span>
-                  )}
                   {clash && (
                     <span
                       title="Overlaps another session in this room"
@@ -840,6 +824,20 @@ export function Calendar({
                   <span className="text-xs font-medium text-stone-500 dark:text-stone-400">
                     Official
                   </span>
+                )}
+                {/* Out of the flow, so a star cannot push the title down a
+                    line and leave two identical blocks reading differently.
+                    Display only, and `pointer-events-none` with it: the block
+                    is drag-sensitive and the resize handle is directly below,
+                    so starring happens in the session sheet. The block's own
+                    `aria-label` already says both facts, which is why the
+                    tally itself is hidden from a screen reader. */}
+                {(starred || starCount > 0) && (
+                  <StarTally
+                    starred={starred}
+                    count={starCount}
+                    className="pointer-events-none absolute bottom-0.5 right-1 rounded bg-white/90 pl-1 text-xs leading-none dark:bg-stone-900/90"
+                  />
                 )}
                 {editable && (
                   <div

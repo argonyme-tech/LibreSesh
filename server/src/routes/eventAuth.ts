@@ -5,11 +5,13 @@ import { isDemoEvent } from '../config.js';
 import type { Ctx } from '../context.js';
 import { claimEventName, eventDisplayName } from '../eventIdentity.js';
 import { HttpError, badRequest, forbidden } from '../errors.js';
+import { factsFor, toPersonDto } from '../mappers.js';
 import {
   adoptProfile,
   ensureOwnProfile,
   findUnclaimedNamesake,
   ownProfile,
+  restoreOnEntry,
 } from '../people.js';
 import { LIMITS, keysFor, limit } from '../ratelimit.js';
 import type { GateDto } from '../shared/types.js';
@@ -38,6 +40,33 @@ export function eventAuthRoutes(ctx: Ctx): Router {
    * gate answers `profile_exists`, and re-entering with `claimProfile` takes
    * it. A profile with a speaker code is already claimed and never gets here.
    */
+  /**
+   * Turning up is how somebody says they are back, so entering takes their
+   * profile out of the archive. Announced like any other change to it: an
+   * organiser with the People list open watches the row return to it rather
+   * than finding out on their next reload.
+   *
+   * The broadcast carries the public view. Nobody has a role here yet — this
+   * runs before the gate grants one — and the organiser-only facts are not
+   * this identity's to hand out anyway.
+   */
+  const restore = (req: Request, personId: number): void => {
+    const row = restoreOnEntry(ctx.db, personId);
+    if (!row) return;
+    audit(ctx.db, {
+      identityId: req.identity.id,
+      eventId: req.event.id,
+      action: 'unarchive',
+      entity: 'person',
+      entityId: personId,
+    });
+    ctx.broker.publish(
+      req.event.slug,
+      'person.updated',
+      toPersonDto(row, req.identity.id, factsFor(ctx.db, req.event.id, personId)),
+    );
+  };
+
   const claim = (req: Request, desired?: string, claimProfile?: boolean): void => {
     const held = eventDisplayName(ctx.db, req.event.id, req.identity.id);
     const name = desired ?? held;
@@ -55,9 +84,16 @@ export function eventAuthRoutes(ctx: Ctx): Router {
     }
 
     claimEventName(ctx.db, req.event.id, req.identity.id, name);
-    if (own) return;
-    if (namesake) adoptProfile(ctx.db, namesake.id, req.identity.id);
-    else ensureOwnProfile(ctx.db, req.event.id, req.identity.id, name);
+    if (own) {
+      restore(req, own.id);
+      return;
+    }
+    if (namesake) {
+      adoptProfile(ctx.db, namesake.id, req.identity.id);
+      // A shell an organiser filed away and its person then walked in under:
+      // the same "they are here" that restores your own profile.
+      restore(req, namesake.id);
+    } else ensureOwnProfile(ctx.db, req.event.id, req.identity.id, name);
   };
 
   /** What this device already is here, for the gate to prefill. */

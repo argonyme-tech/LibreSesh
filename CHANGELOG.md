@@ -45,6 +45,23 @@ All notable changes to this project are documented here.
 
 ### Fixed
 
+- **Starring a session moved its title, and a list card showed two stars.** On
+  the grid, the star and the interest count sat in the row above the title, so
+  starring a session pushed its title down a line — two identical blocks side
+  by side read differently because of something that is not about either
+  session. On a list card there were two stars for one fact: a ☆/★ toggle
+  beside the title and a separate "★ 12" at the bottom, which reads as two
+  different things about starring and leaves you working out which one is
+  yours.
+
+  Both surfaces now draw **one star and one number**, in the bottom-right
+  corner. On the grid it is out of the flow entirely, so nothing above it moves
+  when it appears — and it stays display-only, because a block's pointer
+  handling is drag-sensitive and the resize handle is directly beneath it;
+  starring from the grid is still done in the session sheet. On a list card the
+  tally *is* the control, so the star you press and the count you read are one
+  object.
+
 - **A speaker could not edit their own session.** An organiser schedules a talk
   and types the speaker's name onto it; that person arrives at the gate as an
   ordinary attendee — the role almost every speaker holds, since the speaker
@@ -72,6 +89,77 @@ All notable changes to this project are documented here.
   who is billed on a session but did not create it.
 
 ### Changed
+
+- **The People table no longer badges an outstanding speaker code.** A small
+  amber `code` sat beside the name of anyone whose speaker phrase had been
+  minted and never used. It is a fact about one person, read down a column of
+  everybody, and it says nothing about who they are or what they may do —
+  which is what every other cell on that row is for. Their profile page still
+  says it, where the code is minted and revoked, and says which of the three
+  states it is in rather than flagging only one.
+
+- **Archiving replaced deleting in the People list.** The row menu offered
+  both, and Delete was the wrong tool in every case it was reached for: it
+  refused outright for anybody holding their own profile — which is most of a
+  live event — and where it did go through it stripped the name off every
+  session that person was credited on, with no way back. Archiving does the
+  same tidying up and keeps all of that: the profile leaves the People list
+  and the speaker picker, including the **All** segment, and it keeps its
+  sessions, its role and its way in. Either an organiser or the person
+  themselves can take it back out.
+
+  **And entering the event takes it out by itself.** An organiser tidying up
+  at the end of a day cannot tell a profile that is finished with from one
+  whose person is back tomorrow — only that person can, and the way they say
+  it is by turning up. So the gate un-archives whoever comes through it, the
+  change is announced like any other, and neither side has to remember that a
+  filing decision was ever made. Only the gate does this: archiving signs
+  nobody out, so somebody still reading from before stays filed until they
+  next come in.
+
+  Delete is gone from the menu, and there is no longer any call in the app
+  that deletes a profile. Duplicates are still folded together with **Merge**,
+  which is what Delete was usually being used as a blunt version of.
+
+- **The People table gives its width back to the names in it.** Manage Event →
+  People drew six fixed columns on every row: name, username, UID, role, last
+  seen, and an actions column wide enough for an `Open` button and a `⋯` button
+  side by side. Two of those columns — the UID and the last seen time — answer
+  questions an organiser asks a handful of times an event, and they were
+  `hidden sm:block`, which is that admission made silently: on a phone the
+  table simply had different columns and there was no way to disagree with it
+  in either direction. What was squeezed for all this was the name, the one
+  thing every row is looked up by.
+
+  A **Columns** button beside the search box now says which columns the table
+  shows. A desktop starts with all five, as it always did; a phone starts with
+  **Name, Username, Role and the actions menu**, which is the same call the
+  breakpoint was making silently — the difference is that it is a default
+  rather than a law, and disagreeing with it sticks at both sizes. The choice
+  is remembered per browser, because it is a preference about reading a table
+  rather than a fact about the event. Ordering by a column that is switched
+  off comes home to the name, so the rows are never left in an arrangement
+  with nothing on screen to explain or undo it.
+
+  **Name and username now share what is left, equally.** They are the two
+  things a person is looked up by, and the username was in a fixed narrow
+  column while the name took every pixel that was going — `@margarethami…` is
+  not a lookup. And where the columns no longer fit, **the table scrolls
+  sideways rather than squeeze**, which is the bargain the grid already makes
+  on a phone: a table that fits 375 pixels by giving every column sixty of
+  them is not one anybody can read. The header scrolls with the rows, so a
+  column is never read under the wrong heading, and the width it scrolls to is
+  computed from the columns actually on — so a desktop, where they all fit,
+  never scrolls at all.
+
+  **Open left the row and became "Edit profile" in the menu**, which is the
+  name it deserved — it is what an organiser goes there to do. The row loses
+  nothing by it: the name and the username are now links to the same profile,
+  which is where a finger was aiming anyway. What is left in the actions column
+  is one icon-sized button under a heading that says **Edit**, drawn rather
+  than set as the text `⋯` so it keeps one optical size across font stacks
+  like the rest of the icon set. The columns between Role and the menu closed
+  up with it.
 
 - **The schedule no longer labels sessions "open", and marks nothing by
   default.** A block outside the published programme was badged `open session`

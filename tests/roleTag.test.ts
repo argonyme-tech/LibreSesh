@@ -94,9 +94,19 @@ describe('whether a speaker code was ever generated', () => {
     expect(profile).toMatch(/disabled=\{busy \|\| state === 'none'\}/);
   });
 
-  it('still badges only the outstanding one in the People list', () => {
-    // "used" is a fact for the profile page, not a badge on every row.
+  it('still badges only the outstanding one on a person line', () => {
+    // "used" is a fact for the profile page, not a badge beside a name.
     expect(read('components', 'PersonLine.tsx')).toContain("person.codeState === 'pending'");
-    expect(admin).toContain("person.codeState === 'pending'");
+  });
+
+  /**
+   * The People table dropped it. A column of two hundred rows is read down,
+   * and an outstanding code is a fact about one person that says nothing
+   * about who they are or what they may do — which is what every other cell
+   * on that row is for. The profile page still says it, where the code is
+   * minted and revoked, and says which of the three states it is in.
+   */
+  it('is not a badge in the People table', () => {
+    expect(admin).not.toContain("person.codeState === 'pending'");
   });
 });

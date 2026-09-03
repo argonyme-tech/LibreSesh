@@ -294,3 +294,53 @@ describe('the People list', () => {
     });
   });
 });
+
+/**
+ * Archiving is the tidy-up now, and Delete is not offered at all.
+ *
+ * Delete refused outright for anybody holding their own profile — which is
+ * most of a live event — and where it did go through it stripped the name off
+ * every session that person was credited on, with no way back. Archiving is
+ * the same tidy-up with none of that: the row leaves the list (`All`
+ * included, checked above), the sessions keep their speaker, the holder keeps
+ * their role and their way in, and either of them can undo it.
+ */
+describe('putting a profile away', () => {
+  const admin = readFileSync(
+    join(import.meta.dirname, '..', 'web', 'src', 'pages', 'AdminPage.tsx'),
+    'utf8',
+  );
+
+  it('archives, and no longer offers to delete', () => {
+    expect(admin).toContain('void toggleArchive(person)');
+    expect(admin).toContain('api.archivePerson(slug, person.id)');
+    expect(admin).toContain('api.unarchivePerson(slug, person.id)');
+
+    // The row's menu, on its own: rooms, tracks and tags are still deletable,
+    // and they are things rather than people.
+    const menu = admin.slice(
+      admin.indexOf('function PersonActions'),
+      admin.indexOf('function PeopleColumnsMenu'),
+    );
+    expect(menu).not.toBe('');
+    expect(menu).not.toContain('onDelete');
+    expect(menu).not.toContain('>Delete<');
+
+    // Its handler, and the call underneath it.
+    expect(admin).not.toContain('removePerson');
+    expect(admin).not.toContain('api.deletePerson');
+  });
+
+  it('leaves nothing in the client that can delete a profile', () => {
+    const api = readFileSync(
+      join(import.meta.dirname, '..', 'web', 'src', 'lib', 'api.ts'),
+      'utf8',
+    );
+    expect(api).not.toContain('deletePerson:');
+  });
+
+  it('says where the row went, since it leaves every segment but one', () => {
+    expect(admin).toContain('find them under Archived');
+    expect(admin).toContain('including “All”');
+  });
+});

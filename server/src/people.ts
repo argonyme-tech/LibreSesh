@@ -70,6 +70,31 @@ export function findUnclaimedNamesake(db: Db, eventId: number, name: string): Na
     .get(eventId, name);
 }
 
+/**
+ * Coming back is the appeal against being archived.
+ *
+ * An organiser tidying up at the end of a day cannot tell a profile that is
+ * finished with from one whose person is coming back tomorrow — only the
+ * person can, and the way they say it is by turning up. So entering the event
+ * takes your profile out of the archive, and an organiser who archived a room
+ * full of people at midnight finds the ones who came back in the list again,
+ * without either side having to remember that a filing decision was made.
+ *
+ * Only entering does this. Archiving does not sign anybody out, so somebody
+ * still holding a session from before stays filed until they next come in
+ * through the gate, which is the moment that means "I am here again".
+ *
+ * Returns the row when it actually changed, so the caller can tell a
+ * restoration from an ordinary entry and only announce the former.
+ */
+export function restoreOnEntry(db: Db, personId: number): PersonRow | undefined {
+  const changed = db
+    .prepare('UPDATE people SET archived_at = NULL WHERE id = ? AND archived_at IS NOT NULL')
+    .run(personId).changes;
+  if (changed === 0) return undefined;
+  return db.prepare<[number], PersonRow>('SELECT * FROM people WHERE id = ?').get(personId);
+}
+
 /** Make an unclaimed profile this identity's own. */
 export function adoptProfile(db: Db, personId: number, identityId: number): void {
   db.prepare('UPDATE people SET identity_id = ?, updated_at = ? WHERE id = ?').run(
