@@ -1543,6 +1543,8 @@ export function SchedulePage() {
               matchedIds={matchedIds}
               starredIds={starredIds}
               starCounts={bundle.starCounts}
+              onToggleStar={(s) => void toggleStar(s)}
+              activeId={selected?.id}
               timezone={timezone}
               day={day}
               dayStartMin={event.dayStartMin}

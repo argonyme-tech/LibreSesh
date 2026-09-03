@@ -63,8 +63,7 @@ describe('the list card', () => {
 
 describe('the grid block', () => {
   it('carries the star out of the flow, so the title never moves for it', () => {
-    expect(calendar).toMatch(/<StarTally[\s\S]{0,300}absolute bottom-0\.5 right-1/);
-    expect(calendar).toMatch(/<StarTally[\s\S]{0,300}pointer-events-none/);
+    expect(calendar).toMatch(/<StarTally[\s\S]{0,400}absolute bottom-0\.5 right-1/);
   });
 
   it('no longer puts it in the row above the title', () => {
@@ -74,8 +73,22 @@ describe('the grid block', () => {
     expect((row as RegExpMatchArray)[0]).not.toContain('StarTally');
   });
 
-  it('leaves starring to the sheet, because the block is drag-sensitive', () => {
-    // No `onToggle`, so the tally renders as a span rather than a button.
-    expect(calendar).not.toMatch(/<StarTally[\s\S]{0,300}onToggle/);
+  /**
+   * Starring from the grid used to mean opening the sheet — the block's
+   * pointer handling is drag-sensitive, so the corner tally was display-only.
+   * Now it is a button when a handler is passed, and it claims the press so a
+   * star neither drags the block nor opens it.
+   */
+  it('lets you star without opening it, and swallows the press that would drag it', () => {
+    expect(calendar).toMatch(/<StarTally[\s\S]{0,400}onToggle=\{onToggleStar/);
+    // The read-out fallback keeps its pointer-events-none; the button does not.
+    expect(calendar).toContain("onToggleStar ? '' : 'pointer-events-none'");
+    // StarTally stops the pointer-down itself, which is what a drag starts on.
+    expect(tally).toContain('onPointerDown={(e) => e.stopPropagation()}');
+  });
+
+  it('rings the open session so the grid says which block the sheet is', () => {
+    expect(calendar).toContain('const highlighted = activeId === session.id');
+    expect(calendar).toMatch(/highlighted[\s\S]{0,80}ring-2 ring-stone-900/);
   });
 });

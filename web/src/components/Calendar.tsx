@@ -332,10 +332,17 @@ export interface CalendarProps {
   breaks: BreakDto[];
   /** Sessions filtered out are dimmed rather than removed (SPEC §7.3). */
   matchedIds: Set<number>;
-  /** Sessions on the current identity's personal agenda — shown, not clickable. */
+  /** Sessions on the current identity's personal agenda. */
   starredIds: Set<number>;
   /** sessionId -> how many people starred it, across everyone. */
   starCounts: Record<number, number>;
+  /** Star or unstar from the block itself. Given, the corner tally is a
+   *  button rather than a read-out — so the grid no longer sends you into the
+   *  sheet for the one thing an attendee does most. */
+  onToggleStar?: (session: SessionDto) => void;
+  /** The session whose sheet is open, drawn with a ring so the grid says
+   *  which block the panel beside it belongs to. */
+  activeId?: number;
   timezone: string;
   day: string;
   dayStartMin: number;
@@ -368,6 +375,8 @@ export function Calendar({
   matchedIds,
   starredIds,
   starCounts,
+  onToggleStar,
+  activeId,
   timezone,
   day,
   dayStartMin,
@@ -740,6 +749,7 @@ export function Calendar({
             const clash = overlaps.has(session.id);
             const competes = competing.has(session.id);
             const dimmed = !matchedIds.has(session.id);
+            const highlighted = activeId === session.id;
             const starred = starredIds.has(session.id);
             const starCount = starCounts[session.id] ?? 0;
 
@@ -771,10 +781,16 @@ export function Calendar({
                 }}
                 className={`absolute overflow-hidden rounded-lg border bg-white dark:bg-stone-900 p-2 text-left shadow-sm transition-shadow
                   ${session.type === 'open' ? 'border-dashed border-emerald-400 dark:border-emerald-500' : 'border-stone-200 dark:border-stone-700'}
-                  ${editable ? 'cursor-grab ring-1 ring-stone-300 dark:ring-stone-600' : 'cursor-pointer hover:shadow'}
+                  ${
+                    highlighted
+                      ? 'z-20 shadow-lg ring-2 ring-stone-900 dark:ring-stone-100'
+                      : editable
+                        ? 'cursor-grab ring-1 ring-stone-300 dark:ring-stone-600'
+                        : 'cursor-pointer hover:shadow'
+                  }
                   ${active ? 'z-30 opacity-90 shadow-lg' : ''}
                   ${active?.pending ? 'cursor-progress' : ''}
-                  ${dimmed ? 'opacity-30' : ''}`}
+                  ${dimmed && !highlighted ? 'opacity-30' : ''}`}
                 style={{
                   top: (effectiveStart - dayStartMin) * PX_PER_MIN,
                   left: GUTTER_W + roomIndex * COL_W + 4 + lane.lane * width,
@@ -840,16 +856,23 @@ export function Calendar({
                 )}
                 {/* Out of the flow, so a star cannot push the title down a
                     line and leave two identical blocks reading differently.
-                    Display only, and `pointer-events-none` with it: the block
-                    is drag-sensitive and the resize handle is directly below,
-                    so starring happens in the session sheet. The block's own
-                    `aria-label` already says both facts, which is why the
-                    tally itself is hidden from a screen reader. */}
-                {(starred || starCount > 0) && (
+                    When it can be toggled it is a button that swallows the
+                    press (`StarTally` stops pointer-down), so starring a block
+                    neither drags it nor opens it — the grid stops sending an
+                    attendee into the sheet for the thing they do most. Without
+                    a handler it is a read-out, hidden from a screen reader
+                    because the block's own `aria-label` already says both
+                    facts. It is drawn whenever it can be pressed, so a session
+                    nobody has starred still offers the star to press. */}
+                {(onToggleStar !== undefined || starred || starCount > 0) && (
                   <StarTally
                     starred={starred}
                     count={starCount}
-                    className="pointer-events-none absolute bottom-0.5 right-1 rounded bg-white/90 pl-1 text-xs leading-none dark:bg-stone-900/90"
+                    onToggle={onToggleStar ? () => onToggleStar(session) : undefined}
+                    sessionTitle={session.title}
+                    className={`absolute bottom-0.5 right-1 rounded bg-white/90 pl-1 text-xs leading-none dark:bg-stone-900/90 ${
+                      onToggleStar ? '' : 'pointer-events-none'
+                    }`}
                   />
                 )}
                 {editable && (
