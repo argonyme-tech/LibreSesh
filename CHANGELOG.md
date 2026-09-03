@@ -73,6 +73,46 @@ All notable changes to this project are documented here.
 
 ### Changed
 
+- **The People table gives its width back to the names in it.** Manage Event →
+  People drew six fixed columns on every row: name, username, UID, role, last
+  seen, and an actions column wide enough for an `Open` button and a `⋯` button
+  side by side. Two of those columns — the UID and the last seen time — answer
+  questions an organiser asks a handful of times an event, and they were
+  `hidden sm:block`, which is that admission made silently: on a phone the
+  table simply had different columns and there was no way to disagree with it
+  in either direction. What was squeezed for all this was the name, the one
+  thing every row is looked up by.
+
+  A **Columns** button beside the search box now says which columns the table
+  shows. A desktop starts with all five, as it always did; a phone starts with
+  **Name, Username, Role and the actions menu**, which is the same call the
+  breakpoint was making silently — the difference is that it is a default
+  rather than a law, and disagreeing with it sticks at both sizes. The choice
+  is remembered per browser, because it is a preference about reading a table
+  rather than a fact about the event. Ordering by a column that is switched
+  off comes home to the name, so the rows are never left in an arrangement
+  with nothing on screen to explain or undo it.
+
+  **Name and username now share what is left, equally.** They are the two
+  things a person is looked up by, and the username was in a fixed narrow
+  column while the name took every pixel that was going — `@margarethami…` is
+  not a lookup. And where the columns no longer fit, **the table scrolls
+  sideways rather than squeeze**, which is the bargain the grid already makes
+  on a phone: a table that fits 375 pixels by giving every column sixty of
+  them is not one anybody can read. The header scrolls with the rows, so a
+  column is never read under the wrong heading, and the width it scrolls to is
+  computed from the columns actually on — so a desktop, where they all fit,
+  never scrolls at all.
+
+  **Open left the row and became "Edit profile" in the menu**, which is the
+  name it deserved — it is what an organiser goes there to do. The row loses
+  nothing by it: the name and the username are now links to the same profile,
+  which is where a finger was aiming anyway. What is left in the actions column
+  is one icon-sized button under a heading that says **Edit**, drawn rather
+  than set as the text `⋯` so it keeps one optical size across font stacks
+  like the rest of the icon set. The columns between Role and the menu closed
+  up with it.
+
 - **The schedule no longer labels sessions "open", and marks nothing by
   default.** A block outside the published programme was badged `open session`
   on the grid and `open` in the list, which read as *open to join* — something

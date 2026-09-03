@@ -98,6 +98,102 @@ export const NATURAL_DIR: Record<PeopleSortColumn, PeopleSort['dir']> = {
 /** The default: alphabetical, which is how you find a name you already know. */
 export const BY_NAME: PeopleSort = { column: 'name', dir: 'asc' };
 
+/* ---------------------------------------------------------------- columns */
+
+/**
+ * Which columns the table is showing.
+ *
+ * Every column but the name is optional, and most of them start off. The
+ * table had six of them at every width, which on a phone meant a name
+ * squeezed into whatever three columns of fixed width left over — and two of
+ * those columns, the UID and the last seen time, answer questions an
+ * organiser asks perhaps twice an event. They are still there, one click
+ * away, rather than taxing every row on every screen for the times they are
+ * wanted.
+ *
+ * The name is not in this list because it is not a column an organiser can be
+ * allowed to turn off: it is the row.
+ */
+export const PEOPLE_OPTIONAL_COLUMNS: { id: PeopleSortColumn; label: string; hint: string }[] = [
+  { id: 'username', label: 'Username', hint: 'What they post under here.' },
+  { id: 'uid', label: 'UID', hint: 'The identity holding the profile — what the audit log names.' },
+  { id: 'role', label: 'Role', hint: 'What they may do, and the place to change it.' },
+  { id: 'seen', label: 'Last seen', hint: 'When their device last used this event.' },
+];
+
+/** Canonical left-to-right order, so toggling a column back on returns it to
+ *  where it was rather than to the end. */
+const COLUMN_ORDER: PeopleSortColumn[] = ['name', 'username', 'uid', 'role', 'seen'];
+
+/** Everything the table knows how to show. What a desktop starts with: there
+ *  is room for all five, and the two rare ones cost nothing there. */
+export const ALL_PEOPLE_COLUMNS: PeopleSortColumn[] = [...COLUMN_ORDER];
+
+/** Name, username, role, and the actions every row ends with — what a phone
+ *  starts with. The two that come off are the two that are lookups rather
+ *  than comparisons: a UID and a last-seen time answer a question about one
+ *  person, and neither is worth a fifth of a narrow row to have standing by. */
+export const COMPACT_PEOPLE_COLUMNS: PeopleSortColumn[] = ['name', 'username', 'role'];
+
+/**
+ * What the table shows before anybody says otherwise.
+ *
+ * The width is the whole argument: five columns on a desktop are five facts
+ * side by side, and on a phone they are five things none of which can be
+ * read. This is the same call the old `hidden sm:block` made, made once and
+ * in a place the organiser can overrule — and overruling it sticks, at both
+ * sizes.
+ */
+export const defaultPeopleColumns = (wide: boolean): PeopleSortColumn[] =>
+  wide ? ALL_PEOPLE_COLUMNS : COMPACT_PEOPLE_COLUMNS;
+
+const isColumn = (value: unknown): value is PeopleSortColumn =>
+  typeof value === 'string' && (COLUMN_ORDER as string[]).includes(value);
+
+/** What was stored last time, defended against a hand-edited or outdated
+ *  value: anything unreadable falls back to `fallback` rather than leaving
+ *  the table with no columns at all. */
+export function parsePeopleColumns(
+  raw: string | null,
+  fallback: PeopleSortColumn[],
+): PeopleSortColumn[] {
+  if (raw === null) return fallback;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+  if (!Array.isArray(parsed)) return fallback;
+  const kept = parsed.filter(isColumn);
+  return COLUMN_ORDER.filter((c) => c === 'name' || kept.includes(c));
+}
+
+/** Turning one on or off, in canonical order and with the name column pinned
+ *  on however hard it is asked to go. */
+export function togglePeopleColumn(
+  shown: PeopleSortColumn[],
+  column: PeopleSortColumn,
+): PeopleSortColumn[] {
+  if (column === 'name') return shown;
+  const next = shown.includes(column)
+    ? shown.filter((c) => c !== column)
+    : [...shown, column];
+  return COLUMN_ORDER.filter((c) => c === 'name' || next.includes(c));
+}
+
+/**
+ * The order in force, given what is on screen.
+ *
+ * Hiding the column a list is sorted by leaves it in an order with nothing
+ * on screen to explain it — rows in an arrangement the organiser can neither
+ * see nor undo, because the control that undoes it went with the column. So
+ * the sort comes home to the name when its column leaves.
+ */
+export function sortForColumns(sort: PeopleSort, shown: PeopleSortColumn[]): PeopleSort {
+  return shown.includes(sort.column) ? sort : BY_NAME;
+}
+
 /**
  * How much of the event somebody holds, weakest first. A ladder rather than
  * the alphabet, because "admin, speaker, user, viewer" happens to be

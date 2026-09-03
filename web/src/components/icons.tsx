@@ -184,3 +184,28 @@ export function CalendarIcon({ className }: { className?: string }) {
     </Icon>
   );
 }
+
+/** Three dots stacked — the row's own menu opens from here.
+ *
+ *  It replaced a "⋯" set as text, which is the same trouble as the glyphs at
+ *  the top of this file: the character is a different width and weight in
+ *  every fallback font, and it needed a 56-pixel button to look deliberate.
+ *  Stacked rather than in a line because the button is now the width of one
+ *  glyph, and vertical dots are the shape a table row's menu has everywhere. */
+export function MoreIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M8 3.6v.05M8 7.975v.05M8 12.35v.05" />
+    </Icon>
+  );
+}
+
+/** A pane split into columns — which of them the table is showing. */
+export function ColumnsIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <rect x="2.25" y="3.25" width="11.5" height="9.5" rx="1.75" />
+      <path d="M6 3.25v9.5M10 3.25v9.5" />
+    </Icon>
+  );
+}
