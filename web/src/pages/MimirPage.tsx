@@ -12,7 +12,7 @@ import { useMe } from '../lib/useMe';
 import { eventShape } from '../lib/eventShape';
 import { readiness } from '../lib/readiness';
 import { runSheet } from '../lib/runsheet';
-import { fmtMin, relativeTime } from '../lib/format';
+import { fmtMin, place, relativeTime } from '../lib/format';
 import { digest, readMark, writeMark } from '../lib/changes';
 import { Gate } from '../components/Gate';
 import { MimirChat, mimirChip } from '../components/MimirChat';
@@ -40,6 +40,26 @@ type Tool =
   | 'sessions'
   | 'engine';
 
+/**
+ * Who may open what, decided once. The hub's tiles and the page's switch used
+ * to gate roles separately, and neither covered a deep link: an attendee at
+ * ?tool=readiness got the header and an empty main.
+ */
+const TOOL_ACCESS: Record<Tool, 'any' | 'user' | 'admin'> = {
+  hub: 'any',
+  interview: 'user',
+  eventInterview: 'admin',
+  catalog: 'user',
+  rhythm: 'any',
+  readiness: 'admin',
+  runsheet: 'any',
+  changes: 'admin',
+  chat: 'admin',
+  infographic: 'any',
+  sessions: 'user',
+  engine: 'admin',
+};
+
 export function MimirPage() {
   const { slug = '' } = useParams();
   const { me } = useMe();
@@ -48,9 +68,20 @@ export function MimirPage() {
   const [error, setError] = useState<string | null>(null);
   // Every tool is deep-linkable: /e/:slug/mimir?tool=engine goes straight there.
   const [params, setParams] = useSearchParams();
-  const tool = (params.get('tool') as Tool | null) ?? 'hub';
+  // Unknown names fall back to the hub rather than to a blank page; whether
+  // the named tool is open to this role is decided below, once the role is known.
+  const requested = params.get('tool');
+  const tool: Tool = requested !== null && requested in TOOL_ACCESS ? (requested as Tool) : 'hub';
   const setTool = (t: Tool) => setParams(t === 'hub' ? {} : { tool: t });
   const [chatSeed, setChatSeed] = useState<string | undefined>();
+  // Opening a tool from the hub starts clean. A seed set by a catalog or
+  // harvest action used to outlive its chat: the page stays mounted across
+  // tools, so the plain Chat tile mounted a fresh MimirChat with the old seed
+  // and silently sent it again.
+  const openTool = (t: Tool) => {
+    setChatSeed(undefined);
+    setTool(t);
+  };
   const [engine, setEngine] = useState(false);
 
   const load = useCallback(async () => {
@@ -107,6 +138,9 @@ export function MimirPage() {
     setChatSeed(seed);
     setTool('chat');
   };
+  const access = TOOL_ACCESS[tool];
+  const allowed = access === 'any' || (access === 'user' && canUse) || (access === 'admin' && isAdmin);
+  const active: Tool = allowed ? tool : 'hub';
 
   return (
     <div className="min-h-screen bg-stone-100 dark:bg-stone-950 text-stone-900 dark:text-stone-100">
@@ -132,17 +166,23 @@ export function MimirPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-6">
-        {tool === 'hub' && (
+        {!allowed && (
+          <p className="mb-4 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-600 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300">
+            That tool is for {access === 'admin' ? 'organisers' : 'attendees and organisers'}.
+            Here is everything open to you.
+          </p>
+        )}
+        {active === 'hub' && (
           <Hub
             bundle={bundle}
             canUse={canUse}
             isAdmin={isAdmin}
             engine={engine}
-            onOpen={setTool}
+            onOpen={openTool}
             slug={slug}
           />
         )}
-        {tool === 'interview' &&
+        {active === 'interview' &&
           (engine && isAdmin ? (
             <LiveInterview
               slug={slug}
@@ -156,8 +196,7 @@ export function MimirPage() {
               <SessionInterview slug={slug} onDone={() => setTool('hub')} />
             </>
           ))}
-        {tool === 'eventInterview' &&
-          isAdmin &&
+        {active === 'eventInterview' &&
           (engine ? (
             <LiveInterview
               slug={slug}
@@ -171,17 +210,17 @@ export function MimirPage() {
               <EventInterview bundle={bundle} />
             </>
           ))}
-        {tool === 'catalog' && <Catalog slug={slug} engine={engine} onLive={goLive} />}
-        {tool === 'rhythm' && <Rhythm bundle={bundle} />}
-        {tool === 'readiness' && isAdmin && <Readiness bundle={bundle} />}
-        {tool === 'runsheet' && <RunSheetView bundle={bundle} />}
-        {tool === 'changes' && isAdmin && <Changes slug={slug} />}
-        {tool === 'infographic' && <Infographic bundle={bundle} />}
-        {tool === 'sessions' && (
+        {active === 'catalog' && <Catalog slug={slug} engine={engine} onLive={goLive} />}
+        {active === 'rhythm' && <Rhythm bundle={bundle} />}
+        {active === 'readiness' && <Readiness bundle={bundle} />}
+        {active === 'runsheet' && <RunSheetView bundle={bundle} />}
+        {active === 'changes' && <Changes slug={slug} />}
+        {active === 'infographic' && <Infographic bundle={bundle} />}
+        {active === 'sessions' && (
           <MySessions slug={slug} bundle={bundle} isAdmin={isAdmin} engine={engine} onLive={goLive} />
         )}
-        {tool === 'chat' && isAdmin && <MimirChat slug={slug} seed={chatSeed} />}
-        {tool === 'engine' && isAdmin && <MimirChat slug={slug} openConfig />}
+        {active === 'chat' && <MimirChat slug={slug} seed={chatSeed} />}
+        {active === 'engine' && <MimirChat slug={slug} openConfig />}
       </main>
     </div>
   );
@@ -776,7 +815,11 @@ function ShapeReading({ bundle }: { bundle: BundleDto }) {
         breaks: bundle.breaks,
         sessions: bundle.sessions,
         proposals: bundle.proposals,
-        event: { startDate: bundle.event.startDate, endDate: bundle.event.endDate },
+        event: {
+          startDate: bundle.event.startDate,
+          endDate: bundle.event.endDate,
+          timezone: bundle.event.timezone,
+        },
       }),
     [bundle],
   );
@@ -1152,7 +1195,7 @@ function Catalog({
           </dl>
         </div>
 
-        {Boolean(d.discardIf) ? (
+        {d.discardIf ? (
           <p className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-white dark:bg-stone-900 p-3 text-sm text-indigo-700 dark:text-indigo-300">
             <b>Discard if:</b> {String(d.discardIf)}
           </p>
@@ -1163,7 +1206,7 @@ function Catalog({
           </p>
         )}
 
-        {Boolean(d.steps) ? (
+        {d.steps ? (
           <section>
             <div className="mb-1 flex flex-wrap items-center gap-2">
               <h3 className="text-sm font-semibold">How it runs</h3>
@@ -1819,14 +1862,15 @@ function Infographic({ bundle }: { bundle: BundleDto }) {
   const days = useMemo(() => {
     const byDay = new Map<string, { count: number; minutes: number }>();
     for (const s of bundle.sessions) {
-      const day = s.startsAt.slice(0, 10);
+      // The event's day, not UTC's — the schedule's tabs are cut the same way.
+      const day = place(s, bundle.event.timezone).date;
       const cur = byDay.get(day) ?? { count: 0, minutes: 0 };
       cur.count += 1;
       cur.minutes += Math.round((Date.parse(s.endsAt) - Date.parse(s.startsAt)) / 60000);
       byDay.set(day, cur);
     }
     return Array.from(byDay.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [bundle.sessions]);
+  }, [bundle.sessions, bundle.event.timezone]);
   const phases = useMemo(() => {
     const c: Record<string, number> = {};
     for (const p of bundle.proposals) c[p.phase] = (c[p.phase] ?? 0) + 1;

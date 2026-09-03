@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useDismissed } from '../lib/useDismissed';
 import type { BreakDto, RoomDto, SessionDto, TrackDto } from '@shared/types';
 import { fmtMin, place } from '../lib/format';
 
@@ -187,16 +188,6 @@ export function rhythmWarnings(
   return warnings;
 }
 
-const DISMISS_KEY = 'mimir-rhythm-dismissed';
-const loadDismissed = (): string[] => {
-  // Per-viewer convenience only — storage can be blocked; render fine without.
-  try {
-    return JSON.parse(localStorage.getItem(DISMISS_KEY) ?? '[]') as string[];
-  } catch {
-    return [];
-  }
-};
-
 export function RhythmCheck({
   sessions,
   rooms,
@@ -211,21 +202,12 @@ export function RhythmCheck({
   timezone?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [dismissed, setDismissed] = useState<string[]>(loadDismissed);
+  const { isDismissed, dismiss, restore, hidden } = useDismissed('rhythm');
   const all = useMemo(
     () => rhythmWarnings(sessions, rooms, { breaks, tracks, timezone }),
     [sessions, rooms, breaks, tracks, timezone],
   );
-  const warnings = all.filter((w) => !dismissed.includes(w.key));
-
-  const setAndStore = (keys: string[]) => {
-    setDismissed(keys);
-    try {
-      localStorage.setItem(DISMISS_KEY, JSON.stringify(keys));
-    } catch {
-      /* storage blocked — dismissal just won't persist */
-    }
-  };
+  const warnings = all.filter((w) => !isDismissed(w.key));
 
   // Nothing to say: no chip at all. Vanilla schedules stay untouched.
   if (all.length === 0) return null;
@@ -234,7 +216,7 @@ export function RhythmCheck({
     return (
       <button
         type="button"
-        onClick={() => setAndStore([])}
+        onClick={restore}
         className="rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 px-3 py-2 text-xs text-stone-400 dark:text-stone-500 hover:border-indigo-400"
         title="All rhythm notes ignored — click to bring them back"
       >
@@ -271,7 +253,7 @@ export function RhythmCheck({
                 <span className="text-xs text-indigo-700 dark:text-indigo-400">{w.rule}</span>{' '}
                 <button
                   type="button"
-                  onClick={() => setAndStore([...dismissed, w.key])}
+                  onClick={() => dismiss(w.key)}
                   className="ml-1 rounded border border-stone-300 dark:border-stone-600 px-1.5 py-0.5 text-[11px] text-stone-500 dark:text-stone-400 hover:border-indigo-400"
                 >
                   Ignore
@@ -281,11 +263,11 @@ export function RhythmCheck({
           </ul>
           <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">
             Advisory only — nothing here blocks anything. Rearrange, or ignore
-            {dismissed.length > 0 && (
+            {hidden > 0 && (
               <>
                 {' · '}
-                <button type="button" onClick={() => setAndStore([])} className="underline">
-                  bring back {dismissed.length} ignored
+                <button type="button" onClick={restore} className="underline">
+                  bring back {hidden} ignored
                 </button>
               </>
             )}

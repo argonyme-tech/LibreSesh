@@ -41,7 +41,7 @@ const base = (over: Partial<ShapeInput> = {}): ShapeInput => ({
   breaks: [],
   sessions: [],
   proposals: [],
-  event: { startDate: '2026-09-01', endDate: '2026-09-01' },
+  event: { startDate: '2026-09-01', endDate: '2026-09-01', timezone: 'UTC' },
   ...over,
 });
 
@@ -124,6 +124,25 @@ describe('eventShape', () => {
     );
     expect(s.name).toBe('Assembly or decision meeting');
     expect(s.certain).toBe(false);
+  });
+
+  it('counts days in the event\'s timezone, not UTC\'s', () => {
+    // Los Angeles: 09:00 and 17:00 local on the same day are two UTC dates.
+    // Bucketed by UTC these read as a title that comes back on another day,
+    // and two such titles would make a one-day programme "a course".
+    const s = eventShape(
+      base({
+        rooms: [room(1)],
+        event: { startDate: '2026-09-10', endDate: '2026-09-10', timezone: 'America/Los_Angeles' },
+        sessions: [
+          session(1, '2026-09-10', { title: 'Intro', startsAt: '2026-09-10T16:00:00Z', endsAt: '2026-09-10T17:00:00Z' }),
+          session(2, '2026-09-10', { title: 'Intro', startsAt: '2026-09-11T00:00:00Z', endsAt: '2026-09-11T01:00:00Z' }),
+          session(3, '2026-09-10', { title: 'Method', startsAt: '2026-09-10T17:00:00Z', endsAt: '2026-09-10T18:00:00Z' }),
+          session(4, '2026-09-10', { title: 'Method', startsAt: '2026-09-11T01:00:00Z', endsAt: '2026-09-11T02:00:00Z' }),
+        ],
+      }),
+    );
+    expect(s.name).not.toBe('Course or training');
   });
 
   it('always says what it counted', () => {

@@ -11,6 +11,7 @@ import type {
 } from '@shared/types';
 import { CloseIcon, ExpandIcon } from './icons';
 import { COLLAPSED_COUNT, SessionDetail } from './SessionDetail';
+import type { Note } from '../lib/mimirNotes';
 
 export interface DetailSheetProps {
   session: SessionDto;
@@ -29,6 +30,11 @@ export interface DetailSheetProps {
   userLabel: string;
   /** Where the expand control goes — the same session's full-page route. */
   expandTo: string;
+  /** Mimir add-on: what she has to say about this session. Computed by the
+   *  page, which holds the bundle; forwarded to SessionDetail with the rest.
+   *  The sheet is how most sessions are opened, so leaving this off here
+   *  meant the note existed only on the full-page route nobody reaches first. */
+  mimirNotes?: Note[];
   onClose: () => void;
   onToggleStar: () => void;
   onEdit: () => void;

@@ -1,5 +1,6 @@
 import type { BundleDto, PersonDto, ProposalDto, SessionDto } from '@shared/types';
 import { place } from './format';
+import { cannotEditOwn, stuckSpeakers } from './people';
 
 /**
  * Mímir as a layer rather than a tab.
@@ -94,9 +95,7 @@ export function notesForSession(session: SessionDto, bundle: BundleDto): Note[] 
   // Somebody on this bill who cannot touch it. Editing needs the profile
   // claimed by a device *and* the speaker role — being on the poster is
   // neither, and they find out when they go to fix a typo.
-  const stuck = session.speakers
-    .map((sp) => bundle.people.find((p) => p.id === sp.id))
-    .filter((p): p is PersonDto => p !== undefined && (!p.claimed || p.role === 'user'));
+  const stuck = stuckSpeakers(session, bundle.people);
   if (stuck.length > 0) {
     notes.push({
       key: 'stuck',
@@ -189,7 +188,7 @@ export function notesForPerson(person: PersonDto, bundle: BundleDto): Note[] {
   if (theirs.length === 0) return [];
   const notes: Note[] = [];
 
-  if (!person.claimed || person.role === 'user') {
+  if (cannotEditOwn(person)) {
     notes.push({
       key: 'cannot-edit',
       what: `Cannot edit ${theirs.length === 1 ? 'their session' : `their ${theirs.length} sessions`}`,

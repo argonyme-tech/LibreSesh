@@ -1592,6 +1592,7 @@ export function SchedulePage() {
           slug={slug}
           rooms={bundle.rooms}
           tags={bundle.tags}
+          mimirNotes={notesForSession(selected, bundle)}
           contributions={data.contributions[selected.id]}
           role={role}
           me={me}

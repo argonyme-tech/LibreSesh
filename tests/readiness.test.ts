@@ -85,6 +85,19 @@ describe('readiness', () => {
       expect(f!.soWhat).toContain('there is no button');
     });
 
+    it('catches a claimed holder whose role is viewer, or gone', () => {
+      // Both are reachable: re-entering with the viewer password downgrades
+      // the role; signing out deletes the roles row and keeps the claim. The
+      // server refuses the edit in both; the first predicate said "fine".
+      for (const role of ['viewer', null] as const) {
+        const b = bundle({
+          sessions: [session(1, '2026-09-01')],
+          people: [person(1, { claimed: true, role })],
+        });
+        expect(keys(b), `role ${String(role)}`).toContain('speakers-cannot-edit');
+      }
+    });
+
     it('leaves a linked speaker alone', () => {
       const b = bundle({
         sessions: [session(1, '2026-09-01')],

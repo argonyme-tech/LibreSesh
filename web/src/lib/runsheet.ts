@@ -1,5 +1,6 @@
 import type { BreakDto, BundleDto, PersonDto, SessionDto } from '@shared/types';
-import { place } from './format';
+import { nowMinuteOfDay, place, todayInZone } from './format';
+import { stuckSpeakers } from './people';
 
 /**
  * Mímir add-on: what whoever is on duty needs, at the minute they need it.
@@ -65,39 +66,16 @@ const MINUTE = 60_000;
 /** How far ahead "next" reaches. Beyond this it is the schedule, not a shift. */
 const HORIZON_MIN = 120;
 
-const localDate = (iso: string, timezone: string) =>
-  new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(iso));
-
-const localMinute = (iso: string, timezone: string) => {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(new Date(iso));
-  const h = Number(parts.find((p) => p.type === 'hour')?.value ?? 0);
-  const m = Number(parts.find((p) => p.type === 'minute')?.value ?? 0);
-  return h * 60 + m;
-};
-
-/** On the bill and unable to touch it: unclaimed profile, or claimed below
- *  speaker. The same rule the readiness list uses, applied to one session. */
+/** The same rule the readiness list and the session note use, by name. */
 const stuckNames = (session: SessionDto, people: PersonDto[]): string[] =>
-  session.speakers
-    .map((sp) => people.find((p) => p.id === sp.id))
-    .filter((p): p is PersonDto => p !== undefined && (!p.claimed || p.role === 'user'))
-    .map((p) => p.name);
+  stuckSpeakers(session, people).map((p) => p.name);
 
 export function runSheet(bundle: BundleDto, now: Date = new Date()): RunSheet {
   const tz = bundle.event.timezone;
-  const iso = now.toISOString();
-  const date = localDate(iso, tz);
-  const nowMin = localMinute(iso, tz);
+  // The shared helpers, not a local Intl call: they guard the engines that
+  // render midnight as hour 24, which would put every break in the past.
+  const date = todayInZone(tz, now);
+  const nowMin = nowMinuteOfDay(tz, now);
   const t = now.getTime();
   const roomName = (id: number) => bundle.rooms.find((r) => r.id === id)?.name ?? `room ${id}`;
 

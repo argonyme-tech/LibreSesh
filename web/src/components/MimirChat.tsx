@@ -1,12 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../lib/api';
+import { ApiError, api } from '../lib/api';
 import { popoverPanelClass, usePopover } from './Popover';
 import { PrimaryButton, Spinner, useToast } from './ui';
 
 /** Mímir add-on: the chat, extracted so it can live both in the Mímir tab and
  *  in the floating panel available across the app ("the system's main chat",
  *  per the facilitator's decision 2026-09-01). Indigo = Mímir speaking. */
+
+/**
+ * The server takes at most 80 messages, and a chat that carries its whole
+ * history every turn walked into that wall at turn 41 and could not leave —
+ * every retry sent the same thread. Hidden seeds carry the task and stay; the
+ * visible thread keeps its tail. What is shown is untouched, only what is sent.
+ */
+const HISTORY_WINDOW = 60;
+const windowOf = <T extends { hidden?: boolean }>(thread: T[]): T[] => {
+  const seeds = thread.filter((m) => m.hidden);
+  const rest = thread.filter((m) => !m.hidden).slice(-HISTORY_WINDOW);
+  return [...seeds, ...rest].slice(-80);
+};
 
 export const mimirChip =
   'inline-flex items-center gap-1 rounded-full border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 text-[11px] font-medium text-indigo-700 dark:text-indigo-300';
@@ -36,6 +49,7 @@ export function MimirChat({
     { role: 'user' | 'assistant'; content: string; hidden?: boolean }[]
   >([]);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [chatErrorStatus, setChatErrorStatus] = useState<number | null>(null);
   const [showConfig, setShowConfig] = useState(openConfig);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -87,12 +101,13 @@ export function MimirChat({
       try {
         const res = await api.mimirChat(
           slug,
-          next.map(({ role, content: c }) => ({ role, content: c })),
+          windowOf(next).map(({ role, content: c }) => ({ role, content: c })),
         );
         setMessages([...next, { role: 'assistant', content: res.reply }]);
       } catch (err) {
         // Keep the thread — an error is information, not an eraser.
         setChatError((err as Error).message);
+        setChatErrorStatus(err instanceof ApiError ? err.status : null);
       } finally {
         setBusy(false);
       }
@@ -268,8 +283,11 @@ export function MimirChat({
           <div className="rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-3 text-xs text-red-700 dark:text-red-300">
             <b>The engine did not answer:</b> {chatError}
             <div className="mt-1 text-red-600/80 dark:text-red-400/80">
-              Wrong key or missing Base URL? Fix it in <b>⚙ Engine settings</b> above, then send
-              again — your messages are kept.
+              {chatErrorStatus === 413 || chatErrorStatus === 400
+                ? 'That message was too large for one turn. Try a shorter one — the thread is kept.'
+                : chatErrorStatus === 429
+                  ? 'The engine is rate-limited. Wait a moment, then send again — your messages are kept.'
+                  : 'Wrong key, missing Base URL, or a tunnel that dropped? Fix it in ⚙ Engine settings above, then send again — your messages are kept.'}
             </div>
           </div>
         )}

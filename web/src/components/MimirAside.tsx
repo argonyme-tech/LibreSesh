@@ -1,6 +1,6 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Note } from '../lib/mimirNotes';
+import { useDismissed } from '../lib/useDismissed';
 
 /**
  * Mímir speaking somewhere that is not her own page.
@@ -23,28 +23,11 @@ import type { Note } from '../lib/mimirNotes';
  * - Every note says what was counted, so a reader can check it against the
  *   grid instead of trusting her.
  *
- * `localStorage` is a per-viewer convenience and can be blocked outright, so
- * every read and write is wrapped and the component renders correctly with no
- * stored value at all.
+ * Dismissals live in `useDismissed`, shared with the rhythm notes: one memory,
+ * read-modify-write on every change, every mounted instance told — the first
+ * version kept a snapshot per instance, and with one aside per pitch card
+ * hiding note B quietly brought note A back.
  */
-const KEY = 'mimir-asides-dismissed';
-
-const load = (): string[] => {
-  try {
-    return JSON.parse(localStorage.getItem(KEY) ?? '[]') as string[];
-  } catch {
-    return [];
-  }
-};
-
-const save = (keys: string[]) => {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(keys));
-  } catch {
-    /* storage blocked — dismissal just will not persist */
-  }
-};
-
 export function MimirAside({
   notes,
   scope,
@@ -60,20 +43,8 @@ export function MimirAside({
   /** Inline in a list row: one line each, no heading. */
   compact?: boolean;
 }) {
-  const [dismissed, setDismissed] = useState<string[]>(load);
-  const idOf = (n: Note) => `${scope}:${n.key}`;
-  const live = notes.filter((n) => !dismissed.includes(idOf(n)));
-
-  const drop = (id: string) => {
-    const next = [...dismissed, id];
-    setDismissed(next);
-    save(next);
-  };
-  const restore = () => {
-    const next = dismissed.filter((d) => !d.startsWith(`${scope}:`));
-    setDismissed(next);
-    save(next);
-  };
+  const { isDismissed, dismiss, restore } = useDismissed(scope);
+  const live = notes.filter((n) => !isDismissed(n.key));
 
   // Nothing to say: nothing at all.
   if (notes.length === 0) return null;
@@ -100,7 +71,7 @@ export function MimirAside({
             <span className="text-stone-500 dark:text-stone-400"> — {n.because}</span>
             <button
               type="button"
-              onClick={() => drop(idOf(n))}
+              onClick={() => dismiss(n.key)}
               aria-label={`Hide: ${n.what}`}
               className="ml-1 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200"
             >
@@ -142,7 +113,7 @@ export function MimirAside({
             )}{' '}
             <button
               type="button"
-              onClick={() => drop(idOf(n))}
+              onClick={() => dismiss(n.key)}
               className="rounded border border-stone-300 px-1.5 py-0.5 text-[11px] text-stone-500 hover:border-indigo-400 dark:border-stone-600 dark:text-stone-400"
             >
               Hide

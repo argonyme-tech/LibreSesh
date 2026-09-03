@@ -1,5 +1,6 @@
 import type { BundleDto, PersonDto, SessionDto } from '@shared/types';
 import { place } from './format';
+import { cannotEditOwn } from './people';
 
 /**
  * Mímir add-on: what is still missing before the doors open.
@@ -66,10 +67,7 @@ export function readiness(bundle: BundleDto): Finding[] {
   const stuck = [...credited]
     .map((id) => personById.get(id))
     .filter((p): p is PersonDto => p !== undefined)
-    // `role` is organiser-only and absent for everyone else, so an unclaimed
-    // profile is the signal we can always see; a claimed one below speaker is
-    // the signal we can see as an organiser.
-    .filter((p) => !p.claimed || (p.role !== undefined && p.role !== null && p.role === 'user'));
+    .filter(cannotEditOwn);
   if (stuck.length > 0) {
     found.push({
       key: 'speakers-cannot-edit',

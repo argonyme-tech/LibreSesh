@@ -1,4 +1,5 @@
 import type { BreakDto, ProposalDto, RoomDto, SessionDto, TrackDto } from '@shared/types';
+import { place } from './format';
 
 /**
  * Mímir add-on: what kind of event is this, read off the data.
@@ -37,7 +38,7 @@ export interface ShapeInput {
   breaks: BreakDto[];
   sessions: SessionDto[];
   proposals: ProposalDto[];
-  event: { startDate: string; endDate: string };
+  event: { startDate: string; endDate: string; timezone: string };
 }
 
 const dayCount = (from: string, to: string) =>
@@ -45,10 +46,11 @@ const dayCount = (from: string, to: string) =>
 
 /** Sessions sharing a title across different days — a course's week, or a
  *  workshop repeated so everyone can reach it. */
-function repeats(sessions: SessionDto[]): number {
+function repeats(sessions: SessionDto[], timezone: string): number {
   const days = new Map<string, Set<string>>();
   for (const s of sessions) {
-    const day = s.startsAt.slice(0, 10);
+    // The event's day, not UTC's: a Tokyo morning is yesterday in UTC.
+    const day = place(s, timezone).date;
     const set = days.get(s.title) ?? new Set<string>();
     set.add(day);
     days.set(s.title, set);
@@ -62,7 +64,7 @@ export function eventShape(input: ShapeInput): Shape {
   const holding = sessions.filter((s) => s.blocksOpenBooking);
   const unplaced = proposals.filter((p) => p.placedSessionId === null);
   const days = dayCount(event.startDate, event.endDate);
-  const repeated = repeats(sessions);
+  const repeated = repeats(sessions, event.timezone);
 
   // Nothing built yet. Say that, rather than reading a shape out of an empty
   // grid — an event with no rooms is not "a fixed programme".
