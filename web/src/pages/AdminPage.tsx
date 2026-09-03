@@ -305,6 +305,7 @@ export function AdminPage() {
   const [weekRailFrom, setWeekRailFrom] = useState('8');
   const [auditKeep, setAuditKeep] = useState('1000');
   const [defaultView, setDefaultView] = useState<ViewMode>('list');
+  const [showOfficialBadge, setShowOfficialBadge] = useState(false);
   const [userRoleLabel, setUserRoleLabel] = useState('');
   const [viewerPassword, setViewerPassword] = useState('');
   const [userPassword, setUserPassword] = useState('');
@@ -373,6 +374,7 @@ export function AdminPage() {
     setWeekRailFrom(String(event.weekRailFrom));
     setAuditKeep(String(event.auditKeep));
     setDefaultView(event.defaultView);
+    setShowOfficialBadge(event.showOfficialBadge);
     setUserRoleLabel(event.userRoleLabel);
     // Clear the duplicate form too, so it isn't pre-filled after a clone.
     setCloneName('');
@@ -831,6 +833,7 @@ export function AdminPage() {
         weekRailFrom: parsedWeekRail.value,
         auditKeep: parsedAuditKeep.value,
         defaultView,
+        showOfficialBadge,
         ...(userRoleLabel.trim() ? { userRoleLabel: userRoleLabel.trim() } : {}),
         ...(viewerPassword ? { viewerPassword } : {}),
         ...(userPassword ? { userPassword } : {}),
@@ -1610,6 +1613,16 @@ export function AdminPage() {
                 <option value="list">List — one column, in time order</option>
                 <option value="cal">Calendar — a grid of rooms</option>
               </select>
+            </Field>
+            <Field
+              label="Mark the official programme"
+              hint="Off by default. Turn it on where the schedule mixes an organiser's programme with sessions attendees put up themselves, and the difference is worth seeing at a glance. On an event where everything is official the badge says nothing, and on an open floor it is noise. A session's own panel always says which it is, either way."
+            >
+              <Toggle
+                checked={showOfficialBadge}
+                onChange={setShowOfficialBadge}
+                label="Show an “Official” tag on grid blocks and list cards"
+              />
             </Field>
             <NumberField
               label="Audit entries to keep"

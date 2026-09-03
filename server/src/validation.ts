@@ -424,6 +424,7 @@ export const settingsSchema = z
     adminPassword: passwordSchema.optional(),
     userRoleLabel: roleLabelSchema.optional(),
     auditKeep: auditKeepSchema.optional(),
+    showOfficialBadge: z.boolean().optional(),
     archived: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'Nothing to update' })

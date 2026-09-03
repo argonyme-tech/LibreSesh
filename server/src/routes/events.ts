@@ -101,8 +101,8 @@ export function eventRoutes(ctx: Ctx): Router {
           `INSERT INTO events
             (slug, name, timezone, start_date, end_date, day_start_min, day_end_min,
              week_rail_from, viewer_pw_hash, user_pw_hash, admin_pw_hash, archived,
-             user_role_label, audit_keep, default_view, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
+             user_role_label, audit_keep, default_view, show_official_badge, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
         )
         .run(
           body.newSlug,
@@ -122,6 +122,9 @@ export function eventRoutes(ctx: Ctx): Router {
           source.audit_keep,
           // As does how the copy opens: a clone is the same event again.
           source.default_view,
+          // And whether it badges its programme — the same event runs the same
+          // shape, so the same marking is right or wrong for both.
+          source.show_official_badge,
           now,
         );
       const id = Number(info.lastInsertRowid);

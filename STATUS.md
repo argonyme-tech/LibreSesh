@@ -3,7 +3,7 @@
 The shared queue: what is in flight, what is blocked, and what is planned.
 Shipped work moves to [CHANGELOG.md](CHANGELOG.md) and is not repeated here.
 
-Last updated: 2026-09-02
+Last updated: 2026-09-03
 
 ## In Progress
 
@@ -13,8 +13,8 @@ everything from `79e5044` onwards is unpushed, including the 0.2.3
 release commit. That whole spec
 (`_planning/specs/self-as-speaker-and-merge-ux.md`, six steps, plan at
 `_planning/plans/2026-09-02-everyone-is-a-person.md`) is code-complete as
-of 2026-09-02 and written up in CHANGELOG `[Unreleased]`; 730 tests, lint
-clean, build clean. What is left of it is the browser pass under Blockers.
+of 2026-09-02 and written up in CHANGELOG `[Unreleased]`; the suite stood at
+730 then and is at **807** now, lint clean, build clean. What is left of it is the browser pass under Blockers.
 The breaks rework has landed — `feat/event-level-breaks` (`5e53811`) is an
 ancestor of `dev` — so its code half is done and written up in CHANGELOG
 `[Unreleased]` and ARCHITECTURE §Breaks; what is left of it is the browser
@@ -23,23 +23,31 @@ CHANGELOG.md under `[0.2.0]`, and what has landed since is under
 `[Unreleased]` — including tag colours (`3f723ac`, `0b08a00`),
 multi-speaker sessions (`f26bde3`), the single Calendar menu item
 (`5d020cb`) and per-field profile editing (`aa64417`), all four written up
-2026-09-01 after landing unlogged. What is left of the UI-overhaul plan
-lives in `_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
+2026-09-01 after landing unlogged. The evening of 2026-09-02 added **session formats** and the corrections that
+came straight out of seeing them in the app: a format carries no length, the
+duration picker reaches a day through an `Other…` field, Placement moved to
+the top of the session form, and the word "open" left the UI in favour of an
+opt-in **Official** badge. The same evening fixed a speaker being unable to
+edit their own session — reported from use, three rules deep. All of it is
+code-complete and in CHANGELOG `[Unreleased]`; migrations 014, 015 and 016.
+What is left of it is the browser pass under Blockers. What is left of the
+UI-overhaul plan lives in
+`_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
 
 - **Whole-app UI sweep.** The primitives landed, the admin page is done, and
   as of 2026-08-31 every modal is on the `Modal` primitive (`fb5c759`).
-  **Recounted against the tree on 2026-09-01: 37 bare `underline` usages, not
-  the 21 this entry claimed three times running.** The old number was counted
-  against a fixed list of files rather than the tree, so it could not move.
-  Excluding `ui.tsx` (6 — those are the primitives themselves) and the
-  `[&_a]:underline` in prose wrappers (links inside rendered markdown keep
-  their underline deliberately), the spread is: ProfilePage 5, SchedulePage 4,
-  ProposalBoard 4, FilterMenu 3, SessionDetail 3, AgendaPage 3, ImportPage 3,
-  Gate 2, EventListPage 2, NewEventPage 2, AdminAttendees 2, SearchPage 2,
-  Tour 1, AdminBackup 1. DetailSheet is now 0 — its four moved into
-  SessionDetail with the panel refactor, which is part of why the old list
-  drifted. Use `grep -rl underline web/src --include='*.tsx'` and subtract the
-  `[&_a]:` hits, rather than re-checking the files this entry happens to name.
+  **Recounted against the tree on 2026-09-03: 38 bare `underline` usages** —
+  one *more* than the 37 counted on 2026-09-01, which is exactly why this is
+  recounted rather than carried forward. (Before that it claimed 21 three
+  times running, because it was counted against a fixed list of files instead
+  of the tree, so it could not move.) Excluding `ui.tsx` (8 — those are the
+  primitives themselves) and the three `[&_a]:underline` in prose wrappers
+  (links inside rendered markdown keep their underline deliberately), the
+  spread is: ProfilePage 6, ProposalBoard 4, SessionDetail 4, SchedulePage 4,
+  FilterMenu 3, AgendaPage 3, ImportPage 3, AdminPage 2, EventListPage 2,
+  NewEventPage 2, SearchPage 2, Gate 1, Tour 1, AdminBackup 1. Count every
+  `*.tsx` under `web/src`, then subtract `ui.tsx` and the `[&_a]:` hits —
+  don't re-check the files this entry happens to name.
 
 - **ARCHITECTURE.md concurrency paragraph.** §Realtime documents broadcast and
   heartbeats but never states the model: last-write-wins, `assertNotStale`
@@ -81,6 +89,32 @@ lives in `_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
   may crowd the title on a narrow phone. The official/open control's label
   changed to **Placement** in the same pass — worth checking it does not now
   read as a duplicate of the Room and Day fields it sits near.
+
+  And from the evening of 2026-09-02, none of it seen — now the largest
+  unseen block, and the first three are the ones most likely to be visibly
+  wrong:
+
+  - **The top of the session form.** Format chips, then Placement, then the
+    title: two chip rows stacked above the first text field is a shape this
+    form has never had. Watch a dozen formats wrapping to three lines above
+    the title — the case the design is weakest at — and whether the Placement
+    chip's `: allow parallel sessions` suffix pushes the pair onto two lines
+    on a phone.
+  - **A speaker editing their own session.** The flow that was actually
+    reported. As an attendee credited on an official session: the Edit button
+    should appear at all, Room/Day/Start/Duration should be disabled under the
+    grey notice, Delete should be absent, and saving a changed description
+    should go through. The API is covered by tests; nothing covers the button.
+  - **The duration picker.** `Other…` reveals a number field — check it takes
+    a typed 40, that the `· 1 h 30 min` echo appears past an hour, and that
+    editing a session whose length is off the list opens straight into the
+    field instead of showing a preset it does not have.
+  - **The Official badge.** Off by default, so first confirm the grid and the
+    list say nothing about placement at all; then turn it on in Manage Event →
+    Settings and look at a grid block and a list card, in both themes.
+  - **The Formats section** in Manage Event → Programme: the dashed suggestion
+    chips have never been rendered, and neither has the session form's empty
+    state for an event that defines no formats.
 
   The **gate** is still the one nobody has opened, and it is the screen
   every attendee must get through: it now refuses an empty username and
@@ -187,17 +221,19 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   Event, picked at the top of the session form, shown on the session sheet,
   carried by clones, the export and the importer. It carries no length —
   migration 014 gave it one and 015 took it away, because a format that
-  retimes the session it describes makes one field answer two questions. What was left
-  out on purpose, because none of it is needed for a format to be worth
-  having, and each is a separate decision:
+  retimes the session it describes makes one field answer two questions. What
+  was left out on purpose, because none of it is needed for a format to be
+  worth having, and each is a separate decision:
 
   - **Filtering by format.** It is the obvious second filter after tags, and
     `useFilters.ts` already carries `rooms`, `tags` and `tracks` in the URL —
     a fourth is the same shape. Wants a decision about the filter panel on a
     narrow header before it goes in, since that row already wraps.
-  - **The format on a block.** The grid card has room for about one more word
-    and currently spends it on nothing. A colour dot rather than the name may
-    be the answer at column width; worth looking at a real grid first.
+  - **The format on a block.** The grid card has room for about one more word.
+    It now spends it on the **Official** badge when an event turns that on
+    (migration 016), so this is no longer a free line — decide whether a
+    format shows as a colour dot rather than a name, and what happens on a
+    block that would carry both. Worth looking at a real grid first.
   - **A placed pitch has no format.** `POST /proposals/:id/place` builds the
     session without one (`routes/proposals.ts`), which is defensible — a pitch
     never said what kind of thing it was — but it means the one path that
@@ -206,9 +242,11 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
   Also from the same pass, and not backlog because they are done: the
   official/open control is **Placement** now and sits at the top beside the
-  format rather than under Extras, and the duration picker runs to eight hours
-  with an **Other…** field behind it (any multiple of five up to a day —
-  `shared/sessionLimits.ts`, `MAX_DURATION_MINUTES` raised from 480).
+  format rather than under Extras; the duration picker runs to eight hours with
+  an **Other…** field behind it (any multiple of five up to a day —
+  `shared/sessionLimits.ts`, `MAX_DURATION_MINUTES` raised from 480); and the
+  grid and list stopped labelling placement at all unless an organiser turns
+  the **Official** badge on (migration 016).
 
   Two smaller notes from building it. The import document now has `format` at
   the top meaning "this is a LibreSesh document" **and** `format` on a session
@@ -591,6 +629,24 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   cost something, which is why this is a real backlog item and not a fire.
 
 ## Medium Priority
+
+- **Two judgement calls from 2026-09-02 that nobody has pushed back on yet.**
+  Both were made deliberately and flagged; neither is a bug, and either could
+  reasonably be reversed once the screens have been used.
+
+  - **A credited `viewer` may edit the session they are billed on.**
+    `assertMayMutate` lost its role floor entirely, so being on the bill is the
+    whole test. That is the literal reading of "a speaker owns their own
+    session, whatever role they hold", and a viewer only gets there because an
+    organiser explicitly credited them. If it should floor at attendee instead,
+    it is one condition in `sessionRules.ts` — but note the reason the floor
+    was removed: the speaker role is minted by a code somebody has to remember
+    to send, so a floor of any kind is a floor most real speakers fall below.
+  - **The session sheet still names the placement whatever the badge setting
+    says.** `show_official_badge` governs the grid and the list only; the panel
+    always shows `Official` or `non-official`. Deliberate — a detail view is
+    where a reader goes to find out — but an organiser who switched the badge
+    off may expect it off everywhere.
 
 - **Goal: one database per event, and identity that lives inside the event.**
   Stated 2026-09-02. Cross-event identity — one cookie is one person across

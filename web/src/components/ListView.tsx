@@ -6,6 +6,8 @@ import { fmtMin, place, speakerLine } from '../lib/format';
 export interface ListViewProps {
   rooms: RoomDto[];
   tags: TagDto[];
+  /** Mark the official programme on the card; see Calendar. */
+  showOfficialBadge: boolean;
   sessions: SessionDto[];
   /** Lunch and friends, for the days they apply to. Read-only furniture here
    *  too — it is in the list so the day reads honestly, not to be opened. */
@@ -33,6 +35,7 @@ export interface ListViewProps {
 export function ListView({
   rooms,
   tags,
+  showOfficialBadge,
   sessions,
   breaks,
   contributionCounts,
@@ -179,9 +182,11 @@ export function ListView({
                         </span>
                       );
                     })}
-                    {session.type === 'open' && (
-                      <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:text-emerald-300">
-                        non-official
+                    {/* See Calendar: the programme is what gets marked, and
+                        only when the organiser asks for it. */}
+                    {showOfficialBadge && session.type === 'official' && (
+                      <span className="rounded-full bg-stone-100 dark:bg-stone-800 px-2 py-0.5 text-xs font-medium text-stone-600 dark:text-stone-300">
+                        Official
                       </span>
                     )}
                     {clashes && (

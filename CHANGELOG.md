@@ -73,15 +73,25 @@ All notable changes to this project are documented here.
 
 ### Changed
 
-- **"Open session" is gone from the schedule; the word meant the wrong thing.**
-  A block that is not part of the published programme was badged `open session`
-  on the grid, `open` in the list and `open session` on the sheet — and read as
-  *open to join*, which every session on a schedule is. The one word meant to
-  mark the exception described the rule. All three say **non-official** now,
-  and the session form's Placement control offers **Official** and
-  **Non-official: allow parallel sessions**, which states the consequence that
-  actually differs: only an official session can hold the floor, so something
-  can always run alongside a non-official one. The stored values are unchanged.
+- **The schedule no longer labels sessions "open", and marks nothing by
+  default.** A block outside the published programme was badged `open session`
+  on the grid and `open` in the list, which read as *open to join* — something
+  every session on a schedule is. The word meant to mark the exception
+  described the rule.
+
+  The grid and the list now say nothing about placement unless an organiser
+  asks. **Manage Event → Settings** has a switch that puts a small
+  **Official** on blocks and cards, for the event that really does mix a
+  published programme with a floor attendees book themselves. Marking the
+  programme instead of the exception is the way round that works at both ends:
+  where everything is official the badge is redundant, and on an open floor it
+  was noise. The dashed border still tells them apart, and a session's own
+  panel always says which it is.
+
+  In the session form the control is **Placement**, offering **Official** and
+  **Non-official: allow parallel sessions**, and its help text is rewritten in
+  plain words — what each one means for who can edit and move the session, and
+  why the second says what it says. Stored values are unchanged.
 
 - **A session can run longer than three hours, and for any number of minutes.**
   The duration picker offered seven fixed choices ending at 180, and the server
