@@ -66,6 +66,10 @@ export function StarTally({
       aria-label={`${starred ? 'Unstar' : 'Star'} ${sessionTitle ?? 'this session'}${
         count > 0 ? `. Starred by ${count}${overCapacity ? ', more than the room holds' : ''}` : ''
       }`}
+      // Pointer-down as well as click: on a grid block the press is what
+      // starts a drag, so the star has to claim it before the block does, or
+      // starring a session would pick it up and move it.
+      onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => {
         // Do not let the tap fall through and open the session.
         e.stopPropagation();
