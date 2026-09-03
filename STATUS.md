@@ -630,6 +630,37 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
 ## Medium Priority
 
+### Forms
+
+_A group, because the first item is one instance of a pattern and the rest of
+the site's forms are the others. Add to it rather than scattering form work
+through the priorities._
+
+- **"Expect someone" should be a button, not a field standing open.** The
+  People tab ends in a permanently-open **Expect someone** text field with its
+  own hint paragraph, which costs the bottom of the tab a form-sized block for
+  something an organiser does a handful of times an event — and it reads as
+  something waiting to be filled in rather than an action they can take.
+
+  Make it an inline create affordance: a button labelled **Add new
+  Guest/Speaker**, which on click reveals the name field (focused) with its
+  hint, and collapses again on save or cancel. The affordance is the button;
+  the field is the consequence of pressing it. Keeps the tab's foot to one
+  line at rest, and says what pressing it does — which "Expect someone" over
+  an empty box does not.
+
+  Nothing about what it creates changes: an unclaimed profile the person
+  claims at the gate or with a speaker code. The hint text is worth keeping,
+  moved into the revealed state.
+
+- **The same pass over every other form on the site.** This is the first of
+  them, not the only one — sessions, rooms, tracks, tags, formats, breaks and
+  the event settings all have forms that have grown by addition. Worth doing
+  as one considered sweep once the pattern above has been used in anger:
+  what is a button and what is a field standing open, where the hint goes,
+  what a form looks like at rest. Not yet specified — this is the placeholder
+  that stops it being rediscovered from scratch.
+
 - **Two judgement calls from 2026-09-02 that nobody has pushed back on yet.**
   Both were made deliberately and flagged; neither is a bug, and either could
   reasonably be reversed once the screens have been used.
