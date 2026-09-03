@@ -45,6 +45,23 @@ All notable changes to this project are documented here.
 
 ### Fixed
 
+- **Starring a session moved its title, and a list card showed two stars.** On
+  the grid, the star and the interest count sat in the row above the title, so
+  starring a session pushed its title down a line — two identical blocks side
+  by side read differently because of something that is not about either
+  session. On a list card there were two stars for one fact: a ☆/★ toggle
+  beside the title and a separate "★ 12" at the bottom, which reads as two
+  different things about starring and leaves you working out which one is
+  yours.
+
+  Both surfaces now draw **one star and one number**, in the bottom-right
+  corner. On the grid it is out of the flow entirely, so nothing above it moves
+  when it appears — and it stays display-only, because a block's pointer
+  handling is drag-sensitive and the resize handle is directly beneath it;
+  starring from the grid is still done in the session sheet. On a list card the
+  tally *is* the control, so the star you press and the count you read are one
+  object.
+
 - **A speaker could not edit their own session.** An organiser schedules a talk
   and types the speaker's name onto it; that person arrives at the gate as an
   ordinary attendee — the role almost every speaker holds, since the speaker

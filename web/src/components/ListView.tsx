@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { BreakDto, RoomDto, SessionDto, TagDto } from '@shared/types';
 import { readableInk } from '@shared/tagColors';
 import { fmtMin, place, speakerLine } from '../lib/format';
+import { StarTally } from './StarTally';
 
 export interface ListViewProps {
   rooms: RoomDto[];
@@ -152,21 +153,6 @@ export function ListView({
                         now
                       </span>
                     )}
-                    <button
-                      type="button"
-                      aria-label={starred ? `Unstar ${session.title}` : `Star ${session.title}`}
-                      aria-pressed={starred}
-                      onClick={(e) => {
-                        // Do not let the tap fall through and open the session.
-                        e.stopPropagation();
-                        onToggleStar(session);
-                      }}
-                      className={`-m-1 shrink-0 rounded-full p-1 text-base leading-none ${
-                        starred ? 'text-amber-500 dark:text-amber-400' : 'text-stone-300 dark:text-stone-600 hover:text-amber-500'
-                      }`}
-                    >
-                      <span aria-hidden="true">{starred ? '★' : '☆'}</span>
-                    </button>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
                     {session.tagIds.map((id) => {
@@ -194,29 +180,23 @@ export function ListView({
                         clashes
                       </span>
                     )}
-                    {(stars > 0 || count > 0) && (
-                      <span className="ml-auto flex items-center gap-2 text-xs">
-                        {stars > 0 && (
-                          <span
-                            className={
-                              overCapacity
-                                ? 'font-medium text-amber-700 dark:text-amber-400'
-                                : 'text-stone-400 dark:text-stone-500'
-                            }
-                            aria-label={`Starred by ${stars}${
-                              overCapacity ? ', more than the room holds' : ''
-                            }`}
-                          >
-                            <span aria-hidden="true">★</span> {stars}
-                          </span>
-                        )}
-                        {count > 0 && (
-                          <span className="text-stone-400 dark:text-stone-500">
-                            {count} contribution{count > 1 ? 's' : ''}
-                          </span>
-                        )}
-                      </span>
-                    )}
+                    {/* The card's one star, in the corner furthest from the
+                        title. It was a toggle up beside the title and a count
+                        down here, two stars saying two halves of one fact. */}
+                    <span className="ml-auto flex items-center gap-2 text-xs">
+                      {count > 0 && (
+                        <span className="text-stone-400 dark:text-stone-500">
+                          {count} contribution{count > 1 ? 's' : ''}
+                        </span>
+                      )}
+                      <StarTally
+                        starred={starred}
+                        count={stars}
+                        overCapacity={overCapacity}
+                        sessionTitle={session.title}
+                        onToggle={() => onToggleStar(session)}
+                      />
+                    </span>
                   </div>
                 </div>
               );
