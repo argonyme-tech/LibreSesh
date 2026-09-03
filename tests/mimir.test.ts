@@ -32,6 +32,30 @@ describe('mimir routes', () => {
       .expect(403);
   });
 
+  it('lets a catalog past the app-wide body cap through', async () => {
+    // The corpus is already over 256 KB on disk. The first version gave these
+    // routes a 4 MB parser and never reached it: the global 256 KB parser
+    // runs first and had already answered 413. app.ts now steps aside for
+    // exactly these paths.
+    const dynamics = Array.from({ length: 1500 }, (_, i) => ({
+      id: `d${i}`,
+      title: 'x'.repeat(120),
+      steps: 'y'.repeat(100),
+    }));
+    const body = { version: 1, dynamics };
+    expect(JSON.stringify(body).length).toBeGreaterThan(300_000);
+    const res = await admin.put('/api/e/testconf/mimir/catalog').send(body);
+    expect(res.status).not.toBe(413);
+  });
+
+  it('leaves the cap in place for everything else', async () => {
+    // The skip is for named paths, not for the whole event router.
+    const res = await admin
+      .post('/api/e/testconf/sessions')
+      .send({ title: 'x'.repeat(300_000) });
+    expect(res.status).toBe(413);
+  });
+
   it('answers 503 with a clear code when the chat engine has no key', async () => {
     delete process.env.MIMIR_API_KEY;
     const res = await admin

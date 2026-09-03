@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 
 export type Db = Database.Database;
 
+import { adoptSquashedSeries, isPreSquash } from './adoptSquash.js';
+
 const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'migrations');
 
 /** Raw row shapes, mirroring the SQL schema 1:1. */
@@ -218,12 +220,35 @@ export function migrate(db: Db, migrationsDir = MIGRATIONS_DIR): void {
     applied_at TEXT NOT NULL
   )`);
 
-  const applied = new Set(
-    db.prepare<[], { name: string }>('SELECT name FROM migrations').all().map((r) => r.name),
-  );
+  const readApplied = () =>
+    new Set(
+      db.prepare<[], { name: string }>('SELECT name FROM migrations').all().map((r) => r.name),
+    );
+  let applied = readApplied();
   const files = readdirSync(migrationsDir)
     .filter((f) => f.endsWith('.sql'))
     .sort();
+
+  const backup = () => {
+    // A fresh database has nothing worth copying; an established one does.
+    if (applied.size > 0 && !db.memory && db.name !== '') {
+      const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, 'Z');
+      db.prepare('VACUUM INTO ?').run(`${db.name}.backup-${stamp}`);
+    }
+  };
+
+  // A sibling from before the squash, not a stranger from the future: its
+  // bookkeeping is exactly the old series this build's baseline replaced. Adopt
+  // it here, before the guard below would refuse it — a refusal on deploy is a
+  // crash-loop with nobody present to run a script. The backup comes first
+  // because adoption rebuilds a table, and is then not taken again.
+  let backedUp = false;
+  if (files.includes('001_baseline.sql') && isPreSquash(applied)) {
+    backup();
+    backedUp = true;
+    adoptSquashedSeries(db);
+    applied = readApplied();
+  }
 
   const unknown = [...applied].filter((name) => !files.includes(name)).sort();
   if (unknown.length > 0) {
@@ -237,11 +262,7 @@ export function migrate(db: Db, migrationsDir = MIGRATIONS_DIR): void {
   const pending = files.filter((f) => !applied.has(f));
   if (pending.length === 0) return;
 
-  // A fresh database has nothing worth copying; an established one does.
-  if (applied.size > 0 && !db.memory && db.name !== '') {
-    const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, 'Z');
-    db.prepare('VACUUM INTO ?').run(`${db.name}.backup-${stamp}`);
-  }
+  if (!backedUp) backup();
 
   const record = db.prepare('INSERT INTO migrations (name, applied_at) VALUES (?, ?)');
   db.pragma('foreign_keys = OFF');

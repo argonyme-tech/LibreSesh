@@ -12,7 +12,7 @@ import { identityMiddleware } from './identity.js';
 import { RateLimiter } from './ratelimit.js';
 import { agendaRoutes, calendarRoutes } from './routes/agenda.js';
 import { auditRoutes } from './routes/audit.js';
-import { mimirRoutes } from './routes/mimir.js';
+import { BIG_BODY_ROUTE, mimirRoutes } from './routes/mimir.js';
 import { attendeeRoutes } from './routes/attendees.js';
 import { backupRoutes, exportRoutes } from './routes/backup.js';
 import { breakRoutes } from './routes/breaks.js';
@@ -48,7 +48,12 @@ export function createApp(db: Db, config: Config): App {
 
   if (config.trustProxy) app.set('trust proxy', 1);
   app.disable('x-powered-by');
-  app.use(express.json({ limit: '256kb' }));
+  // The cap keeps an oversized import from reaching a route at all. Mímir's
+  // corpus routes carry their own, larger parser — and a parser mounted after
+  // this one never runs, because body-parser has already answered 413. So this
+  // one steps aside for exactly those paths and lets theirs be first.
+  const json = express.json({ limit: '256kb' });
+  app.use((req, res, next) => (BIG_BODY_ROUTE.test(req.path) ? next() : json(req, res, next)));
   app.use(cookieParser(config.cookieSecret));
 
   const api = Router();
