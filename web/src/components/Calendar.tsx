@@ -667,6 +667,19 @@ export function Calendar({
                   {fmtMin(item.startMin)}–{fmtMin(item.endMin)}
                 </span>
               </span>
+              {/* The same again, bottom-right. On a grid more than two columns
+                  wide the top-left label is off the edge of where you are
+                  reading — the far side of lunch has no marker at all — so it
+                  is repeated in the opposite corner. Only when the band is
+                  tall enough that the two labels do not meet. */}
+              {columns.length > 2 && (item.endMin - item.startMin) * PX_PER_MIN >= 44 && (
+                <span className="absolute bottom-0.5 right-2 text-xs font-semibold text-stone-500 dark:text-stone-400">
+                  {item.label}
+                  <span className="ml-1.5 font-normal">
+                    {fmtMin(item.startMin)}–{fmtMin(item.endMin)}
+                  </span>
+                </span>
+              )}
             </div>
           ))}
 
