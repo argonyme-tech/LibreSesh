@@ -7,6 +7,7 @@ import type {
   ContributionRow,
   PersonRow,
   RoomRow,
+  FormatRow,
   SessionRow,
   TagRow,
   TrackRow,
@@ -18,21 +19,23 @@ import {
   toBreakDto,
   toContributionDto,
   toEventDto,
+  NOBODY,
+  personFacts,
   toPersonDto,
-  personRosterFacts,
   toRoomDto,
   toSessionDto,
+  toFormatDto,
   toTagDto,
   toTrackDto,
   loadSessionDto,
   loadProposalDtos,
 } from '../mappers.js';
+import { loadClaims } from '../claims.js';
 import { getPermissions } from '../permissions.js';
 import { limit } from '../ratelimit.js';
 import { trackWindowsFor } from '../trackHours.js';
 import { getSession } from '../sessionRules.js';
 
-const UNCLAIMED = { role: null, holderUid: null, codePending: false } as const;
 
 /** Read endpoints. The whole event fits comfortably in one JSON payload, so the
  *  client fetches a bundle once and patches it from the SSE stream. */
@@ -49,6 +52,13 @@ export function bundleRoutes(ctx: Ctx): Router {
     const tags = ctx.db
       .prepare<[number], TagRow>(
         'SELECT * FROM tags WHERE event_id = ? AND deleted_at IS NULL ORDER BY name',
+      )
+      .all(eventId);
+    // The organiser's running order, not alphabetical: keynote before talk
+    // before lightning is the sequence they typed them in.
+    const formats = ctx.db
+      .prepare<[number], FormatRow>(
+        'SELECT * FROM session_formats WHERE event_id = ? AND deleted_at IS NULL ORDER BY sort_order, id',
       )
       .all(eventId);
     const tracks = ctx.db
@@ -89,7 +99,7 @@ export function bundleRoutes(ctx: Ctx): Router {
       ctx.db,
       sessions.map((s) => s.id),
     );
-    const roster = req.role === 'admin' ? personRosterFacts(ctx.db, eventId) : undefined;
+    const facts = personFacts(ctx.db, eventId);
 
     // Admins see hidden contributions in the count; everyone else does not.
     const counts = ctx.db
@@ -109,6 +119,7 @@ export function bundleRoutes(ctx: Ctx): Router {
         eventDisplayName(ctx.db, eventId, req.identity.id) ?? req.identity.display_name,
       rooms: rooms.map(toRoomDto),
       tags: tags.map(toTagDto),
+      formats: formats.map(toFormatDto),
       tracks: tracks.map((t) => toTrackDto(t, trackWindowRows.get(t.id) ?? [])),
       breaks: breaks.map(toBreakDto),
       sessions: sessions.map((s) =>
@@ -119,15 +130,12 @@ export function bundleRoutes(ctx: Ctx): Router {
           speakers.get(s.id) ?? [],
         ),
       ),
-      // Who holds each profile, and whether they have ever used it, is for
-      // organisers: an attendee has no business being handed a list of who
-      // runs the event. `roster` is undefined for everyone else, and the
-      // fields are then absent rather than null — "not disclosed to you", not
-      // "nobody holds this". A person the query missed simply has no identity.
+      // Who holds each profile, at what role, and whether they have ever
+      // used it is for organisers only — an attendee has no business being
+      // handed a list of who runs the event. Username and whether a person
+      // may be credited are public: the picker needs them.
       people: people.map((p) =>
-        roster === undefined
-          ? toPersonDto(p, req.identity.id)
-          : toPersonDto(p, req.identity.id, roster.get(p.id) ?? UNCLAIMED),
+        toPersonDto(p, req.identity.id, facts.get(p.id) ?? NOBODY, req.role === 'admin'),
       ),
       proposals: loadProposalDtos(ctx.db, eventId, req.identity.id),
       starredSessionIds: ctx.db
@@ -151,6 +159,7 @@ export function bundleRoutes(ctx: Ctx): Router {
       ),
       contributionCounts: Object.fromEntries(counts.map((c) => [c.session_id, c.n])),
       permissions: getPermissions(ctx.db, eventId),
+      claims: loadClaims(ctx.db, eventId, req.identity.id, req.role === 'admin'),
     };
     res.json(bundle);
   });

@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import type { PersonDetailDto, PersonDto, PersonLink } from '@shared/types';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import type { PersonDetailDto, PersonDto, LabelledLink, Role } from '@shared/types';
 import { ApiError, api, type PersonWrite } from '../lib/api';
-import { dayLabel, fmtMin, place, rowId, todayInZone } from '../lib/format';
+import { dayLabel, fmtMin, place, todayInZone } from '../lib/format';
 import { renderMarkdown } from '../lib/markdown';
 import { useEventData } from '../lib/useEventData';
 import { EditIcon } from '../components/icons';
+import { MergeModal } from '../components/MergeModal';
+import { PersonStatusBadge } from '../components/PersonLine';
+import { RoleControl } from '../components/RoleControl';
 import {
   EmptyState,
-  Field,
   FormError,
-  FormStack,
   IconButton,
-  Modal,
   PrimaryButton,
   SecondaryButton,
   Spinner,
@@ -36,8 +36,17 @@ export function ProfilePage() {
   const { slug = '', personId = '' } = useParams();
   const id = Number(personId);
   const navigate = useNavigate();
+  /**
+   * Where "back" goes. A profile is reached from two places that are nothing
+   * like each other — the schedule, and Manage → People — and sending an
+   * organiser who came from the People tab out to the schedule made them
+   * navigate back in for every person they looked at. Whoever links here says
+   * where here was; anyone who does not gets the schedule, as before.
+   */
+  const from = (useLocation().state as { back?: { to: string; label: string } } | null)?.back;
   // The bundle gives us the viewer's role, the timezone and live edits.
   const data = useEventData(slug);
+  const toast = useToast();
 
   const [detail, setDetail] = useState<PersonDetailDto | null>(null);
   const [status, setStatus] = useState<Status>('loading');
@@ -49,7 +58,7 @@ export function ProfilePage() {
   const [draftDisplayName, setDraftDisplayName] = useState('');
   const [draftName, setDraftName] = useState('');
   const [draftBio, setDraftBio] = useState('');
-  const [draftLinks, setDraftLinks] = useState<PersonLink[]>([]);
+  const [draftLinks, setDraftLinks] = useState<LabelledLink[]>([]);
 
   useEffect(() => {
     let live = true;
@@ -101,6 +110,23 @@ export function ProfilePage() {
   );
 
   const isAdmin = bundle?.role === 'admin';
+  /**
+   * Asking for a profile an organiser left for you. It stops at asking: a
+   * shell is usually credited on sessions, and holding it is the right to
+   * rewrite those talks, so an organiser agrees before anything moves.
+   */
+  const myClaim = bundle?.claims.find((c) => c.isMine && c.personId === id);
+  const waitingElsewhere = bundle?.claims.find(
+    (c) => c.isMine && c.personId !== id && c.declinedAt === null,
+  );
+  const claimAction = async (run: () => Promise<unknown>) => {
+    try {
+      await run();
+      await data.reload();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
   const canEdit = !!person && (person.isMine || isAdmin);
 
   if (status === 'loading') return <Spinner label="Loading profile…" />;
@@ -157,15 +183,67 @@ export function ProfilePage() {
     data.apply({ type: 'person.updated', entity: updated });
   };
 
-  const setLink = (i: number, patch: Partial<PersonLink>) =>
+  /**
+   * Put this profile away, or take it back out.
+   *
+   * Both directions are here because both callers are: an organiser tidying
+   * up, and the person themselves finding out that they were tidied. The
+   * server decides who may do which — an organiser either way, the holder
+   * only outwards.
+   */
+  const toggleArchive = async () => {
+    try {
+      const updated =
+        person.archivedAt === null
+          ? await api.archivePerson(slug, person.id)
+          : await api.unarchivePerson(slug, person.id);
+      setDetail((d) => (d ? { ...d, person: updated } : d));
+      data.apply({ type: 'person.updated', entity: updated });
+    } catch (err) {
+      toast.show((err as Error).message);
+    }
+  };
+
+  /**
+   * Hand them a different role. The server refuses to demote the last
+   * organiser — an event nobody can administer has no way back — so that
+   * refusal arrives as a toast rather than being predicted here.
+   */
+  const changeRole = async (role: Role) => {
+    try {
+      const updated = await api.setPersonRole(slug, person.id, role);
+      setDetail((d) => (d ? { ...d, person: updated } : d));
+      data.apply({ type: 'person.updated', entity: updated });
+    } catch (err) {
+      toast.show((err as Error).message);
+    }
+  };
+
+  const setLink = (i: number, patch: Partial<LabelledLink>) =>
     setDraftLinks((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
 
   return (
     <div className="min-h-screen bg-stone-100 dark:bg-stone-950 text-stone-900 dark:text-stone-100">
       <div className="mx-auto max-w-2xl px-4 py-8">
-        <Link to={`/e/${slug}`} className="text-xs text-stone-500 dark:text-stone-400 underline">
-          ← Schedule
-        </Link>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <Link
+            to={from?.to ?? `/e/${slug}`}
+            className="text-xs text-stone-500 dark:text-stone-400 underline"
+          >
+            ← {from?.label ?? 'Schedule'}
+          </Link>
+          {/* A deep link into a profile arrives with no history to speak of,
+              so an organiser gets the tab named outright rather than only as
+              a back arrow they may not have. */}
+          {isAdmin && from === undefined && (
+            <Link
+              to={`/e/${slug}/admin?tab=people`}
+              className="text-xs text-stone-500 dark:text-stone-400 underline"
+            >
+              Manage → People
+            </Link>
+          )}
+        </div>
 
         <div className="mt-4 rounded-2xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-5 shadow-sm">
           <div className="flex items-start gap-3">
@@ -180,14 +258,14 @@ export function ProfilePage() {
                   }}
                   hint={
                     person.isMine
-                      ? 'The name on this profile — what sessions you host are credited to.'
-                      : undefined
+                      ? 'Your full name — what sessions you give are credited to. Need not be unique.'
+                      : 'Their full name — what sessions they give are credited to.'
                   }
                 >
                   <input
                     value={draftName}
                     onChange={(e) => setDraftName(e.target.value)}
-                    aria-label="Name"
+                    aria-label="Full name"
                     maxLength={120}
                     className={`${inputClass} text-lg font-semibold`}
                     autoFocus
@@ -200,8 +278,8 @@ export function ProfilePage() {
                   </h1>
                   {canEdit && (
                     <IconButton
-                      aria-label="Edit name"
-                      title="Edit name"
+                      aria-label="Edit full name"
+                      title="Edit full name"
                       className="shrink-0"
                       onClick={() => edit('name')}
                     >
@@ -210,21 +288,130 @@ export function ProfilePage() {
                   )}
                 </div>
               )}
-              {/* Profile names are checked for clashes but are not the thing
-                  that identifies anyone — this id is, and it is the one in the
-                  address bar. Per event on purpose: a number that followed a
-                  person between events would tie their names together, which
-                  is exactly what per-event names exist to avoid. */}
-              <p className="mt-0.5 font-mono text-xs text-stone-400 dark:text-stone-500">
-                ({rowId(person.id)})
+              {/* Two names, two jobs: the heading is the full name a session
+                  is credited to, and under it the username the room actually
+                  calls them. The profile's row id used to sit here; it is in
+                  the address bar and nowhere else does anyone need it. */}
+              <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">
+                {person.username === null
+                  ? 'Nobody holds this profile yet'
+                  : `@${person.username}`}
               </p>
+              {/* What this person is here, for organisers only — the same
+                  badge the People list shows, changeable in the same way.
+                  An organiser who opens a profile to read a bio is one click
+                  from the reason they usually came: the role is wrong. Before
+                  this, the only place to change it was the row they left. */}
+              {isAdmin && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {person.claimed ? (
+                    <RoleControl
+                      role={person.role ?? null}
+                      userLabel={bundle?.event.userRoleLabel}
+                      personName={person.name}
+                      onChange={(role) => void changeRole(role)}
+                    />
+                  ) : (
+                    <PersonStatusBadge person={person} userLabel={bundle?.event.userRoleLabel} />
+                  )}
+                </div>
+              )}
             </div>
             {isAdmin && (
-              <SecondaryButton className="shrink-0 py-1.5" onClick={() => setMerging(true)}>
-                Merge…
-              </SecondaryButton>
+              <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                <SecondaryButton className="py-1.5" onClick={() => setMerging(true)}>
+                  Merge…
+                </SecondaryButton>
+                {/* Only inwards. Coming back out is the notice below, which
+                    is where the holder finds it too. */}
+                {person.archivedAt === null && (
+                  <SecondaryButton
+                    className="py-1.5"
+                    title="Take this profile out of the People list and the speaker picker. Nothing is lost, and it can come back."
+                    onClick={() => void toggleArchive()}
+                  >
+                    Archive
+                  </SecondaryButton>
+                )}
+              </div>
             )}
           </div>
+
+          {/* Archived, said to the two people it concerns: whoever holds the
+              profile, and whoever runs the event. A stranger arriving from a
+              session's speaker link is shown nothing — the profile still
+              works, and "archived" is an organiser's filing note, not a fact
+              about the person.
+
+              The holder's copy is the whole reason archiving is not deleting.
+              Their cookie still works, their role is untouched, and this is
+              where they find out that they were put away and take themselves
+              back out without having to find an organiser. */}
+          {person.archivedAt !== null && (person.isMine || isAdmin) && (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900/60 dark:bg-amber-950/30">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-stone-700 dark:text-stone-300">
+                  {person.isMine
+                    ? 'This profile was archived, so it is out of the People list and the speaker picker. Nothing was lost — you keep your role, your sessions and everything you have posted.'
+                    : `Archived ${new Date(person.archivedAt).toLocaleDateString()}. It is out of the People list and the speaker picker, and keeps its sessions, its role and its holder.`}
+                </span>
+                <PrimaryButton
+                  className="ml-auto py-1 text-xs"
+                  onClick={() => void toggleArchive()}
+                >
+                  {person.isMine ? 'I’m still here' : 'Take out of the archive'}
+                </PrimaryButton>
+              </div>
+            </div>
+          )}
+
+          {!person.claimed && !isAdmin && (
+            <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm dark:border-stone-700 dark:bg-stone-800/60">
+              {myClaim && myClaim.declinedAt === null ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-stone-700 dark:text-stone-300">
+                    You have asked to hold this profile. An organiser decides.
+                  </span>
+                  <SecondaryButton
+                    className="ml-auto py-1 text-xs"
+                    onClick={() => void claimAction(() => api.withdrawClaim(slug, myClaim.id))}
+                  >
+                    Withdraw
+                  </SecondaryButton>
+                </div>
+              ) : myClaim ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-stone-700 dark:text-stone-300">
+                    An organiser turned that request down.
+                  </span>
+                  <SecondaryButton
+                    className="ml-auto py-1 text-xs"
+                    onClick={() => void claimAction(() => api.withdrawClaim(slug, myClaim.id))}
+                  >
+                    Dismiss
+                  </SecondaryButton>
+                </div>
+              ) : waitingElsewhere ? (
+                <p className="text-stone-600 dark:text-stone-400">
+                  You are already waiting on{' '}
+                  <span className="font-medium">{waitingElsewhere.personName}</span>. Withdraw that
+                  request before asking for this one.
+                </p>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-stone-600 dark:text-stone-400">
+                    Nobody holds this profile. If it is you, an organiser can hand it over.
+                  </span>
+                  <PrimaryButton
+                    className="ml-auto py-1 text-xs"
+                    onClick={() => void claimAction(() => api.claimPerson(slug, person.id))}
+                  >
+                    This is me
+                  </PrimaryButton>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="mt-4 space-y-4 border-t border-stone-100 pt-4 dark:border-stone-800">
             {person.isMine && (
@@ -232,18 +419,18 @@ export function ProfilePage() {
                  identity in the event — so it saves through its own call, and
                  an organiser looking at your profile does not get to touch it. */
               <ProfileField
-                label="Display name"
-                hint="How you appear in this event: the header chip, and anything you post. Must be unlike anyone else's here."
+                label="Username"
+                hint="How you appear in this event: the header chip, and anything you post. Unique here; not a login."
                 canEdit
                 filled={displayName !== ''}
-                emptyText="You have no name in this event yet."
-                addLabel="Set a display name"
+                emptyText="You have no username in this event yet."
+                addLabel="Set a username"
                 editing={open === 'displayName'}
                 onEdit={() => edit('displayName')}
                 onClose={close}
                 onSave={async () => {
                   const wanted = draftDisplayName.trim();
-                  if (!wanted) throw new Error('A display name cannot be empty.');
+                  if (!wanted) throw new Error('A username cannot be empty.');
                   if (wanted === displayName) return;
                   await api.renameInEvent(slug, wanted);
                   await data.reload();
@@ -252,7 +439,7 @@ export function ProfilePage() {
                   <input
                     value={draftDisplayName}
                     onChange={(e) => setDraftDisplayName(e.target.value)}
-                    aria-label="Display name"
+                    aria-label="Username"
                     maxLength={40}
                     className={inputClass}
                     autoFocus
@@ -422,6 +609,7 @@ export function ProfilePage() {
           slug={slug}
           survivor={person}
           people={bundle.people}
+          userLabel={bundle.event.userRoleLabel}
           onClose={() => setMerging(false)}
           onMerged={(updated, loserId) => {
             setDetail((d) => (d ? { ...d, person: updated } : d));
@@ -588,89 +776,6 @@ function FieldForm({
 }
 
 /**
- * Fold a duplicate profile into this one (identity spec, B2). The duplicate's
- * sessions and pitches move here, then it disappears — there is no undo, which
- * is why the sentence spells out the direction before the button.
- */
-function MergeModal({
-  slug,
-  survivor,
-  people,
-  onClose,
-  onMerged,
-}: {
-  slug: string;
-  survivor: PersonDto;
-  people: PersonDto[];
-  onClose: () => void;
-  onMerged: (updated: PersonDto, loserId: number) => void;
-}) {
-  const toast = useToast();
-  const [fromId, setFromId] = useState<number | null>(null);
-  const [busy, setBusy] = useState(false);
-  const candidates = people.filter((p) => p.id !== survivor.id);
-
-  const merge = async () => {
-    if (fromId === null || busy) return;
-    setBusy(true);
-    try {
-      const updated = await api.mergePerson(slug, survivor.id, fromId);
-      onMerged(updated, fromId);
-    } catch (err) {
-      toast.show((err as Error).message);
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      title="Merge a duplicate"
-      description={
-        <>
-          The profile you pick is folded into{' '}
-          <span className="font-medium">{survivor.name}</span>: its sessions and pitches move
-          here, then it is removed. This cannot be undone.
-        </>
-      }
-      onClose={onClose}
-      onSubmit={() => void merge()}
-      footer={
-        <>
-          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-          <PrimaryButton type="submit" disabled={busy || fromId === null}>
-            {busy ? 'Merging…' : 'Merge'}
-          </PrimaryButton>
-        </>
-      }
-    >
-      {candidates.length === 0 ? (
-        <p className="text-sm text-stone-400 dark:text-stone-500">
-          There is no other profile to merge.
-        </p>
-      ) : (
-        <FormStack>
-          <Field label="Duplicate to fold in">
-            <select
-              value={fromId === null ? '' : String(fromId)}
-              onChange={(e) => setFromId(e.target.value ? Number(e.target.value) : null)}
-              className={inputClass}
-            >
-              <option value="">— pick a profile —</option>
-              {candidates.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                  {p.claimed ? ' (claimed)' : ''}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </FormStack>
-      )}
-    </Modal>
-  );
-}
-
-/**
  * Organiser-only: mint or revoke this person's speaker phrase. The phrase is
  * shown exactly once, at mint — the server keeps only a hash. Whoever types
  * it at any gate becomes this person with the speaker role, on any number of
@@ -709,6 +814,9 @@ function SpeakerAccess({
     try {
       await api.revokeSpeakerCode(slug, person.id);
       setPhrase(null);
+      // Reload as minting does: the badge above is read off the person, and
+      // a revoked code that still shows "code unused" is worse than no badge.
+      onChanged();
       toast.show('Speaker phrase revoked');
     } catch (err) {
       toast.show((err as Error).message);
@@ -717,16 +825,49 @@ function SpeakerAccess({
     }
   };
 
+  /**
+   * Whether a phrase is out there, which this section could not say before.
+   * It knew only about a phrase minted in this page's own lifetime, so an
+   * organiser returning the next day was shown "Generate phrase" whether they
+   * had sent one or not — and the only way to find out was to mint a second,
+   * which silently invalidates the first.
+   */
+  const state = person.codeState ?? 'none';
+
   return (
     <div className="mt-4 border-t border-stone-100 pt-3 dark:border-stone-800">
-      <div className="flex items-center gap-2">
-        <span className="flex-1 text-xs font-semibold text-stone-500 dark:text-stone-400">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold text-stone-500 dark:text-stone-400">
           Speaker access
         </span>
+        {state === 'pending' && (
+          <span
+            title="The phrase has been generated and never typed at the gate — it is still sitting in an unread message."
+            className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+          >
+            code unused
+          </span>
+        )}
+        {state === 'used' && (
+          <span
+            title="The phrase has been typed at the gate at least once, so a device is signed in as this profile."
+            className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+          >
+            code used
+          </span>
+        )}
+        <span className="flex-1" />
         <SecondaryButton className="py-1 text-xs" onClick={() => void mint()} disabled={busy}>
-          {phrase ? 'New phrase' : 'Generate phrase'}
+          {state === 'none' ? 'Generate phrase' : 'New phrase'}
         </SecondaryButton>
-        <SecondaryButton className="py-1 text-xs" onClick={() => void revoke()} disabled={busy}>
+        {/* Off when there is nothing to revoke, rather than hidden: the button
+            disappearing would read as "you may not do this". */}
+        <SecondaryButton
+          className="py-1 text-xs"
+          onClick={() => void revoke()}
+          disabled={busy || state === 'none'}
+          title={state === 'none' ? 'No phrase to revoke.' : undefined}
+        >
           Revoke
         </SecondaryButton>
       </div>
@@ -742,8 +883,11 @@ function SpeakerAccess({
         </>
       ) : (
         <p className="mt-1.5 text-xs text-stone-500 dark:text-stone-400">
-          A phrase {person.name} can type at the gate to become this profile, with the speaker
-          role. Generating a new one replaces the old.
+          {state === 'none'
+            ? `No phrase exists for ${person.name}. Generate one and they can type it at the gate to become this profile, with the speaker role.`
+            : state === 'pending'
+              ? `A phrase exists and has not been used. It is shown only once, so if it did not reach ${person.name}, generate a new one — which replaces the old.`
+              : `${person.name} has used their phrase. It still works on further devices; generating a new one replaces it, revoking cancels it without signing out the devices already in.`}
         </p>
       )}
     </div>

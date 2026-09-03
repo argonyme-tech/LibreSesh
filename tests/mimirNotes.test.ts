@@ -140,14 +140,24 @@ describe('beside a person, on the row that fixes it', () => {
     expect(notesForPerson(person(1, { claimed: false }), bundle())).toEqual([]);
   });
 
-  it('counts their sessions when they cannot edit them', () => {
+  it('counts their sessions when nobody holds the profile', () => {
     const b = bundle({
       sessions: [session(1), session(2, { startsAt: '2026-09-01T14:00:00Z', endsAt: '2026-09-01T15:00:00Z' })],
-      people: [person(1, { claimed: true, role: 'user' })],
+      people: [person(1, { claimed: false, role: null })],
     });
     const note = notesForPerson(b.people[0], b).find((n) => n.key === 'cannot-edit');
     expect(note!.what).toContain('their 2 sessions');
-    expect(note!.because).toContain('below speaker');
+    expect(note!.because).toContain('Nobody holds');
+  });
+
+  it('says nothing about a holder whatever their role', () => {
+    // Upstream 486077a: credited is the qualification. A claimed attendee
+    // edits their own talk; a note saying otherwise would be wrong.
+    const b = bundle({
+      sessions: [session(1)],
+      people: [person(1, { claimed: true, role: 'user' })],
+    });
+    expect(notesForPerson(b.people[0], b).map((n) => n.key)).not.toContain('cannot-edit');
   });
 
   it('states adjacency and never judges the person', () => {

@@ -1,5 +1,15 @@
 import { useMemo, useState } from 'react';
-import type { PersonDto, RoomDto, Role, SessionDto, TagDto, TrackDto } from '@shared/types';
+import type {
+  FormatDto,
+  LabelledLink,
+  PersonDto,
+  RoomDto,
+  Role,
+  SessionDto,
+  TagDto,
+  TrackDto,
+} from '@shared/types';
+import { LINK_RULE, safeLink } from '@shared/links';
 import { windowLabel, windowOn } from '@shared/trackHours';
 import type { SessionWrite } from '../lib/api';
 import { fmtMin, place } from '../lib/format';
@@ -14,6 +24,13 @@ import {
   type Weekday,
 } from '@shared/repeat';
 import { zonedTimeToUtc } from '@shared/time';
+import {
+  DURATION_CHOICES,
+  MAX_DURATION_MINUTES,
+  MIN_DURATION_MINUTES,
+  SNAP_MINUTES,
+  durationLabel,
+} from '@shared/sessionLimits';
 import { RemoveIcon } from './icons';
 import { SpeakerCombobox, type SpeakerChoice } from './SpeakerCombobox';
 import {
@@ -25,6 +42,7 @@ import {
   FormGrid,
   HelpButton,
   HelpNote,
+  IconButton,
   Modal,
   PrimaryButton,
   SecondaryButton,
@@ -32,16 +50,38 @@ import {
   inputClass,
 } from './ui';
 
-const DURATIONS = [15, 30, 45, 60, 90, 120, 180];
+
+
+/**
+ * The two ways a session gets onto the schedule. The second used to be
+ * labelled "open", which read as *open to join* — the opposite of a useful
+ * distinction on a schedule where everything is open to join. It is stated as
+ * the negative of the first now, with the consequence that actually matters
+ * spelled out beside it: only an official session can hold the floor, so
+ * anything non-official can always have something running alongside it.
+ *
+ * The stored value is unchanged (`official | open`); this is what a person
+ * reads.
+ */
+const PLACEMENTS: readonly { value: 'official' | 'open'; label: string; note?: string }[] = [
+  { value: 'official', label: 'Official' },
+  { value: 'open', label: 'Non-official', note: 'allow parallel sessions' },
+];
 
 export interface SessionModalProps {
   session?: SessionDto;
   rooms: RoomDto[];
   tags: TagDto[];
+  /** What kinds of session this event runs. Empty when the organiser has
+   *  defined none, and the Format row is then absent entirely. */
+  formats: FormatDto[];
   /** Empty when the event defines none; the Track field is then absent. */
   tracks: TrackDto[];
   people: PersonDto[];
   role: Role;
+  /** `session.credit_others` for this role — off means the speaker field is
+   *  a toggle between you and nobody. */
+  canCreditOthers: boolean;
   timezone: string;
   days: string[];
   dayLabels: Record<string, string>;
@@ -49,6 +89,10 @@ export interface SessionModalProps {
   dayStartMin: number;
   dayEndMin: number;
   saving: boolean;
+  /** False when this editor may change the session's words but not its slot —
+   *  a speaker on an official session. The fields are disabled rather than
+   *  left to be refused on save. */
+  canMove?: boolean;
   onCancel: () => void;
   /** `repeat` asks for the same session on every day of a run. What comes back
    *  is that many independent sessions — see `shared/repeat.ts`. */
@@ -60,9 +104,11 @@ export function SessionModal({
   session,
   rooms,
   tags,
+  formats,
   tracks,
   people,
   role,
+  canCreditOthers,
   timezone,
   days,
   dayLabels,
@@ -70,6 +116,7 @@ export function SessionModal({
   dayStartMin,
   dayEndMin,
   saving,
+  canMove = true,
   onCancel,
   onSave,
   onDelete,
@@ -83,16 +130,35 @@ export function SessionModal({
 
   const existing = session ? place(session, timezone) : null;
   const [title, setTitle] = useState(session?.title ?? '');
-  const [speakers, setSpeakers] = useState<SpeakerChoice[]>(
-    () => session?.speakers.map((p) => p.id) ?? [],
-  );
+  // A new session by anyone but an organiser starts credited to them: at an
+  // unconference you mostly host what you book, and it is one click to
+  // remove. An organiser's starts empty — they are usually placing someone
+  // else's talk.
+  const [speakers, setSpeakers] = useState<SpeakerChoice[]>(() => {
+    if (session) return session.speakers.map((p) => p.id);
+    const mine = people.find((p) => p.isMine);
+    return !isAdmin && mine ? [mine.id] : [];
+  });
   const [description, setDescription] = useState(session?.description ?? '');
-  const [livestreamUrl, setLivestreamUrl] = useState(session?.livestreamUrl ?? '');
+  // A session can be streamed more than once. Kept as a draft list with a
+  // blank row at the end, the way the profile's links are edited: adding the
+  // second one should not need a button pressed before there is a field.
+  const [livestreams, setLivestreams] = useState<LabelledLink[]>(
+    () => session?.livestreams ?? [],
+  );
   const [roomId, setRoomId] = useState<number>(session?.roomId ?? allowedRooms[0]?.id ?? 0);
   const [day, setDay] = useState(existing?.date ?? defaultDay);
   const [start, setStart] = useState(fmtMin(existing?.startMin ?? Math.max(dayStartMin, 14 * 60)));
   const [durMin, setDurMin] = useState(existing?.durMin ?? 30);
+  // A session already 40 minutes long has no chip in the list, and a select
+  // whose value matches no option silently shows the first one — so the form
+  // would have offered to shorten it to 15 the moment anything else was saved.
+  // Opening straight into the typed field is what stops that.
+  const [customDur, setCustomDur] = useState(
+    () => existing !== null && !(DURATION_CHOICES as readonly number[]).includes(existing.durMin),
+  );
   const [tagIds, setTagIds] = useState<number[]>(session?.tagIds ?? []);
+  const [formatId, setFormatId] = useState<number | null>(session?.formatId ?? null);
   const [typeHelp, setTypeHelp] = useState(false);
   const [trackId, setTrackId] = useState<number | null>(session?.trackId ?? null);
   const [type, setType] = useState<'official' | 'open'>(
@@ -106,6 +172,11 @@ export function SessionModal({
   // it, so the form never offers the combination: switching the type to open
   // takes the hold with it, visibly, while the box is still on screen.
   const holdsFloor = isAdmin && type === 'official' && blocksOpenBooking;
+
+  /** Clicking the active chip clears the format: "unspecified" is a real
+   *  answer, and it is the one every session starts with. A format never
+   *  touches the times — how long a session runs is the session's business. */
+  const pickFormat = (next: FormatDto) => setFormatId(formatId === next.id ? null : next.id);
 
   // Repeating is for building a programme, so it belongs to organisers and to
   // sessions that do not exist yet. Editing one day of a run edits that day:
@@ -148,15 +219,32 @@ export function SessionModal({
       setError('There is no room you can place this in');
       return;
     }
+    if (
+      !Number.isInteger(durMin) ||
+      durMin < MIN_DURATION_MINUTES ||
+      durMin > MAX_DURATION_MINUTES ||
+      durMin % SNAP_MINUTES !== 0
+    ) {
+      setError(
+        `A session runs between ${MIN_DURATION_MINUTES} minutes and ${durationLabel(MAX_DURATION_MINUTES)}, in ${SNAP_MINUTES}-minute steps`,
+      );
+      return;
+    }
     const [h, m] = start.split(':').map(Number);
     const startMin = Math.round(((h ?? 0) * 60 + (m ?? 0)) / 5) * 5;
     if (!isAdmin && (startMin < dayStartMin || startMin + durMin > dayEndMin)) {
-      setError(`Open sessions must sit between ${fmtMin(dayStartMin)} and ${fmtMin(dayEndMin)}`);
+      setError(`A session you place must sit between ${fmtMin(dayStartMin)} and ${fmtMin(dayEndMin)}`);
       return;
     }
-    const stream = livestreamUrl.trim();
-    if (stream && !/^https?:\/\//i.test(stream)) {
-      setError('A livestream link must start with http:// or https://');
+    const streams = livestreams
+      .map((l) => ({ label: l.label.trim(), url: l.url.trim() }))
+      .filter((l) => l.url !== '' || l.label !== '');
+    if (streams.some((l) => safeLink(l.url) === null)) {
+      setError(LINK_RULE);
+      return;
+    }
+    if (streams.some((l) => l.label === '')) {
+      setError('Give each stream a name, so a reader knows which is which');
       return;
     }
     if (repeatProblem) {
@@ -170,15 +258,16 @@ export function SessionModal({
       title: title.trim(),
       speakers,
       description: description.trim(),
-      livestreamUrl: livestreamUrl.trim(),
+      livestreams: streams,
       startsAt: zonedTimeToUtc(day, startMin, timezone).toISOString(),
       endsAt: zonedTimeToUtc(day, startMin + durMin, timezone).toISOString(),
       tagIds,
       trackId,
+      formatId,
     }, repeat);
   };
 
-  const heading = session ? 'Edit session' : isAdmin ? 'Add session' : 'Propose an open session';
+  const heading = session ? 'Edit session' : isAdmin ? 'Add session' : 'Propose a session';
 
   return (
     // `wide`: the form is mostly two- and three-column FormGrids (day, start,
@@ -189,7 +278,7 @@ export function SessionModal({
       description={
         isAdmin
           ? undefined
-          : 'Open sessions live in rooms that anyone may book, and stay editable by you.'
+          : 'What you propose lives in a room anyone may book, and stays editable by you.'
       }
       onClose={onCancel}
       wide
@@ -222,7 +311,141 @@ export function SessionModal({
       )}
 
       <div className="space-y-5">
-        <FieldGroup title="What it is">
+        <FieldGroup>
+          {/* An organiser who defines none would otherwise see the row simply
+              missing, which reads as "this app has no formats" rather than
+              "this event has none yet" — the two are indistinguishable from
+              inside the form, and the second is where every event starts.
+              Attendees are spared it: they cannot add one. */}
+          {formats.length === 0 && isAdmin && (
+            <Field label="Format">
+              <p className="text-xs text-stone-500 dark:text-stone-400">
+                This event defines none yet. Add them under Manage Event →
+                Programme and they appear here, at the top of this form.
+              </p>
+            </Field>
+          )}
+
+          {/* First in the form, because it is what the thing is. It sets
+              nothing else: the times below are the session's own. */}
+          {formats.length > 0 && (
+            <Field label="Format">
+              <div className="flex flex-wrap gap-1.5">
+                {formats.map((f) => (
+                  <Chip
+                    key={f.id}
+                    dot={f.color}
+                    active={formatId === f.id}
+                    onClick={() => pickFormat(f)}
+                  >
+                    {f.name}
+                  </Chip>
+                ))}
+              </div>
+            </Field>
+          )}
+
+          {/* Second, directly under Format and above the title, not down in
+              Extras where it used to sit. An organiser who never scrolls to it
+              places everything as official — the default — and official is the
+              one choice that locks a session against the person who put it up.
+              A decision with that consequence has to be visible before the
+              form is filled in, not after.
+
+              Called "Placement" and not "Type": it says who put the session up
+              and whether it is the published programme, while the field above
+              says what kind of session it is. */}
+          {isAdmin && (
+            <Field label="Placement">
+              <div className="flex items-center gap-1.5">
+                {PLACEMENTS.map((p) => (
+                  <Chip key={p.value} active={type === p.value} onClick={() => setType(p.value)}>
+                    {p.label}
+                    {p.note && <span className="ml-1 font-normal opacity-70">: {p.note}</span>}
+                  </Chip>
+                ))}
+                <HelpButton
+                  open={typeHelp}
+                  onClick={() => setTypeHelp(!typeHelp)}
+                  label="how a session is placed"
+                />
+              </div>
+              {typeHelp && (
+                <HelpNote>
+                  <p>
+                    <strong className="font-semibold text-stone-800 dark:text-stone-100">
+                      Official
+                    </strong>{' '}
+                    means the organisers put it on. Only they can add one, move it or delete
+                    it — though anyone named as a speaker can still edit what it says.
+                  </p>
+                  <p>
+                    <strong className="font-semibold text-stone-800 dark:text-stone-100">
+                      Non-official
+                    </strong>{' '}
+                    means an attendee put it on. Whoever created it keeps editing it, and it
+                    can only go in a room that anyone may book.
+                  </p>
+                  <p>
+                    Why “allow parallel sessions”: an official session can be marked{' '}
+                    <em>Everyone should be at this</em>, which stops attendees adding anything
+                    while it runs. A non-official one can never be marked that way, so
+                    something else can always run at the same time.
+                  </p>
+                  <p>
+                    Worth knowing before you switch one: making somebody&rsquo;s non-official
+                    session official takes it out of their hands, unless they are named as a
+                    speaker on it.
+                  </p>
+                </HelpNote>
+              )}
+            </Field>
+          )}
+
+          {isAdmin && type === 'official' && (
+            <Field label="Attendance">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                <Toggle
+                  checked={blocksOpenBooking}
+                  onChange={setBlocksOpenBooking}
+                  label="Everyone should be at this"
+                />
+                <HelpButton
+                  open={blockHelp}
+                  onClick={() => setBlockHelp(!blockHelp)}
+                  label="holding the floor"
+                />
+              </div>
+              {blockHelp && (
+                <HelpNote>
+                  <p>
+                    While this session runs, attendees cannot add a session anywhere — not even
+                    in a room that allows booking. For a keynote or a closing plenary that is
+                    the point: there is nowhere else to be.
+                  </p>
+                  <p>
+                    It holds only its own hours, so leave it off for registration, coffee and
+                    anything that runs all day. Organisers and speakers can still place sessions
+                    against it, and those show on the schedule as{' '}
+                    <strong className="font-semibold text-stone-800 dark:text-stone-100">
+                      competing
+                    </strong>
+                    .
+                  </p>
+                  <p>
+                    Sessions already booked in these hours stay where they are — ticking this
+                    afterwards moves and cancels nobody.
+                  </p>
+                  <p>
+                    Lunch, dinner and coffee are not sessions at all — they are breaks, set
+                    up once in Manage Event → Programme and drawn quietly behind every day
+                    they apply to.
+                  </p>
+                </HelpNote>
+              )}
+            </Field>
+          )}
+
           <Field label="Title">
             <input
               value={title}
@@ -233,7 +456,13 @@ export function SessionModal({
             />
           </Field>
           <Field label="Speaker or host">
-            <SpeakerCombobox people={people} value={speakers} onChange={setSpeakers} />
+            <SpeakerCombobox
+              people={people}
+              value={speakers}
+              onChange={setSpeakers}
+              isAdmin={isAdmin}
+              onlySelf={!isAdmin && !canCreditOthers}
+            />
           </Field>
           <Field label="Description" hint="Markdown is supported.">
             <textarea
@@ -268,11 +497,22 @@ export function SessionModal({
         </FieldGroup>
 
         <FieldGroup title="When and where">
+          {/* Said once, above the fields it applies to, rather than as a
+              refusal after Save. A speaker owns their talk's words; where and
+              when it runs is the programme, and the programme is the
+              organiser's. */}
+          {!canMove && (
+            <p className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-600 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300">
+              You are credited on this session, so you can edit what it says.
+              Moving it is the organisers&rsquo; — ask them if the slot is wrong.
+            </p>
+          )}
           <FormGrid>
             <Field label="Room">
               <select
                 value={roomId}
                 onChange={(e) => setRoomId(Number(e.target.value))}
+                disabled={!canMove}
                 className={inputClass}
               >
                 {allowedRooms.map((r) => (
@@ -312,7 +552,12 @@ export function SessionModal({
               "duration" under "day" and left a hole beside it. */}
           <FormGrid cols={3}>
             <Field label="Day">
-              <select value={day} onChange={(e) => setDay(e.target.value)} className={inputClass}>
+              <select
+                value={day}
+                onChange={(e) => setDay(e.target.value)}
+                disabled={!canMove}
+                className={inputClass}
+              >
                 {days.map((d) => (
                   <option key={d} value={d}>
                     {dayLabels[d] ?? d}
@@ -326,21 +571,55 @@ export function SessionModal({
                 step={300}
                 value={start}
                 onChange={(e) => setStart(e.target.value)}
+                disabled={!canMove}
                 className={inputClass}
               />
             </Field>
+            {/* A list plus a way past it. The list used to stop at three
+                hours, which quietly said no session runs longer — and a
+                full-day excursion, an all-afternoon poster hall and a
+                hackathon all do. "Other" takes any multiple of five up to a
+                day, which is what the server accepts. */}
             <Field label="Duration">
               <select
-                value={durMin}
-                onChange={(e) => setDurMin(Number(e.target.value))}
+                value={customDur ? 'other' : durMin}
+                onChange={(e) => {
+                  if (e.target.value === 'other') {
+                    setCustomDur(true);
+                    return;
+                  }
+                  setCustomDur(false);
+                  setDurMin(Number(e.target.value));
+                }}
+                disabled={!canMove}
                 className={inputClass}
               >
-                {DURATIONS.map((d) => (
+                {DURATION_CHOICES.map((d) => (
                   <option key={d} value={d}>
-                    {d} min
+                    {durationLabel(d)}
                   </option>
                 ))}
+                <option value="other">Other…</option>
               </select>
+              {customDur && (
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    value={durMin}
+                    onChange={(e) => setDurMin(Number(e.target.value))}
+                    min={MIN_DURATION_MINUTES}
+                    max={MAX_DURATION_MINUTES}
+                    step={SNAP_MINUTES}
+                    aria-label="Duration in minutes"
+                    autoFocus
+                    disabled={!canMove}
+                    className={`${inputClass} w-24`}
+                  />
+                  <span className="text-xs text-stone-500 dark:text-stone-400">
+                    minutes{durMin >= 60 ? ` · ${durationLabel(durMin)}` : ''}
+                  </span>
+                </div>
+              )}
             </Field>
           </FormGrid>
 
@@ -402,98 +681,56 @@ export function SessionModal({
         </FieldGroup>
 
         <FieldGroup title="Extras">
-          <Field label="Livestream link" hint="Optional. Attendees only see this if you set it.">
-            <input
-              value={livestreamUrl}
-              onChange={(e) => setLivestreamUrl(e.target.value)}
-              placeholder="https://…"
-              maxLength={2000}
-              className={inputClass}
-            />
+          <Field
+            label="Livestream links"
+            hint="Optional, and as many as the session has — a main camera, a room feed, an interpreted channel. Attendees only see what you add."
+          >
+            <div className="flex flex-col gap-1.5">
+              {livestreams.map((stream, i) => (
+                <div key={i} className="flex gap-1.5">
+                  <input
+                    value={stream.label}
+                    onChange={(e) =>
+                      setLivestreams((ls) =>
+                        ls.map((l, j) => (j === i ? { ...l, label: e.target.value } : l)),
+                      )
+                    }
+                    aria-label={`Name of stream ${i + 1}`}
+                    placeholder="YouTube"
+                    maxLength={60}
+                    className={`${inputClass} w-32 shrink-0`}
+                  />
+                  <input
+                    value={stream.url}
+                    onChange={(e) =>
+                      setLivestreams((ls) =>
+                        ls.map((l, j) => (j === i ? { ...l, url: e.target.value } : l)),
+                      )
+                    }
+                    aria-label={`Link for stream ${i + 1}`}
+                    placeholder="https:// or ipfs://…"
+                    maxLength={2000}
+                    className={inputClass}
+                  />
+                  <IconButton
+                    aria-label={`Remove stream ${i + 1}`}
+                    onClick={() => setLivestreams((ls) => ls.filter((_, j) => j !== i))}
+                  >
+                    <RemoveIcon className="h-3.5 w-3.5" />
+                  </IconButton>
+                </div>
+              ))}
+              {livestreams.length < 6 && (
+                <SecondaryButton
+                  className="self-start py-1 text-xs"
+                  onClick={() => setLivestreams((ls) => [...ls, { label: '', url: '' }])}
+                >
+                  {livestreams.length === 0 ? 'Add a stream' : 'Add another'}
+                </SecondaryButton>
+              )}
+            </div>
           </Field>
 
-          {isAdmin && (
-            <Field label="Type">
-              <div className="flex items-center gap-1.5">
-                {(['official', 'open'] as const).map((t) => (
-                  <Chip key={t} active={type === t} onClick={() => setType(t)}>
-                    <span className="capitalize">{t}</span>
-                  </Chip>
-                ))}
-                <HelpButton
-                  open={typeHelp}
-                  onClick={() => setTypeHelp(!typeHelp)}
-                  label="session types"
-                />
-              </div>
-              {typeHelp && (
-                <HelpNote>
-                  <p>
-                    <strong className="font-semibold text-stone-800 dark:text-stone-100">
-                      Official
-                    </strong>{' '}
-                    is the published programme. Only organisers can add one or change it.
-                  </p>
-                  <p>
-                    <strong className="font-semibold text-stone-800 dark:text-stone-100">
-                      Open
-                    </strong>{' '}
-                    is attendee-placed. Whoever created it can keep editing it, and it can only
-                    go in a room that allows booking.
-                  </p>
-                  <p>
-                    Making a session official therefore locks it against the person who put it
-                    up. Neither type affects timing: organisers may double-book a room, everyone
-                    else may not, whichever type it is.
-                  </p>
-                </HelpNote>
-              )}
-            </Field>
-          )}
-
-          {isAdmin && type === 'official' && (
-            <Field label="Attendance">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                <Toggle
-                  checked={blocksOpenBooking}
-                  onChange={setBlocksOpenBooking}
-                  label="Everyone should be at this"
-                />
-                <HelpButton
-                  open={blockHelp}
-                  onClick={() => setBlockHelp(!blockHelp)}
-                  label="holding the floor"
-                />
-              </div>
-              {blockHelp && (
-                <HelpNote>
-                  <p>
-                    While this session runs, attendees cannot add a session anywhere — not even
-                    in a room that allows booking. For a keynote or a closing plenary that is
-                    the point: there is nowhere else to be.
-                  </p>
-                  <p>
-                    It holds only its own hours, so leave it off for registration, coffee and
-                    anything that runs all day. Organisers and speakers can still place sessions
-                    against it, and those show on the schedule as{' '}
-                    <strong className="font-semibold text-stone-800 dark:text-stone-100">
-                      competing
-                    </strong>
-                    .
-                  </p>
-                  <p>
-                    Sessions already booked in these hours stay where they are — ticking this
-                    afterwards moves and cancels nobody.
-                  </p>
-                  <p>
-                    Lunch, dinner and coffee are not sessions at all — they are breaks, set
-                    up once in Manage Event → Programme and drawn quietly behind every day
-                    they apply to.
-                  </p>
-                </HelpNote>
-              )}
-            </Field>
-          )}
         </FieldGroup>
       </div>
     </Modal>

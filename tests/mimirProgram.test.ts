@@ -181,6 +181,8 @@ describe('the prompt layers reach a deployment', () => {
     // Order is not cosmetic: the manual names the objects that the live event
     // state is about, so it has to be read before that state is appended.
     const source = readFileSync(join(ROOT, 'server', 'src', 'routes', 'mimir.ts'), 'utf8');
-    expect(source).toContain('[base, annex, program]');
+    // The three files are listed in reading order and joined in that order;
+    // the list is what carries it, however the reading is cached.
+    expect(source).toMatch(/const files = \[\s*base,\s*annexPath[\s\S]*?programPath[\s\S]*?\]/);
   });
 });

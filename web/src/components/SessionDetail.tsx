@@ -7,6 +7,7 @@ import type {
   RoomDto,
   Role,
   SessionDto,
+  FormatDto,
   TagDto,
 } from '@shared/types';
 import { MimirAside } from './MimirAside';
@@ -41,11 +42,16 @@ export interface SessionDetailProps {
   slug: string;
   rooms: RoomDto[];
   tags: TagDto[];
+  /** Every format the event defines, to name the one this session wears. */
+  formats: FormatDto[];
   contributions: ContributionDto[] | undefined;
   role: Role;
   me: Me | null;
   timezone: string;
   canEdit: boolean;
+  /** Deleting is narrower than editing: a co-speaker may rewrite a session
+   *  they are billed on, but not take it off the programme. */
+  canDelete: boolean;
   archived: boolean;
   /** Whether this session is on the current identity's personal agenda. */
   starred: boolean;
@@ -76,11 +82,13 @@ export function SessionDetail({
   slug,
   rooms,
   tags,
+  formats,
   contributions,
   role,
   me,
   timezone,
   canEdit,
+  canDelete,
   archived,
   starred,
   userLabel,
@@ -130,13 +138,56 @@ export function SessionDetail({
     }
   };
 
+  /**
+   * The primary way to star from the grid — the calendar blocks stay
+   * display-only because their pointer handling is drag-sensitive.
+   *
+   * The label it used to carry ("Add to my agenda" / "On my agenda") is gone
+   * from the surface and kept in `title` and `aria-label`. A filled star
+   * against a hollow one already says which state it is in, and the words were
+   * a full-width row of chrome at the top of a panel whose actual content —
+   * the description, the notes — is what somebody opened it for. The hollow
+   * outline is the affordance; the tooltip is there for anyone unsure.
+   */
+  const starButton = (
+    <button
+      type="button"
+      onClick={onToggleStar}
+      title={starred ? 'On my agenda — click to remove' : 'Add to my agenda'}
+      aria-label={starred ? `Unstar ${session.title}` : `Star ${session.title}`}
+      aria-pressed={starred}
+      // The same 36px square as the sheet's own header buttons, so the three
+      // read as one column rather than as a stack of different controls.
+      className={`grid h-9 w-9 place-items-center rounded-full text-lg leading-none ${
+        starred
+          ? 'text-amber-500 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40'
+          : 'text-stone-400 hover:bg-stone-100 hover:text-stone-600 dark:text-stone-500 dark:hover:bg-stone-800 dark:hover:text-stone-300'
+      }`}
+    >
+      <span aria-hidden="true">{starred ? '★' : '☆'}</span>
+    </button>
+  );
+
   const header = (
     <div className={`flex items-start gap-2 ${page ? 'mb-6' : 'mb-3'}`}>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
+          {/* First in the row, because it is what the thing *is*; the
+              official/open badge beside it says who put it there. */}
+          {(() => {
+            const format = formats.find((f) => f.id === session.formatId);
+            return format ? (
+              <span
+                className="rounded-full px-2 py-0.5 text-xs font-semibold"
+                style={{ background: format.color, color: readableInk(format.color) }}
+              >
+                {format.name}
+              </span>
+            ) : null;
+          })()}
           {session.type === 'open' ? (
             <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
-              open session
+              non-official
             </span>
           ) : (
             <span className="rounded-full bg-stone-100 dark:bg-stone-800 px-2 py-0.5 text-xs font-semibold text-stone-600 dark:text-stone-300">
@@ -193,7 +244,15 @@ export function SessionDetail({
               ))}
         </p>
       </div>
-      {headerActions}
+      {/* The star sits under the sheet's close button rather than in a row of
+          its own, which is where a control that acts on this session belongs —
+          beside the other two, not stacked above the description pushing it
+          down. On the full page there are no header actions, so it is simply
+          the top-right corner. */}
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        {headerActions}
+        {starButton}
+      </div>
     </div>
   );
 
@@ -201,27 +260,6 @@ export function SessionDetail({
     mimirNotes.length > 0 ? (
       <MimirAside notes={mimirNotes} scope={`session-${session.id}`} slug={slug} />
     ) : null;
-
-  // The primary way to star from the grid — the calendar blocks stay
-  // display-only because their pointer handling is drag-sensitive.
-  const starButton = (
-    <button
-      type="button"
-      onClick={onToggleStar}
-      aria-label={starred ? `Unstar ${session.title}` : `Star ${session.title}`}
-      aria-pressed={starred}
-      className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold ${
-        page ? 'w-full justify-center' : 'mb-4'
-      } ${
-        starred
-          ? 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300'
-          : 'border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 text-stone-600 dark:text-stone-300 hover:border-stone-400 dark:hover:border-stone-500'
-      }`}
-    >
-      <span aria-hidden="true">{starred ? '★' : '☆'}</span>
-      {starred ? 'On my agenda' : 'Add to my agenda'}
-    </button>
-  );
 
   const descriptionBlock = description ? (
     <div
@@ -233,19 +271,29 @@ export function SessionDetail({
     />
   ) : null;
 
-  // Rendered only when set — most sessions have no stream, and an empty row
-  // would be noise on a phone in a hallway.
-  const livestream = session.livestreamUrl ? (
-    <a
-      href={session.livestreamUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="mb-4 flex items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-medium text-stone-700 hover:border-stone-400 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-200 dark:hover:border-stone-500"
-    >
-      <span aria-hidden>▶</span>
-      Watch the livestream
-    </a>
-  ) : null;
+  // Rendered only when there are any — most sessions have no stream, and an
+  // empty row would be noise on a phone in a hallway. A session can have
+  // several: a main camera, a room's own feed, an interpreted channel. One
+  // keeps the wording it always had; a list says which is which.
+  const livestream =
+    session.livestreams.length > 0 ? (
+      <div className="mb-4 flex flex-col gap-1.5">
+        {session.livestreams.map((stream, i) => (
+          <a
+            key={`${stream.url}-${i}`}
+            href={stream.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-medium text-stone-700 hover:border-stone-400 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-200 dark:hover:border-stone-500"
+          >
+            <span aria-hidden>▶</span>
+            {session.livestreams.length === 1 && stream.label.trim() === ''
+              ? 'Watch the livestream'
+              : stream.label.trim() || 'Watch'}
+          </a>
+        ))}
+      </div>
+    ) : null;
 
   const ownerActions =
     canEdit && !archived ? (
@@ -256,14 +304,16 @@ export function SessionDetail({
           <EditIcon className="h-3.5 w-3.5" />
           Edit session
         </SecondaryButton>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
-        >
-          <RemoveIcon className="h-3.5 w-3.5" />
-          Delete
-        </button>
+        {canDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"
+          >
+            <RemoveIcon className="h-3.5 w-3.5" />
+            Delete
+          </button>
+        )}
       </div>
     ) : null;
 
@@ -427,7 +477,7 @@ export function SessionDetail({
         onClick={() => void submit()}
         disabled={!body.trim() || posting}
       >
-        Post as {me?.displayName ?? 'you'}
+        Post as {me?.displayName || 'you'}
       </PrimaryButton>
     </div>
   );
@@ -436,7 +486,6 @@ export function SessionDetail({
     return (
       <>
         {header}
-        {starButton}
         {aside}
         {descriptionBlock}
         {livestream}
@@ -448,8 +497,9 @@ export function SessionDetail({
   }
 
   // Two columns from `lg`: the discussion is the long half and gets the width,
-  // while the things you act with — star, edit, composer — stay put in a
-  // sticky rail rather than sitting below a hundred notes. Below `lg` it falls
+  // while the things you act with — edit, composer — stay put in a sticky rail
+  // rather than sitting below a hundred notes. The star is not among them: it
+  // is in the header's top-right corner, the same place it is in the sheet. Below `lg` it falls
   // back to the same single stack as the sheet, with the rail's contents
   // ahead of the lists.
   return (
@@ -458,7 +508,6 @@ export function SessionDetail({
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:order-2 lg:col-span-1">
           <div className="lg:sticky lg:top-20 space-y-4">
-            {starButton}
             {aside}
             {ownerActions}
             {composer}

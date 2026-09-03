@@ -3,12 +3,19 @@
 The shared queue: what is in flight, what is blocked, and what is planned.
 Shipped work moves to [CHANGELOG.md](CHANGELOG.md) and is not repeated here.
 
-Last updated: 2026-09-01
+Last updated: 2026-09-03
 
 ## In Progress
 
-Working on `dev`; `main` is the released line and only takes merges. The
-breaks rework has landed — `feat/event-level-breaks` (`5e53811`) is an
+Working on `dev`; `main` is the released line and only takes merges.
+**`dev` is well ahead of `origin/dev`, which is still at `5142d10`** —
+everything from `79e5044` onwards is unpushed, including the 0.2.3
+release commit. That whole spec
+(`_planning/specs/self-as-speaker-and-merge-ux.md`, six steps, plan at
+`_planning/plans/2026-09-02-everyone-is-a-person.md`) is code-complete as
+of 2026-09-02 and written up in CHANGELOG `[Unreleased]`; the suite stood at
+730 then and is at **844** now, lint clean, build clean. What is left of it is the browser pass under Blockers.
+The breaks rework has landed — `feat/event-level-breaks` (`5e53811`) is an
 ancestor of `dev` — so its code half is done and written up in CHANGELOG
 `[Unreleased]` and ARCHITECTURE §Breaks; what is left of it is the browser
 confirmation under Blockers. 0.2.0 was tagged 2026-08-30; what shipped is in
@@ -16,23 +23,31 @@ CHANGELOG.md under `[0.2.0]`, and what has landed since is under
 `[Unreleased]` — including tag colours (`3f723ac`, `0b08a00`),
 multi-speaker sessions (`f26bde3`), the single Calendar menu item
 (`5d020cb`) and per-field profile editing (`aa64417`), all four written up
-2026-09-01 after landing unlogged. What is left of the UI-overhaul plan
-lives in `_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
+2026-09-01 after landing unlogged. The evening of 2026-09-02 added **session formats** and the corrections that
+came straight out of seeing them in the app: a format carries no length, the
+duration picker reaches a day through an `Other…` field, Placement moved to
+the top of the session form, and the word "open" left the UI in favour of an
+opt-in **Official** badge. The same evening fixed a speaker being unable to
+edit their own session — reported from use, three rules deep. All of it is
+code-complete and in CHANGELOG `[Unreleased]`; migrations 014, 015 and 016.
+What is left of it is the browser pass under Blockers. What is left of the
+UI-overhaul plan lives in
+`_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
 
 - **Whole-app UI sweep.** The primitives landed, the admin page is done, and
-  as of 2026-08-31 every modal is on the `Modal` primitive — the last six
-  hand-rolled intro paragraphs and button rows are gone (`fb5c759`).
-  21 underline usages remain across ProfilePage (5), SchedulePage (4),
-  ProposalBoard (4), DetailSheet (4), EventListPage (1), NewEventPage (1),
-  Tour (1) and Gate (1, the "already here on another device" link added with
-  device linking). The count excludes the `[&_a]:underline` in prose wrappers —
-  links inside rendered markdown keep their underline deliberately — and the
-  five in `ui.tsx`, which are the primitives themselves. Re-counted 2026-08-31
-  after the Backup and Audit tabs and the gate's name-collision link: still 21,
-  because all three use the primitives (`secondaryButtonClass`, `linkClass`)
-  rather than a bare `underline`. Still 21 on 2026-09-01: the per-field
-  profile rework added no bare underline, because its "add a bio" affordance
-  is a `SecondaryButton` — it is an action, not navigation.
+  as of 2026-08-31 every modal is on the `Modal` primitive (`fb5c759`).
+  **Recounted against the tree on 2026-09-03: 38 bare `underline` usages** —
+  one *more* than the 37 counted on 2026-09-01, which is exactly why this is
+  recounted rather than carried forward. (Before that it claimed 21 three
+  times running, because it was counted against a fixed list of files instead
+  of the tree, so it could not move.) Excluding `ui.tsx` (8 — those are the
+  primitives themselves) and the three `[&_a]:underline` in prose wrappers
+  (links inside rendered markdown keep their underline deliberately), the
+  spread is: ProfilePage 6, ProposalBoard 4, SessionDetail 4, SchedulePage 4,
+  FilterMenu 3, AgendaPage 3, ImportPage 3, AdminPage 2, EventListPage 2,
+  NewEventPage 2, SearchPage 2, Gate 1, Tour 1, AdminBackup 1. Count every
+  `*.tsx` under `web/src`, then subtract `ui.tsx` and the `[&_a]:` hits —
+  don't re-check the files this entry happens to name.
 
 - **ARCHITECTURE.md concurrency paragraph.** §Realtime documents broadcast and
   heartbeats but never states the model: last-write-wins, `assertNotStale`
@@ -40,59 +55,106 @@ lives in `_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`:
 
 ## Blockers
 
-- **The breaks band still has not been seen in a browser.** What is left of
-  this: nobody has yet said whether the band is on the grid. DONE, works.
+- **Most of 2026-09-02 has not been seen in a browser.** The People list,
+  the profile page and the merge dialog were looked at once and fixed from
+  what that showed (`c00fef5`, `4d8dbc0` — the role select was discarding
+  the role it had just set). Everything since is unseen: **asking for a
+  profile** (the "This is me" button on an unclaimed profile, and the
+  approval queue above the People list), **the next-day button** at the
+  end of a day's list, **several stream links** on a session, which
+  changed the session form, and everything from 2026-09-02's People work:
 
-  **The "older app" half is solved, 2026-09-01, and the answer was a process.**
-  A whole dev stack from 2026-08-31 was still running — `npm run dev` (pid
-  1005743), its vite holding port 3000 since the day before. Its API half had
-  stopped listening on 3001, which is what "not running anymore with the db"
-  turned out to be: a front end with nothing behind it. Everything the browser
-  loaded came from that Aug-31 vite. It also explains the empty commit in
-  About (see Backlog): the build stamp is read once at config load, so it was
-  reporting the 31st. Killed and restarted clean; API and web both answer 200,
-  and `data/app.db` is on migration `008_default_view.sql`.
+  - **The role tag.** The People list's role select is a coloured badge
+    with a pencil in it, opening a menu, and the same control is on the
+    profile page under the name. Look at whether the badge still fits the
+    `w-24` role column at the longest role word an event can set, and
+    whether the menu opens over the row rather than pushing it.
+  - **Sortable columns.** Every heading in the People table is now the
+    control that orders by it. Look at the arrow on the active column and
+    whether the headings still line up with the rows under them.
+  - **Archiving.** The row's three action buttons became `Open` plus a ⋯
+    menu (Merge, Archive, Delete). Look at the menu's placement on the last
+    row of a long list — it is `bottom-end` and flips, but that is
+    untested against a real viewport — and at the amber notice on an
+    archived profile, which is the one screen the holder is meant to find
+    on their own.
 
-  **What to check first next time UI looks stale: `ss -tlnp | grep 3000` and
-  the start time of what owns it.** A vite that has been up for a day serves
-  current source through HMR — which is why this hid for so long — but its
-  config, its env stamp and its dep graph are from whenever it started.
+  And from later the same day, **formats** (migration 014), none of it seen:
+  the chip row at the top of the session form — whether a dozen formats wrap
+  into three lines above the title, which is the case the design is weakest
+  at, and whether picking one visibly moves the Duration select below it; the
+  **Formats** section in Manage Event → Programme, where the suggestion chips
+  are a dashed row that has never been rendered; and the format badge at the
+  head of the session sheet, which now sits before the official/open badge and
+  may crowd the title on a narrow phone. The official/open control's label
+  changed to **Placement** in the same pass — worth checking it does not now
+  read as a duplicate of the Room and Day fields it sits near.
 
-  The checks below are kept as the record of what was ruled out server side,
-  and was verified rather than assumed:ruled out server side, and was verified rather than assumed:
-  - `data/app.db` holds three breaks (democonf: Lunch 12:00–14:00, Coffee
-    15:30–16:00; longconf: Lunch), all `date: null`, and the bundle returns
-    them.
-  - The running vite serves the new modules — `AdminPage.tsx` imports
-    `AdminBreaks`, `SchedulePage.tsx` passes `breaks: bundle.breaks` to both
-    `Calendar` and `ListView`.
-  - `Calendar` rendered server-side with one break emits the band with the
-    right geometry (`top:384px;height:192px` for 12:00–14:00 on an 08:00 grid),
-    `aria-hidden` and `pointer-events-none` as designed.
-  - There is no service worker and no client-side bundle cache, so nothing
-    should be able to serve stale UI.
-  - An identity that is not ours (`6f257`, admin on both events) was hitting
-    this API live, and nothing listened on 3000 before the dev server started,
-    so the tab did load from this vite.
+  And from the evening of 2026-09-02, none of it seen — now the largest
+  unseen block, and the first three are the ones most likely to be visibly
+  wrong:
 
-  A stale build server on port 3221 (`node server/dist/index.js` from
-  2026-08-30, pointed at a scratchpad `bug.db`) was found and killed — that one
-  explains the earlier "state seems old", but not why the reloaded app still
-  shows no breaks.
+  - **The top of the session form.** Format chips, then Placement, then the
+    title: two chip rows stacked above the first text field is a shape this
+    form has never had. Watch a dozen formats wrapping to three lines above
+    the title — the case the design is weakest at — and whether the Placement
+    chip's `: allow parallel sessions` suffix pushes the pair onto two lines
+    on a phone.
+  - **A speaker editing their own session.** The flow that was actually
+    reported. As an attendee credited on an official session: the Edit button
+    should appear at all, Room/Day/Start/Duration should be disabled under the
+    grey notice, Delete should be absent, and saving a changed description
+    should go through. The API is covered by tests; nothing covers the button.
+  - **The duration picker.** `Other…` reveals a number field — check it takes
+    a typed 40, that the `· 1 h 30 min` echo appears past an hour, and that
+    editing a session whose length is off the list opens straight into the
+    field instead of showing a preset it does not have.
+  - **The Official badge.** Off by default, so first confirm the grid and the
+    list say nothing about placement at all; then turn it on in Manage Event →
+    Settings and look at a grid block and a list card, in both themes.
+  - **The Formats section** in Manage Event → Programme: the dashed suggestion
+    chips have never been rendered, and neither has the session form's empty
+    state for an event that defines no formats.
 
-  What it unblocked on, kept for the next time: two checks from the browser
-  that reports the problem — open
-  `/src/pages/AdminBreaks.tsx` on the dev server (JS source = right server, so
-  hard-reload the tab; app HTML or 404 = the forwarded port goes somewhere
-  else), and read the build under **?** → **About LibreSesh**, which should
-  say `v0.2.0 · 5e53811-dirty` (it was a pill in the bottom-right corner until
-  2026-09-01). If it is the port, the next move is a second dev
-  server on a fresh port so VS Code auto-forwards it, side-stepping the fixed
-  `appPort` mapping in `.devcontainer/devcontainer.json`.
+  The **gate** is still the one nobody has opened, and it is the screen
+  every attendee must get through: it now refuses an empty username and
+  asks "is that you?" when the name matches an unclaimed profile. A
+  mistake there locks the room out rather than merely looking wrong.
+  Restart the dev stack before looking — see the port note below.
 
-The identity design question that sat here is decided and shipped — see
-`_planning/specs/identity-and-people.md` §Decisions for the reasoning and
-CHANGELOG `[Unreleased]` for what landed.
+- **Waiting on a decision: whether to purge the local dangling objects from
+  the accidental commit.** Verified across every ref, both worktrees,
+  stashes and the whole object store on 2026-09-02: the Valley event export
+  is **in no commit on any branch or tag and was never pushed**. `origin/dev`
+  was pushed at 11:22 UTC; the accidental commit `d096fec` was made at 11:58
+  UTC and amended away a minute later, so nothing between those two moments
+  left the machine. No reachable blob anywhere in history contains
+  export-shaped JSON.
+
+  What remains is local only: Git keeps `d096fec` in this clone's reflog, so
+  the file contents sit in `.git` as unreachable objects until the reflog
+  expires in ninety days. This removes them now:
+
+  ```
+  git reflog expire --expire-unreachable=now --all && git gc --prune=now
+  ```
+
+  It is irreversible and indiscriminate — it drops every unreachable object,
+  not only these. Nothing of value is in that set today, since both earlier
+  versions of the commit were superseded by `2c913e3`.
+
+  Also noticed while checking: `_planning/valley-2026-09-02.json` and its
+  `.import.json` twin are **no longer on disk**, though
+  `export-to-import.py` still is. If nobody deleted them deliberately, an
+  editor buffer may be the last copy.
+
+**Kept from the breaks investigation, because it will happen again: when the
+UI looks stale, check `ss -tlnp | grep 3000` and the start time of whatever
+owns the port.** A vite that has been up for a day serves current source
+through HMR — which is why this hid for so long — but its config, its env
+stamp and its dependency graph are from whenever it started. That was the
+whole of the "older app" mystery: a dev stack from the previous day still
+holding 3000 with its API half no longer listening on 3001.
 
 ---
 
@@ -102,17 +164,193 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 
 ## High Priority
 
-- **The commit in About LibreSesh comes out empty — cause found, one line
-  left.** Reported 2026-09-01 against the About dialog (`52a11fc`). It was the
-  stale dev server (see the entry under Blockers): the build stamp is computed
-  once, when vite loads its config, and the process serving port 3000 had
-  loaded its config on 2026-08-31. Started fresh on 2026-09-01 the same page
-  serves `VITE_BUILD_COMMIT: "6654fab"`, so there is nothing wrong with the
-  stamping. What is still worth doing is one line of hardening: `HelpMenu`
-  falls back with `??`, which only catches `undefined`, so an empty string
-  would print as blank rather than `unknown` — `||`, or an explicit check.
-  Same for the `dirty` flag, which read `true` against a clean tree on the
-  fresh server and is worth a second look.
+- **Publishing a session: a link that works without the gate.** Every read
+  under `/api/e/:slug` sits behind `event.use(requireRole(db, 'viewer'))`
+  (`server/src/app.ts:69`), so today there is no way to show one session to
+  someone who has not been given a password. Sharing a session means sharing
+  the event, and the only link that exists — the invite QR — hands over a
+  role, which is the opposite of what "here is the talk I am giving" wants.
+
+  There is one precedent for reading before the gate and it is worth copying
+  the shape of, not the substance: `calendarRoutes` is mounted _above_ the
+  role check (`app.ts:66`, route at `routes/agenda.ts:71`) and authenticates
+  by `identities.ics_token` in `?token=` instead of a cookie. It still
+  refuses unless that token's owner holds a role, so it is not public — a
+  published session would be the first genuinely unauthenticated read in the
+  app, and the first place a wrong decision leaks a real event.
+
+  **Decided 2026-09-02: the snapshot.** Publishing copies the session into a
+  table nothing else joins to, and the public route reads only that table.
+  Nothing private can leak by omission, because nothing private is in there —
+  which is the property worth paying for on the app's first unauthenticated
+  read. The costs are known and accepted: a re-publish after every edit (an
+  "update the public copy" button, or a republish on save), and a second place
+  a session's text lives. The rejected alternative is kept here because it is
+  the one to revisit if the re-publish step turns out to annoy people more
+  than the safety is worth.
+
+  Two shapes were on the table. **Live, flagged**: a `published_at` on `sessions`, plus a route above
+  the gate that reads the row now and strips what must not travel. Edits show
+  up immediately; the stripping is a filter that has to stay correct as
+  `SessionDto` grows. **Snapshot, copied**: publishing writes a frozen row
+  into a table nothing else joins to — the "unprotected DB area" — and the
+  public route reads only that table. Nothing private can leak by omission
+  because nothing private is in there, at the cost of a re-publish after
+  every edit and a second place a session's text lives.
+
+  What must not travel, either way: contributions are this app's comments —
+  `ContributionDto` (`shared/types.ts:273`) carries `kind` (`note` / `link` /
+  `question`), a `body`, `createdBy`, `createdByName` and a `hidden` flag —
+  and none of them go on a public page. Nor do stars, agendas, `createdBy` /
+  `createdByName` on the session itself, or anything about who is in the
+  room. Speakers are the exception a programme exists to show, but a
+  `PersonRef` leads to a profile carrying a bio, links and a claim state, so
+  decide what a public page renders for a speaker rather than linking to the
+  profile page and finding out. Anonymised contributions are a later
+  question, not this one.
+
+  Also to settle: who may publish (organiser only, or a speaker for their own
+  session), whether unpublishing is real revocation or only a hidden link,
+  whether the URL is guessable (`/s/:id`) or a capability (a random token
+  like the ics one), and what an unpublished-but-linked page says. And the
+  event's own visibility bounds it — a session inside an archived event
+  should not stay readable because a link was minted once.
+
+- **The format exists; three places still do not use it.** Landed 2026-09-02
+  (migrations 014 and 015, `session_formats`): defined per event in Manage
+  Event, picked at the top of the session form, shown on the session sheet,
+  carried by clones, the export and the importer. It carries no length —
+  migration 014 gave it one and 015 took it away, because a format that
+  retimes the session it describes makes one field answer two questions. What
+  was left out on purpose, because none of it is needed for a format to be
+  worth having, and each is a separate decision:
+
+  - **Filtering by format.** It is the obvious second filter after tags, and
+    `useFilters.ts` already carries `rooms`, `tags` and `tracks` in the URL —
+    a fourth is the same shape. Wants a decision about the filter panel on a
+    narrow header before it goes in, since that row already wraps.
+  - **The format on a block.** The grid card has room for about one more word.
+    It now spends it on the **Official** badge when an event turns that on
+    (migration 016), so this is no longer a free line — decide whether a
+    format shows as a colour dot rather than a name, and what happens on a
+    block that would carry both. Worth looking at a real grid first.
+  - **A placed pitch has no format.** `POST /proposals/:id/place` builds the
+    session without one (`routes/proposals.ts`), which is defensible — a pitch
+    never said what kind of thing it was — but it means the one path that
+    creates a session outside the form always creates a formatless one. Either
+    the pitch form gains the picker, or placing one asks.
+
+  Also from the same pass, and not backlog because they are done: the
+  official/open control is **Placement** now and sits at the top beside the
+  format rather than under Extras; the duration picker runs to eight hours with
+  an **Other…** field behind it (any multiple of five up to a day —
+  `shared/sessionLimits.ts`, `MAX_DURATION_MINUTES` raised from 480); and the
+  grid and list stopped labelling placement at all unless an organiser turns
+  the **Official** badge on (migration 016).
+
+  Two smaller notes from building it. The import document now has `format` at
+  the top meaning "this is a LibreSesh document" **and** `format` on a session
+  meaning what kind of session it is; they are different scopes and both read
+  correctly, but it is a collision worth remembering before either is renamed.
+  And `SUGGESTED_FORMATS` in `shared/formats.ts` is the seed list — suggestions
+  an organiser clicks, never rows created for them — so adding to it is free.
+
+- **Mentioning a person, and somewhere for a mention to land.** Nothing in the
+  app addresses anyone. A `@name` typed into a description, a contribution, a
+  pitch or a bio is plain text that renders as plain text, so the way to tell
+  a co-host their room moved is to find them in the hallway. Two halves, and
+  the second is the larger one: resolving `@name`, and having a place a
+  resolved mention shows up.
+
+  Resolution is the cheap half and the app is already shaped for it. Display
+  names are unique per event (migration 009) and `people` rows are per event
+  (010), so `@ada` means exactly one person inside one event and means
+  nothing outside it — no global user table to consult, no ambiguity to
+  disambiguate. `NameResolver` (`server/src/eventIdentity.ts`) already turns
+  an identity into the name to show. Mentions belong in the same shared
+  renderer the links went into (`shared/links.ts`), so a mention written in a
+  bio and one written in a session description cannot disagree about what
+  parses — and so the parse happens once, on the server, rather than in each
+  of the four places markdown is rendered.
+
+  Delivery is the half with nothing built. There is no notification concept
+  at all: `sse.ts` is an in-process broker per event slug that carries
+  schedule changes to open tabs, which is the right transport and not the
+  storage — a mention has to survive a closed tab. That wants a
+  `notifications` table (recipient, event, source, read-at), a panel in the
+  header with an unread count, and answers to the questions such a table
+  always raises: what else creates one besides a mention (being added as a
+  speaker, a session you starred moving, a pitch of yours scheduled), whether
+  anything leaves the app by mail (nothing does today, and adding it changes
+  what this project stores about people), and pruning, since `pruneAudit`
+  already exists as the precedent for a table that would otherwise grow
+  forever.
+
+  Two edges that are specific to this app, and both are the reason to design
+  before building. **Merging**: identities merge (`mergePeople.ts`) and
+  profiles archive (migration 013), so notifications must follow a person
+  through a merge the way authorship does, or an organiser tidying up
+  duplicates silently deletes someone's inbox. **Unclaimed profiles**: an
+  organiser can type a speaker's name onto a session before that person ever
+  arrives, so a mention can be addressed to a profile with no identity behind
+  it. It should wait and be delivered on adoption (`adoptProfile` in
+  `people.ts`), not be dropped for having nowhere to go.
+
+- **A production event export is sitting untracked in a directory git will
+  happily commit.** Noticed 2026-09-02 when a `git add -A` swept
+  `_planning/valley-2026-09-02.json` (72 KB, 2447 lines), its `.import.json`
+  twin and `export-to-import.py` into a commit; they were taken back out
+  before it was pushed, but nothing stops it happening again. `.gitignore`
+  covers only `_planning/transcripts-backup/` and
+  `_planning/deployment-guide.md`, so every other working file there is
+  fair game — and this one is a real event's export, carrying real
+  attendees' names, in a repo whose upstream is public
+  (`Valley-of-the-Commons/LibreSesh`).
+
+  **Nothing leaked** — verified 2026-09-02 across every ref, both worktrees,
+  stashes and the object store; details under Blockers. The hole is still
+  open, though, and that is what this item is: the next `git add -A` in that
+  directory does the same thing again.
+
+  The fix is a line or two: ignore `_planning/*.json`, or invert it and
+  ignore `_planning/` while un-ignoring `specs/`, `plans/` and anything else
+  meant to be shared. Decide which way round, because the inverted form is
+  the one that stays safe as new working files appear.
+
+- **An event this app exported cannot be imported back.** Found 2026-09-02
+  restoring a production event onto a fresh staging box: the export downloads,
+  the import rejects it. The first error reads `breaks.0.start: Required`, but
+  that is one of **103** — every one of the 96 sessions fails too, and the real
+  answer is that these are two different formats wearing one name.
+
+  `exportEvent.ts` writes a dump keyed by database id: `startMin`/`endMin`
+  integers on breaks and tracks, `roomId`/`trackId`/`tagIds` on sessions,
+  `date: null` where there is no date. `eventImportSchema` takes the authoring
+  document: `start`/`end` as `HH:MM`, rooms/tracks/tags **by name**, and an
+  absent key rather than a null. It is also `.strict()` at the top level, so
+  the export's `people`, `proposals`, `contributions` and `exportedAt` are
+  rejected outright rather than ignored.
+
+  What makes this a bug and not a documented limitation is the importer's own
+  first field: `format: z.literal('libresesh.event').optional()`, commented
+  "Present on a document this app produced; ignored, but not rejected". It
+  says it recognises our export and then refuses it. There is no round-trip
+  test in the suite, which is why nobody noticed.
+
+  One piece of luck sizes the fix: `importSessionSchema` already accepts
+  `startsAt`/`endsAt` as ISO instants, so no timezone conversion is involved —
+  the mapping is id → name, minutes → `HH:MM`, null → absent, plus tolerating
+  the export-only top-level keys. A converter proving that is in
+  `_planning/` (it turned the Valley export into a document the schema
+  accepts, verified against `eventImportSchema` itself), but it belongs in the
+  app, not in a script an organiser has to be handed.
+
+  Decide where it goes: the importer accepting both shapes, or export learning
+  to emit the authoring document. Whichever, the missing test is the round
+  trip — export an event, import it, and compare. Note also what the export
+  cannot carry back either way: `people` profiles, `contributions` and every
+  `starCount`. If restoring an instance is the real goal, the encrypted
+  whole-database backup is the tool; this path is for moving one event.
 
 - **The drop still flickers, and the fix so far only made it smaller.**
   Reported 2026-08-31, after the two fixes in CHANGELOG `[Unreleased]` landed
@@ -148,8 +386,10 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   and a disabled `Toggle` restyles, which is a visible change that is not a
   revert and could easily read as one.
 
-- **Pitch board.** Always show the creator, default the creator as host, and
-  split the board into hot/new. The plan is
+- **Pitch board.** Showing the creator is done — a card reads "pitched by
+  {name}" (`ProposalBoard.tsx:332`). What is left is defaulting the creator as
+  host (a new pitch starts with an empty speaker field,
+  `ProposalModal.tsx:42`) and splitting the board into hot/new. The plan is
   `_planning/plans/2026-08-29-ui-overhaul-permissions-pitches.md`, whose
   up/down-vote assumption is **withdrawn** (decided 2026-08-31): interest stays
   one-way, so no `proposal_votes` table, no migration, and `interestCount`
@@ -250,7 +490,21 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
 - **Manual browser pass — now with a specific backlog.** Automated coverage is
   server-side, so everything below shipped on a read-through alone (no browser
   in this dev container, no component tests). Each wants a real look, ideally
-  on a phone. From 2026-08-31:
+  on a phone. From 2026-09-01:
+  - the **session star**, now a 36px icon under the sheet's close button rather
+    than a labelled row. Two things to see: that the sheet's right-hand column
+    reading expand / close / star does not crowd the title on a narrow phone,
+    and that the star still reads as a control at all without its label — the
+    hollow-vs-filled distinction carries the whole state now;
+  - **Event passwords** in Manage Event → Settings: that "Show passwords"
+    reveals three rows, that a typed one reads "set by you — not stored"
+    rather than looking broken, and that Replace's confirm dialog is legible
+    on a phone;
+  - the gate's **"Nobody can get in as organiser"** panel: it is the only
+    place a wrong instance password is typed, and the error has never been
+    seen rendered.
+
+  From 2026-08-31:
   - the **Repeat** control in the session form — the only part of it with no
     automated coverage, since the server route is tested and the modal is not.
     Worth watching: the weekday chips wrapping under `sm` inside a `FormGrid`
@@ -344,9 +598,9 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   next deploy is their first real run. `deploy/docker-compose.yml`, the Caddy
   front end and `deploy/backup.sh` have never been run at all; treat the first
   VPS deploy as their test. Railway notes: `_planning/deployment-guide.md` §10.
-- **No component test coverage, and no error boundary.** 384 tests, and the
-  only web-side ones (`format.test.ts`, `calendar.test.ts`) cover pure
-  functions — there is no jsdom/testing-library stack, so nothing renders a
+- **No component test coverage, and no error boundary.** 703 tests as of
+  2026-09-01, and the web-side ones cover pure functions or assert on source
+  text (`format.test.ts`, `numberField.test.ts`, `gridChrome.test.ts`) — there is no jsdom/testing-library stack, so nothing renders a
   component. The drag maths, the SSE reducer and the clash detection are the
   parts most likely to regress silently, and the Calendar column refactor on
   2026-08-30 went in on a read-through alone. The build-stamp crash the same
@@ -374,46 +628,87 @@ _The only queue of future work, priority-ordered. Top High-Priority item = next 
   the fix and would only hurt the typo case; bcrypt already makes each guess
   cost something, which is why this is a real backlog item and not a fire.
 
-- **A person who never opened their profile cannot be merged.** Reported
-  2026-09-01: the merge dialog does not offer the people you most want to fold
-  together. Mechanism — a `people` row only exists once somebody edits their
-  profile, is typed as a speaker on a session, or is added by an organiser.
-  Someone who walked in, took a display name at the gate and never touched
-  their profile has no row at all: they live in `event_identities`/`roles`
-  only. The merge dialog lists `bundle.people` and `/people/:id/merge` loads
-  both sides out of the `people` table (`ProfilePage.tsx` MergeModal,
-  `people.ts:231`), so such a person cannot be either side of a merge.
-
-  The duplicate this actually produces: an organiser bills a session to "Ada
-  Lovelace" (auto-creating an unclaimed profile), Ada then joins the gate as
-  "Ada" and gets an identity with no profile. Two records, one human, and
-  merging is not the tool for it — they are not two profiles. The claim path
-  that would fix it fires only on an exact name match and only when she edits
-  her own profile (`people.ts:105-113`). The roster query already carries
-  `person_id` per attendee (`attendees.ts:47`), so Manage Event → People
-  already knows who has a profile and who does not; what is missing is the
-  organiser move "this attendee **is** that profile", which is a claim on
-  someone's behalf rather than a second kind of merge. Worth deciding whether
-  the merge dialog should also list profile-less attendees and quietly do the
-  claim, or whether that belongs on the People tab where the two lists meet.
-
 ## Medium Priority
 
-- **There is no landing page — `/` is the list of every event.** A visitor to
-  the root gets the logo, an Import and a New event button, and the instance's
-  events (`App.tsx:20`, `EventListPage.tsx`). Nothing says what LibreSesh is or
-  what it is for; the About dialog behind the "?" says it, but only to someone
-  already inside an event. On a public instance the list is also the front
-  door, so every event on the box is enumerable by anyone who loads the page,
-  which is a second reason not to lead with it.
+### Forms
 
-  Wants a simple page at `/` — what this is, one line on the licence, the way
-  in for someone holding an event link, and a way through to the list. The
-  list itself then wants its own address (`/events`), and the catch-all
-  redirect at `App.tsx:39` has to follow it rather than keep pointing at `/`.
-  The copy already exists in the About dialog and the README; this is mostly a
-  decision about what the list is for once it is not the first thing anyone
-  sees.
+_A group, because the first item is one instance of a pattern and the rest of
+the site's forms are the others. Add to it rather than scattering form work
+through the priorities._
+
+- **"Expect someone" should be a button, not a field standing open.** The
+  People tab ends in a permanently-open **Expect someone** text field with its
+  own hint paragraph, which costs the bottom of the tab a form-sized block for
+  something an organiser does a handful of times an event — and it reads as
+  something waiting to be filled in rather than an action they can take.
+
+  Make it an inline create affordance: a button labelled **Add new
+  Guest/Speaker**, which on click reveals the name field (focused) with its
+  hint, and collapses again on save or cancel. The affordance is the button;
+  the field is the consequence of pressing it. Keeps the tab's foot to one
+  line at rest, and says what pressing it does — which "Expect someone" over
+  an empty box does not.
+
+  Nothing about what it creates changes: an unclaimed profile the person
+  claims at the gate or with a speaker code. The hint text is worth keeping,
+  moved into the revealed state.
+
+- **The same pass over every other form on the site.** This is the first of
+  them, not the only one — sessions, rooms, tracks, tags, formats, breaks and
+  the event settings all have forms that have grown by addition. Worth doing
+  as one considered sweep once the pattern above has been used in anger:
+  what is a button and what is a field standing open, where the hint goes,
+  what a form looks like at rest. Not yet specified — this is the placeholder
+  that stops it being rediscovered from scratch.
+
+- **Two judgement calls from 2026-09-02 that nobody has pushed back on yet.**
+  Both were made deliberately and flagged; neither is a bug, and either could
+  reasonably be reversed once the screens have been used.
+
+  - **A credited `viewer` may edit the session they are billed on.**
+    `assertMayMutate` lost its role floor entirely, so being on the bill is the
+    whole test. That is the literal reading of "a speaker owns their own
+    session, whatever role they hold", and a viewer only gets there because an
+    organiser explicitly credited them. If it should floor at attendee instead,
+    it is one condition in `sessionRules.ts` — but note the reason the floor
+    was removed: the speaker role is minted by a code somebody has to remember
+    to send, so a floor of any kind is a floor most real speakers fall below.
+  - **The session sheet still names the placement whatever the badge setting
+    says.** `show_official_badge` governs the grid and the list only; the panel
+    always shows `Official` or `non-official`. Deliberate — a detail view is
+    where a reader goes to find out — but an organiser who switched the badge
+    off may expect it off everywhere.
+
+- **Goal: one database per event, and identity that lives inside the event.**
+  Stated 2026-09-02. Cross-event identity — one cookie is one person across
+  the instance, `GET /me` lists roles in every event, a UID that is "the same
+  at every event" — is judged a feature nobody needs, and it is the source of
+  the three-table identity model (`identities` / `event_identities` /
+  `roles` / `people`) that keeps confusing everyone. The target shape: a
+  registry (`events`, `event_slugs`, passwords) and one SQLite file per
+  event, where a **person is a row with an optional device token** —
+  unclaimed means no token — and username, full name, role, stars and
+  authorship all hang off that one row. Merge becomes trivial (everything
+  keys on the person), device linking and speaker codes still work (adopt a
+  person's token), export/import gets closer to "the file", backup is a
+  copy, and a missed `event_id` in a query can no longer leak across events
+  because there is no other event in the file.
+
+  Not feasible while an event is live: it touches every server route
+  (`ctx.db` becomes a per-request handle, 19 files; `req.identity` is used
+  109 times), the migration runner, backup, clone, the cookie (one per
+  event, `cid_<eventId>`, since the token must not follow a person between
+  files), and the test helpers. A split script is straightforward — copy
+  each event's rows into its file, drop the column — but it is the biggest
+  change since the identity work and wants a quiet week and a tagged
+  release before it. ARCHITECTURE §One database, many events records the
+  opposite decision and must be rewritten when this is taken up.
+
+  **Rule for everything built until then:** put nothing new on
+  `identities` and nothing new that spans events. New facts about a human
+  go on `people`, per event. The "everyone is a person" spec above is the
+  first half of this goal — once `people` is the primary human record, the
+  only instance-wide thing left is the token, and moving it is the split.
 
 - **Put the last two popdowns on `usePopover`.** `ProfileMenu` and
   `SpeakerCombobox` still position themselves and still carry their own
@@ -506,6 +801,23 @@ w-48`, the other `w-full` — so they are exempted by name in
   each other, which is the reason to do them in the same commit rather than
   fixing whichever one is noticed first.
 
+- **The People list cannot put somebody out of the event.** Left undone
+  deliberately in the identity work (2026-09-02, spec
+  `self-as-speaker-and-merge-ux.md` §What was built). The role control
+  moves a person between viewer, attendee, speaker and organiser, and a row
+  whose holder has no role reads `signed out` — but only a merge or the
+  person's own logout can produce that state. So an organiser can hand a
+  role back but cannot take one away entirely, and somebody admitted by
+  mistake stays admitted until the event password changes.
+
+  It is a `DELETE /people/:id/role` calling the `clearRole` that
+  `/logout` already uses, plus a "Sign out of this event" item on the role
+  select. What needs deciding first is what it means: the person keeps
+  their username, their profile and everything they wrote, and can walk
+  back in through the gate with the password they still know — so it is a
+  nudge, not a ban, and the UI should not imply otherwise. Wait until an
+  organiser actually asks.
+
 ## Low Priority / Ideas
 
 - **Show an organiser the old addresses an event still answers to.** Renaming
@@ -545,20 +857,6 @@ w-48`, the other `w-full` — so they are exempted by name in
   across pitches, not a click per pitch), so it wants its own schema and its
   own thinking rather than a column bolted onto `proposal_interest`.
 
-- **Numbered migrations again, before the first deployment that holds data.**
-  Since the squash the working practice has been to edit `001_baseline.sql` in
-  place — `public_id` went in that way on 2026-08-31. That is free exactly
-  while every database is disposable, and stops being free the moment one
-  isn't: the runner tracks migrations by filename, so an edit never reaches a
-  database that already recorded the file, and the symptom is not a migration
-  error but a crash at runtime (`table identities has no column named
-public_id` on the first request from a new browser). Nothing warns about it —
-  tests build fresh databases every time, and so does a reseed. Low priority
-  because no instance holds data yet, and the remedy until then is to delete
-  and recreate. What it wants is a line in the ARCHITECTURE §Migrations
-  section naming the deploy as the cut-over, so the first `002_*.sql` is
-  written deliberately rather than remembered.
-
 - **A one-line reset for the local database.** Wiping a dev instance is
   currently three commands: stop the api, `rm -f data/app.db data/app.db-wal
 data/app.db-shm`, restart and let boot reseed. Easy to get wrong in the
@@ -584,6 +882,12 @@ data/app.db-shm`, restart and let boot reseed. Easy to get wrong in the
   should not be touched at all. So it is three decisions, not one
   find-and-replace: 222 identifier hits across the TypeScript alone, plus
   README, ARCHITECTURE, CHANGELOG and the SPEC.
+
+- **`HelpMenu` falls back with `??`, which only catches `undefined`.** So an
+  empty `VITE_BUILD_COMMIT` prints blank rather than `unknown`
+  (`HelpMenu.tsx:26-27`); `||` fixes it. All that is left of the "About shows
+  no commit" report from 2026-09-01 — the cause was a stale dev server, not
+  the stamping, and a fresh one stamps correctly. Two characters.
 
 - **Print / PDF grid.** Unconferences put the grid on a wall. A print
   stylesheet would cover most of it.

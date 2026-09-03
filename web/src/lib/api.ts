@@ -1,5 +1,4 @@
 import type {
-  AttendeeDto,
   BreakDto,
   AuditPageDto,
   BundleDto,
@@ -7,19 +6,22 @@ import type {
   ContributionKind,
   EventDto,
   EventSummary,
+  GateDto,
   GeneratedPasswords,
   ImportResult,
   LinkCodeDto,
   Me,
   PersonDetailDto,
   PersonDto,
-  PersonLink,
+  LabelledLink,
+  ProfileClaimDto,
   ProposalDto,
   Role,
   RoomDto,
   SessionDetailDto,
   SessionDto,
   TagDto,
+  FormatDto,
   TrackDto,
   TrackWindowDto,
   ViewMode,
@@ -34,6 +36,9 @@ export class ApiError extends Error {
     readonly code: string,
     message: string,
     readonly retryAfter?: number,
+    /** Facts the server attached for the client to act on — the gate's
+     *  `profile_exists` names the profile it found. */
+    readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -59,13 +64,16 @@ async function request<T>(
   const payload: unknown = text ? JSON.parse(text) : undefined;
 
   if (!res.ok) {
-    const err = payload as { error?: { code?: string; message?: string } } | undefined;
+    const err = payload as
+      | { error?: { code?: string; message?: string; details?: Record<string, unknown> } }
+      | undefined;
     const retryAfter = Number(res.headers.get('Retry-After')) || undefined;
     throw new ApiError(
       res.status,
       err?.error?.code ?? 'unknown',
       err?.error?.message ?? 'Something went wrong',
       retryAfter,
+      err?.error?.details,
     );
   }
   return payload as T;
@@ -135,11 +143,17 @@ export const api = {
   /** `displayName` is claimed inside the event, where names are unique. A 409
    *  means someone here already has it — nothing is granted, so the gate can
    *  ask again. */
-  authenticate: (slug: string, password: string, displayName?: string) =>
-    request<{ role: Role }>('POST', `/e/${encode(slug)}/auth`, { password, displayName }),
+  /** The username this device already holds here, before it is in. */
+  gate: (slug: string) => request<GateDto>('GET', `/e/${encode(slug)}/gate`),
+  authenticate: (slug: string, password: string, displayName?: string, claimProfile?: boolean) =>
+    request<{ role: Role }>('POST', `/e/${encode(slug)}/auth`, {
+      password,
+      displayName,
+      claimProfile,
+    }),
   /** Demo instances only: the gate picks a role instead of checking a password. */
-  authenticateAsRole: (slug: string, role: Role, displayName?: string) =>
-    request<{ role: Role }>('POST', `/e/${encode(slug)}/auth`, { role, displayName }),
+  authenticateAsRole: (slug: string, role: Role, displayName?: string, claimProfile?: boolean) =>
+    request<{ role: Role }>('POST', `/e/${encode(slug)}/auth`, { role, displayName, claimProfile }),
   /** Which role a password grants, without granting it — admin only. The
    *  invite-QR panel asks before drawing a code, because the server holds only
    *  bcrypt hashes and cannot check the organiser's typing any other way. */
@@ -169,6 +183,15 @@ export const api = {
     request<TagDto>('PATCH', `/e/${encode(slug)}/tags/${id}`, body),
   deleteTag: (slug: string, id: number) => request<void>('DELETE', `/e/${encode(slug)}/tags/${id}`),
 
+  // Formats — what kind of thing a session is. Managed like tags; the list is
+  // whatever this event runs.
+  createFormat: (slug: string, body: { name: string; color?: string }) =>
+    request<FormatDto>('POST', `/e/${encode(slug)}/formats`, body),
+  updateFormat: (slug: string, id: number, body: Partial<Omit<FormatDto, 'id'>>) =>
+    request<FormatDto>('PATCH', `/e/${encode(slug)}/formats/${id}`, body),
+  deleteFormat: (slug: string, id: number) =>
+    request<void>('DELETE', `/e/${encode(slug)}/formats/${id}`),
+
   // Tracks — thematic strands the schedule can use as columns instead of rooms.
   createTrack: (slug: string, body: TrackWrite & { name: string }) =>
     request<TrackDto>('POST', `/e/${encode(slug)}/tracks`, body),
@@ -194,14 +217,40 @@ export const api = {
     request<PersonDto>('POST', `/e/${encode(slug)}/people`, body),
   updatePerson: (slug: string, id: number, body: Partial<PersonWrite>) =>
     request<PersonDto>('PATCH', `/e/${encode(slug)}/people/${id}`, body),
-  deletePerson: (slug: string, id: number) =>
-    request<void>('DELETE', `/e/${encode(slug)}/people/${id}`),
+  // No `deletePerson`. Nothing in the app deletes a profile any more:
+  // archiving does the tidying up and Merge does the de-duplicating, and both
+  // keep the sessions the profile is credited on. The server route is still
+  // there for an operator with the API, but nothing in here reaches for it.
   /** Mint (or replace) a person's speaker code; the phrase is shown only once. */
   mintSpeakerCode: (slug: string, id: number) =>
     request<{ phrase: string }>('POST', `/e/${encode(slug)}/people/${id}/speaker-code`),
   revokeSpeakerCode: (slug: string, id: number) =>
     request<void>('DELETE', `/e/${encode(slug)}/people/${id}/speaker-code`),
   /** Fold profile `from` into `id`: sessions/pitches repoint, `from` disappears. */
+  /** "That profile is me." Returns the claims the caller may see. */
+  claimPerson: (slug: string, id: number) =>
+    request<ProfileClaimDto[]>('POST', `/e/${encode(slug)}/people/${id}/claim`),
+  approveClaim: (slug: string, id: number) =>
+    request<ProfileClaimDto[]>('POST', `/e/${encode(slug)}/claims/${id}/approve`),
+  declineClaim: (slug: string, id: number) =>
+    request<ProfileClaimDto[]>('POST', `/e/${encode(slug)}/claims/${id}/decline`),
+  /** Withdraw your own request, or clear one you were refused. */
+  withdrawClaim: (slug: string, id: number) =>
+    request<ProfileClaimDto[]>('DELETE', `/e/${encode(slug)}/claims/${id}`),
+
+  /**
+   * Tidy a profile out of the organiser's lists without deleting it: it keeps
+   * its sessions, its role and its holder.
+   */
+  archivePerson: (slug: string, id: number) =>
+    request<PersonDto>('POST', `/e/${encode(slug)}/people/${id}/archive`),
+  /** Out again — an organiser's doing, or the holder's own. */
+  unarchivePerson: (slug: string, id: number) =>
+    request<PersonDto>('DELETE', `/e/${encode(slug)}/people/${id}/archive`),
+
+  /** Hand the holder of a profile a different role at this event. */
+  setPersonRole: (slug: string, id: number, role: Role) =>
+    request<PersonDto>('PUT', `/e/${encode(slug)}/people/${id}/role`, { role }),
   mergePerson: (slug: string, id: number, from: number) =>
     request<PersonDto>('POST', `/e/${encode(slug)}/people/${id}/merge`, { from }),
   // 201 when it creates your profile, 200 when it updates it — the caller only
@@ -290,7 +339,6 @@ export const api = {
 
   /** Everyone who has ever picked a name or held a role at this event —
    *  admin-only, the other half of the profile roster. */
-  attendees: (slug: string) => request<AttendeeDto[]>('GET', `/e/${encode(slug)}/attendees`),
 
   /** The per-event JSON export is a plain authenticated GET, so the link in
    *  Manage Event downloads it directly — no fetch, no blob, no wrapper. */
@@ -352,13 +400,16 @@ export interface SessionWrite {
    * person. Omit to leave the billing alone; `[]` clears it.
    */
   speakers?: (number | string)[];
-  /** Watch-along link, http(s). '' clears it. */
-  livestreamUrl?: string;
+  /** Watch-along links, http(s). `[]` clears them. */
+  livestreams?: LabelledLink[];
   startsAt: string;
   endsAt: string;
   tagIds?: number[];
   /** `null` clears the track; omitting the key leaves it as it was. */
   trackId?: number | null;
+  /** What kind of session it is. `null` clears it; omitting the key leaves it
+   *  as it was. */
+  formatId?: number | null;
 }
 
 export interface TrackWrite {
@@ -423,7 +474,7 @@ export interface TrashDto {
 export interface PersonWrite {
   name: string;
   bio?: string;
-  links?: PersonLink[];
+  links?: LabelledLink[];
 }
 
 export interface SettingsWrite {
@@ -442,5 +493,7 @@ export interface SettingsWrite {
   auditKeep?: number;
   /** Where the schedule opens for a reader who has not picked a view. */
   defaultView?: ViewMode;
+  /** Whether the grid and the list badge an official session. */
+  showOfficialBadge?: boolean;
   archived?: boolean;
 }

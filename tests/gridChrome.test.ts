@@ -256,4 +256,15 @@ describe('a rail says when the line goes on', () => {
     expect(rail).toContain('aria-hidden="true"');
   });
 
+  /**
+   * A break band spans the whole width and labels itself at the top-left. On
+   * a grid more than two columns wide the far side of lunch has no marker at
+   * all, so the label is repeated bottom-right — but only when the band is
+   * tall enough that the two do not collide.
+   */
+  it('repeats the break label bottom-right on a wide grid', () => {
+    expect(calendar).toContain('absolute bottom-0.5 right-2');
+    expect(calendar).toMatch(/columns\.length > 2 &&[\s\S]{0,80}>= 44/);
+  });
+
 });

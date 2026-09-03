@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { can } from '@shared/capabilities';
 import type { BundleDto, ProposalDto } from '@shared/types';
 import { dateRange } from '@shared/time';
 import { readableInk } from '@shared/tagColors';
@@ -11,7 +12,7 @@ import { notesForPitch, type Note } from '../lib/mimirNotes';
 import { MimirAside } from './MimirAside';
 import { PlaceProposalModal } from './PlaceProposalModal';
 import { ProposalModal } from './ProposalModal';
-import { EmptyState, PrimaryButton, SecondaryButton, Spinner, useToast } from './ui';
+import { EmptyState, PrimaryButton, SecondaryButton, Spinner, useConfirm, useToast } from './ui';
 
 type Status = 'loading' | 'gate' | 'error' | 'ready';
 
@@ -21,6 +22,7 @@ export function ProposalBoard() {
   const { slug = '' } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const confirm = useConfirm();
   const { me } = useMe();
 
   const [bundle, setBundle] = useState<BundleDto | null>(null);
@@ -140,7 +142,12 @@ export function ProposalBoard() {
 
   const withdrawProposal = useCallback(
     async (proposal: ProposalDto) => {
-      if (!window.confirm(`Withdraw “${proposal.title}”?`)) return;
+      const ok = await confirm({
+        title: `Withdraw “${proposal.title}”?`,
+        body: 'The pitch and the interest people registered in it go together, and the bin does not hold pitches. This cannot be undone.',
+        confirmLabel: 'Withdraw',
+      });
+      if (!ok) return;
       try {
         await api.deleteProposal(slug, proposal.id);
         setBundle((prev) =>
@@ -154,7 +161,7 @@ export function ProposalBoard() {
         toast.show((err as Error).message);
       }
     },
-    [slug, toast],
+    [confirm, slug, toast],
   );
 
   const placeProposal = useCallback(
@@ -261,6 +268,8 @@ export function ProposalBoard() {
         <ProposalModal
           proposal={editing.proposal}
           people={bundle.people}
+          role={bundle.role}
+          canCreditOthers={can(bundle.permissions, bundle.role, 'session.credit_others')}
           tags={bundle.tags}
           saving={saving}
           onCancel={() => setEditing(null)}

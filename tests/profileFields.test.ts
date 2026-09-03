@@ -32,8 +32,7 @@ describe('a profile field saves without the rest of the profile', () => {
         name: 'Ada',
         bio: 'Builds engines.',
         links: [{ label: 'Site', url: 'https://example.com' }],
-      })
-      .expect(201);
+      }).expect(200);
 
     // What the Bio field on its own sends.
     const patched = await user
@@ -49,8 +48,7 @@ describe('a profile field saves without the rest of the profile', () => {
     const user = await actorWithRole(harness, 'testconf', 'user-pw');
     await user
       .patch('/api/e/testconf/me/profile')
-      .send({ bio: 'Placeholder.', links: [{ label: 'Site', url: 'https://example.com' }] })
-      .expect(201);
+      .send({ bio: 'Placeholder.', links: [{ label: 'Site', url: 'https://example.com' }] }).expect(200);
 
     // Clearing is a save like any other — the field goes back to its empty
     // state on the page rather than silently keeping the old text.
@@ -104,6 +102,30 @@ describe('the profile page edits a field at a time', () => {
     // is the one save that can be refused (names are unique per event).
     expect(page).toContain('api.renameInEvent(slug, wanted)');
     expect(page).not.toMatch(/savePerson\(\{\s*displayName/);
+  });
+
+  /**
+   * A profile is reached from the schedule and from Manage → People, and
+   * those are nothing like each other. Sending an organiser out to the
+   * schedule made them navigate back in for every person they looked at.
+   */
+  it('goes back where it was opened from, and to the schedule otherwise', () => {
+    expect(page).toMatch(/useLocation\(\)\.state as \{ back\?: /);
+    expect(page).toMatch(/from\?\.to \?\? `\/e\/\$\{slug\}`/);
+    expect(page).toMatch(/from\?\.label \?\? 'Schedule'/);
+    // A deep link arrives with no history, so an organiser is told the tab.
+    expect(page).toContain('Manage → People');
+
+    const admin = readFileSync('web/src/pages/AdminPage.tsx', 'utf8');
+    expect(admin).toMatch(/state=\{\{ back: \{ to: `\/e\/\$\{slug\}\/admin\?tab=people`/);
+  });
+
+  it('names the two names, and shows the row id nowhere', () => {
+    // The heading is the full name a session is credited to; under it the
+    // username the room calls them. The row id is in the address bar.
+    expect(page).toMatch(/aria-label="Full name"/);
+    expect(page).toContain('Username');
+    expect(page).not.toContain('rowId');
   });
 
   it('opens one field at a time', () => {

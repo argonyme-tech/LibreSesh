@@ -60,10 +60,11 @@ every failure as `{ error: { code, message } }`.
 | `event_identities` | `(event, identity) → display name`, unique within the event |
 | `roles` | `(identity, event) → viewer\|user\|speaker\|admin` |
 | `rooms`, `tags` | Per event, soft-deleted |
+| `session_formats` | What kind of thing a session is — talk, workshop, panel. A name and a colour, nothing else. Per event, soft-deleted, in the organiser's running order rather than by name. A session wears one (`sessions.format_id`, nullable); deleting a format clears it from them (migrations 014, 015) |
 | `breaks` | Lunch and friends: a label and local minutes of day, `date` null meaning every day. No room, no author, hard-deleted |
 | `sessions` | Scheduled: always has a room and a time; `blocks_open_booking` holds the floor against attendees |
 | `proposals` | Pitched: no room, no time, until an organiser places it |
-| `people` | Speakers/hosts, optionally claimed by an identity |
+| `people` | One per identity that has entered the event (made at the gate, migration 010), plus organiser-typed shells nobody has claimed yet. Holds the full name; the username lives on `event_identities`. `archived_at` files a row out of the lists without deleting it (migration 013). Manage → People lists these and nothing else |
 | `contributions` | Notes, links, questions; `hidden` for moderation |
 | `stars`, `proposal_interest` | Private per-identity interest |
 | `audit` | Append-only log of every write |
@@ -92,6 +93,71 @@ notices `event.slug` differs from the one in its URL and replaces the address
 bar; that is cosmetic, and nothing server-side depends on it happening.
 Uniqueness is checked across both tables (`slugTaken`), so a slug that still
 redirects cannot be handed to a new event.
+
+### A format is not a type
+
+`sessions.type` is `official | open` and answers **who put this here**: the
+published programme, or an attendee booking a room that allows it. The stored
+values are unchanged, but nothing shows the word "open" to a reader any more —
+it read as *open to join*, which every session on the schedule is, so the badge
+meant to mark the exception described the rule. The session form says
+**Official** and **Non-official**.
+
+The grid and the list mark neither by default. `events.show_official_badge`
+(migration 016, off) turns on a small **Official** on blocks and cards, for the
+event that actually mixes a published programme with an open floor. Marking the
+programme rather than the exception is the way round that survives both ends:
+an event where everything is official has nothing to say, and an unconference
+has nothing to say either. The session's own panel always says which it is. It decides
+permissions — who may move the session, whether it can hold the floor — and it
+is the oldest column in the table.
+
+`sessions.format_id` answers **what this is**: a talk, a workshop, a panel, a
+jam. It decides nothing. No rule reads it, no placement check consults it, and
+a session without one is in the state every session in the app was in before
+migration 014. The two are independent: an open session can be a workshop and
+an official one can be a jam.
+
+They are two columns and not one because they are two questions, and the app
+had a word for only the first of them. The visible label on the official/open
+control in the session form is therefore **Placement**, not Type — the field at
+the top of that form is the one that says what kind of session it is, and two
+fields called Type at opposite ends of one form would be indistinguishable.
+
+Formats are event-defined rather than an enum because an unconference invents
+them; `shared/formats.ts` ships a dozen suggestions the organiser clicks to
+create, and creates none of them on its own. The shape is exactly the tags
+table: a name and a colour.
+
+**A format carries no length.** Migration 014 gave it one, which the session
+form prefilled, and migration 015 took it away again — it made one field answer
+two questions, the same mistake "type" made. A workshop is a workshop at ninety
+minutes or at a whole afternoon, and picking a format to *describe* a session
+should not silently retime it. How long a session runs is the session's, bounded
+by `shared/sessionLimits.ts`: five minutes to a day, in five-minute steps.
+
+### Who may change a session
+
+Three questions, deliberately separate, and the bug they caused when they were
+conflated is worth keeping in view:
+
+1. **May this person change this session at all?** `assertMayMutate`. An
+   organiser always may. Anyone **credited on the session** may — that is the
+   whole test, independent of role, because the speaker role is minted by a
+   code an organiser has to remember to send and most speakers never hold one.
+   Otherwise it takes the `session.edit_own` capability, authorship, and an
+   open session.
+2. **May they move it?** Only an organiser, for an official session. Checked on
+   what actually *changed* — room, type, start, end — never on which keys the
+   request carried, because the session form posts the whole session on every
+   save and a presence check reads an untouched field as a move.
+3. **May they delete it?** The creator and the organisers. `assertMayMutate` is
+   called without `speaksHere` on the delete route: being billed on a session
+   is a claim on its words, not a mandate to take it off the programme.
+
+Editing is **not** gated on `session.create_open`. Creating and editing are
+different permissions, and an event that closes the first — a curated
+conference — must not close the second on its own speakers.
 
 ### Sessions that hold the floor
 
@@ -220,9 +286,25 @@ the answer is probably separate *instances*, not separate files.
 
 A name is how one person is known inside one room. Two unconferences a year
 apart have no business fighting over "Ada", so `event_identities` holds the
-name and enforces `UNIQUE(event_id, display_name)`;
-`identities.display_name` is demoted to the seed a newcomer is offered, and
-follows whatever name they last chose.
+name and enforces `UNIQUE(event_id, display_name)`. `identities.display_name`
+is only a trace: empty when an identity is minted, following whatever name
+its owner last chose, prefilled nowhere. A username is typed at every first
+gate — nothing like `attendee_x7f2k` is generated — and a device re-entering
+an event gets its own name back from `GET /e/:slug/gate`.
+
+**Two names, two jobs.** The **username** (`event_identities.display_name`)
+is what the room calls you: unique here, on everything you post, in the
+header chip. The **full name** (`people.name`) is what a session is credited
+to: free to repeat, since two "Alex Chen"s can be in one room and the merge
+tool exists for two rows that are one human, not for namesakes. Every
+identity that enters holds exactly one live `people` row (`ensureOwnProfile`
+in `server/src/people.ts`, called from the gate; migration 010 backfilled the
+entrants from before), with the full name initialised to the username and not
+following it afterwards. A `people` row *without* an identity is a shell an
+organiser typed onto a talk for someone who has not arrived. When somebody
+enters under that shell's name the gate does not hand it over silently — the
+same name can be a different person — but answers `profile_exists` and takes
+it only on a second entry with `claimProfile`.
 
 Global uniqueness was the tempting one-line version — a `UNIQUE` index and a
 check in `PATCH /me` — and it is worse than the bug it fixes. It makes the
@@ -454,6 +536,40 @@ both cases. That is what makes one speaker code work from any number of
 devices. Phrases are stored hashed; guesses share the password rate-limit
 budget.
 
+### Archiving a profile, and why it is not deleting
+
+A `people` row has three states, not two: live, archived (`archived_at` set),
+and soft-deleted (`deleted_at` set). The middle one exists because deleting is
+the wrong tool for the profiles that actually accumulate at a real event — the
+ones made while testing the room, a shell typed twice, a walk-in who never came
+back. Deleting cannot be undone, it strips the name off every session the
+profile was credited on, and `DELETE /people/:id` refuses outright for anyone
+who *holds* their profile, which is exactly the case an organiser most wants
+tidied away.
+
+Archiving changes nothing but visibility. The row keeps its sessions, its bio,
+its role, its speaker code and its identity. What it loses is its place in the
+lists an organiser reads: every segment of Manage → People except **Archived**
+drops it, and the speaker picker stops offering it. Crediting by name still
+finds it — `resolveSpeaker` orders live profiles first and falls through to an
+archived one rather than spawning a twin — because a name that matches only an
+archived profile is still that person.
+
+**The holder is the way back out.** `DELETE /people/:id/archive` takes
+`requireRole('user')` rather than `admin`, and then allows it for an organiser
+*or* for whoever holds the row. That is deliberate and it is the whole
+difference from deletion: an organiser tidying up at the end of a day cannot
+tell a profile that is finished with from one whose person is coming back
+tomorrow, and the person themselves can. They still hold their cookie and their
+role, so they open their profile, see that it was put away, and take it back
+out. `archivedAt` is therefore on the public `PersonDto` and not among the
+organiser-only facts — the one reader who most needs it is the holder, and it
+discloses nothing about who runs the event.
+
+Both directions are idempotent and both are audited (`archive`, `unarchive`).
+Archiving twice does not re-stamp the date: *when* it was filed is what tells a
+tidy-up from a mistake three weeks later.
+
 ### Merging two people
 
 Two rows in `people` can describe one human — an organiser typed "Ada
@@ -507,7 +623,7 @@ So after a merge:
   same operation as /logout — rather than left signed in as a zombie that is
   present but owns nothing. Deleting the identity itself would not be safe:
   it may be a real person at other events on this instance, and the audit log
-  points at it. Its event display name row stays, so the attendance list and
+  points at it. Its event display name row stays, so the People list and
   old audit entries keep their label and the name stays reserved. The device
   can re-enter through the gate and is then a fresh participant;
 - the re-keying and the sign-out are **scoped to the event being merged**. The

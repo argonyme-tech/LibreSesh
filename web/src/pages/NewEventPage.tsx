@@ -117,7 +117,7 @@ export function NewEventPage() {
 
   return (
     <div className="mx-auto max-w-lg px-4 py-10">
-      <Link to="/" className="text-xs text-stone-500 dark:text-stone-400 underline">
+      <Link to="/events" className="text-xs text-stone-500 dark:text-stone-400 underline">
         ← All events
       </Link>
       <h1 className="mb-1 mt-3 text-lg font-semibold tracking-tight">Create an event</h1>
@@ -219,7 +219,7 @@ export function NewEventPage() {
           />
         </Field>
         <Field
-          label={`${userRoleLabel.trim() || 'Attendee'} — add contributions and open sessions`}
+          label={`${userRoleLabel.trim() || 'Attendee'} — add contributions and propose sessions`}
           hint="Optional — blank generates one."
         >
           <input

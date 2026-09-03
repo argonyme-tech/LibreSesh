@@ -1,6 +1,6 @@
 import type { BreakDto, BundleDto, PersonDto, SessionDto } from '@shared/types';
 import { nowMinuteOfDay, place, todayInZone } from './format';
-import { stuckSpeakers } from './people';
+import { stuckSpeakers } from './ownership';
 
 /**
  * Mímir add-on: what whoever is on duty needs, at the minute they need it.

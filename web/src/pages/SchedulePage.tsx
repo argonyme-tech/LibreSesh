@@ -7,11 +7,13 @@ import type {
   SessionDto,
   TrackDto,
 } from "@shared/types";
+import { can } from '@shared/capabilities';
 import type { Repeat } from "@shared/repeat";
 import { dateRange, zonedTimeToUtc } from "@shared/time";
 import { windowLabel, windowOn } from "@shared/trackHours";
 import { ApiError, api, type SessionWrite } from "../lib/api";
 import {
+  dayAfter,
   dayLabel,
   dayRangeLabel,
   fmtMin,
@@ -58,8 +60,9 @@ import {
   SecondaryButton,
   Spinner,
   inputClass,
+  useConfirm,
   useToast,
-} from "../components/ui";
+} from '../components/ui';
 
 const NOW_TICK_MS = 30_000;
 
@@ -144,6 +147,7 @@ export function SchedulePage() {
   const { slug = "", sessionId } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const confirm = useConfirm();
   const { me } = useMe();
   const data = useEventData(slug);
   const filters = useFilters();
@@ -216,6 +220,15 @@ export function SchedulePage() {
      that survives every shape of event. The switch still works either way, and
      a chosen view goes in the URL, which is what a shared link reproduces. */
   const view = filters.view ?? event?.defaultView ?? "list";
+
+  /** The day after the one being read, for the button at the end of the
+   *  list. Absent on the last day, which has nothing after it. */
+  const nextDay = useMemo(() => {
+    const date = dayAfter(days, day);
+    if (date === null) return undefined;
+    const label = dayLabel(date, today);
+    return { date, label: `${label.top} ${label.sub}`.trim() };
+  }, [days, day, today]);
 
   const dayLabels = useMemo(
     () =>
@@ -470,13 +483,56 @@ export function SchedulePage() {
     if (selected) void loadContributions(selected.id);
   }, [selected?.id, loadContributions, selected]);
 
+  /** The profiles this device holds. A person is credited on a session by
+   *  profile id, not by identity, so this is the bridge between them. */
+  const myPersonIds = useMemo(
+    () => new Set((bundle?.people ?? []).filter((p) => p.isMine).map((p) => p.id)),
+    [bundle?.people],
+  );
+  const speaksOn = useCallback(
+    (session: SessionDto) => session.speakers.some((p) => myPersonIds.has(p.id)),
+    [myPersonIds],
+  );
+
+  /**
+   * Mirrors `assertMayMutate` on the server. Being credited on a session is
+   * enough on its own — one of five co-hosts as much as the only one, and an
+   * official session as much as an open one, because the official one is
+   * precisely the one an organiser typed your name onto. Whether you may
+   * *move* it is a separate question; see `canMove`.
+   */
   const canEdit = useCallback(
     (session: SessionDto) =>
       bundle?.role === "admin" ||
-      (bundle?.role === "user" &&
+      speaksOn(session) ||
+      (bundle !== null &&
+        can(bundle.permissions, bundle.role, "session.edit_own") &&
         session.type === "open" &&
         session.createdBy === me?.id),
-    [bundle?.role, me?.id],
+    [bundle, me?.id, speaksOn],
+  );
+
+  /** Deleting is the creator's and the organiser's, never a co-speaker's:
+   *  being billed on a session is not a mandate to remove it from the
+   *  programme. The server draws the same line — it never passes `speaksHere`
+   *  to `assertMayMutate` on a delete. */
+  const canDelete = useCallback(
+    (session: SessionDto) =>
+      bundle?.role === "admin" ||
+      (bundle !== null &&
+        can(bundle.permissions, bundle.role, "session.edit_own") &&
+        session.type === "open" &&
+        session.createdBy === me?.id),
+    [bundle, me?.id],
+  );
+
+  /** An official session's slot belongs to the organisers, so a speaker
+   *  editing one gets the words and not the placement — the fields are
+   *  disabled rather than left to fail on save. */
+  const canMove = useCallback(
+    (session: SessionDto | undefined) =>
+      bundle?.role === "admin" || session === undefined || session.type !== "official",
+    [bundle?.role],
   );
 
   const reportError = useCallback(
@@ -807,7 +863,11 @@ export function SchedulePage() {
 
   const deleteSession = useCallback(
     async (session: SessionDto) => {
-      if (!window.confirm(`Delete “${session.title}”?`)) return;
+      const ok = await confirm({
+        title: `Delete “${session.title}”?`,
+        body: 'It moves to the bin, with its notes and questions. An organiser can put it back from Manage Event, under Trash.',
+      });
+      if (!ok) return;
       try {
         await api.deleteSession(slug, session.id);
         data.apply({ type: "session.deleted", entity: { id: session.id } });
@@ -818,7 +878,7 @@ export function SchedulePage() {
         reportError(err);
       }
     },
-    [closeSession, data, reportError, slug, toast],
+    [closeSession, confirm, data, reportError, slug, toast],
   );
 
   const addContribution = useCallback(
@@ -882,7 +942,7 @@ export function SchedulePage() {
       <EmptyState>
         {data.error ?? "Could not load this event."}
         <div className="mt-3">
-          <Link to="/" className="underline">
+          <Link to="/events" className="underline">
             Back to all events
           </Link>
         </div>
@@ -899,7 +959,13 @@ export function SchedulePage() {
   // room and length included — through Edit session, which is the same change
   // made by naming it rather than by aiming at it. The server never knew about
   // Arrange; it gates the underlying edit, and that rule is unchanged.
-  const canArrange = !event.archived && role === "admin";
+  //
+  // Grid only. `arrange` is read by `Calendar` and by nothing else — the list
+  // has no geometry to drag against — so in the list the button was a toggle
+  // for a mode with no effect: it lit up, said "Done arranging", and changed
+  // nothing on the page under it. Editing from the list is unaffected; it
+  // never went through Arrange, it is Edit session on the row.
+  const canArrange = !event.archived && role === "admin" && view === "cal";
 
   // Ordered coach-marks. Role-conditional controls are dropped here; the Tour
   // itself also skips any target that isn't in the DOM. Not memoised because
@@ -942,7 +1008,7 @@ export function SchedulePage() {
     {
       target: "session-block",
       title: "Open a session",
-      body: "Tap any block for its description, speaker and everyone's notes, links and questions. Dashed green blocks are open sessions that anyone may propose.",
+      body: "Tap any block for its description, speaker and everyone's notes, links and questions. Dashed green blocks are non-official — anyone may propose one, and something else can always run alongside it.",
     },
     {
       target: "filters",
@@ -961,7 +1027,7 @@ export function SchedulePage() {
     tourSteps.push({
       target: "add",
       title: "Add a session",
-      body: "Organisers add official sessions anywhere; everyone else proposes open sessions in the rooms that anyone may book.",
+      body: "Organisers add official sessions anywhere; everyone else proposes non-official ones in the rooms that anyone may book.",
     });
   }
   if (role === "admin") {
@@ -1017,7 +1083,7 @@ export function SchedulePage() {
               <Link
                 to="/"
                 className="flex shrink-0 items-center"
-                aria-label="All events"
+                aria-label="LibreSesh home"
               >
                 {/* Below `sm` the wordmark's width belongs to the event name, so
                     the phone header gets the near-square mark instead. The swap
@@ -1171,7 +1237,13 @@ export function SchedulePage() {
                     <button
                       key={v}
                       type="button"
-                      onClick={() => filters.set({ view: v })}
+                      onClick={() => {
+                        filters.set({ view: v });
+                        // Leaving the grid also leaves Arrange, rather than
+                        // holding a drag mode open behind a button that is no
+                        // longer on screen to turn it off.
+                        if (v !== "cal") setArrange(false);
+                      }}
                       aria-pressed={view === v}
                       className={`rounded-md px-3 py-1.5 text-xs font-medium ${
                         view === v
@@ -1410,11 +1482,13 @@ export function SchedulePage() {
             rooms={bundle.rooms}
             tags={bundle.tags}
             mimirNotes={notesForSession(selected, bundle)}
+            formats={bundle.formats}
             contributions={data.contributions[selected.id]}
             role={role}
             me={me}
             timezone={timezone}
             canEdit={canEdit(selected)}
+            canDelete={canDelete(selected)}
             archived={event.archived}
             starred={starredIds.has(selected.id)}
             userLabel={event.userRoleLabel}
@@ -1489,11 +1563,14 @@ export function SchedulePage() {
               moveBetweenColumns={axis === "room"}
               subtitleOf={axis === "track" ? roomNameOf : undefined}
               tags={bundle.tags}
+              showOfficialBadge={event.showOfficialBadge}
               sessions={daySessions}
               breaks={bundle.breaks}
               matchedIds={matchedIds}
               starredIds={starredIds}
               starCounts={bundle.starCounts}
+              onToggleStar={(s) => void toggleStar(s)}
+              activeId={selected?.id}
               timezone={timezone}
               day={day}
               dayStartMin={event.dayStartMin}
@@ -1513,6 +1590,7 @@ export function SchedulePage() {
           <ListView
             rooms={bundle.rooms}
             tags={bundle.tags}
+            showOfficialBadge={event.showOfficialBadge}
             sessions={visibleSessions}
             breaks={bundle.breaks}
             contributionCounts={bundle.contributionCounts}
@@ -1521,8 +1599,13 @@ export function SchedulePage() {
             clashingIds={clashIds}
             timezone={timezone}
             day={day}
+            nextDay={nextDay}
             nowMin={nowMin}
             onOpen={openSession}
+            onGoToDay={(d) => {
+              filters.set({ day: d });
+              window.scrollTo({ top: 0 });
+            }}
             onToggleStar={(s) => void toggleStar(s)}
           />
         )}
@@ -1593,11 +1676,13 @@ export function SchedulePage() {
           rooms={bundle.rooms}
           tags={bundle.tags}
           mimirNotes={notesForSession(selected, bundle)}
+          formats={bundle.formats}
           contributions={data.contributions[selected.id]}
           role={role}
           me={me}
           timezone={timezone}
           canEdit={canEdit(selected)}
+          canDelete={canDelete(selected)}
           archived={event.archived}
           starred={starredIds.has(selected.id)}
           userLabel={event.userRoleLabel}
@@ -1617,9 +1702,11 @@ export function SchedulePage() {
           session={editing.session}
           rooms={bundle.rooms}
           tags={bundle.tags}
+          formats={bundle.formats}
           tracks={bundle.tracks}
           people={bundle.people}
           role={role}
+          canCreditOthers={can(bundle.permissions, role, 'session.credit_others')}
           timezone={timezone}
           days={days}
           dayLabels={dayLabels}
@@ -1629,8 +1716,9 @@ export function SchedulePage() {
           saving={saving}
           onCancel={() => setEditing(null)}
           onSave={(body, repeat) => void saveSession(body, repeat)}
+          canMove={canMove(editing.session)}
           onDelete={
-            editing.session
+            editing.session && canDelete(editing.session)
               ? () => void deleteSession(editing.session as SessionDto)
               : undefined
           }

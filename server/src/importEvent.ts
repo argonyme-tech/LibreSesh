@@ -114,6 +114,10 @@ const importTrackSchema = z
 
 const importTagSchema = z.object({ name: trimmed(40), color: colorSchema.optional() });
 
+/** What kinds of session this event runs. Declared once, like rooms and tags,
+ *  and referred to by name from each session. */
+const importFormatSchema = z.object({ name: trimmed(40), color: colorSchema.optional() });
+
 /**
  * Lunch, dinner, coffee. Wall-clock times like everything else in this
  * document, and no `date` means every day of the event — which is how a
@@ -142,6 +146,8 @@ const importSessionSchema = z
   .object({
     room: trimmed(80),
     track: trimmed(60).nullish(),
+    /** The name of a format declared at the top of the document. */
+    format: trimmed(40).nullish(),
     tags: z.array(trimmed(40)).max(20).optional(),
     type: z.enum(['official', 'open']).optional(),
     /** Holds the floor: attendees can place nothing while this one runs. */
@@ -233,6 +239,7 @@ export const eventImportSchema = z
     rooms: z.array(importRoomSchema).max(100).optional(),
     tracks: z.array(importTrackSchema).max(60).optional(),
     tags: z.array(importTagSchema).max(200).optional(),
+    formats: z.array(importFormatSchema).max(60).optional(),
     breaks: z.array(importBreakSchema).max(40).optional(),
     sessions: z.array(importSessionSchema).max(1000).optional(),
   })
@@ -367,6 +374,7 @@ export function importEvent(
   const rooms = doc.rooms ?? [];
   const tracks = doc.tracks ?? [];
   const tags = doc.tags ?? [];
+  const formats = doc.formats ?? [];
   const breaks = doc.breaks ?? [];
   const sessions = doc.sessions ?? [];
 
@@ -496,6 +504,18 @@ export function importEvent(
       tagIds.set(key(tag.name), Number(id));
     }
 
+    assertNamesDistinct(formats, 'formats');
+    const formatIds = new Map<string, number>();
+    const insertFormat = db.prepare(
+      `INSERT INTO session_formats (event_id, name, color, sort_order) VALUES (?, ?, ?, ?)`,
+    );
+    // Document order is the running order, the way it is for rooms.
+    formats.forEach((format, i) => {
+      const id = insertFormat.run(eventId, format.name, format.color ?? '#6B7280', i)
+        .lastInsertRowid;
+      formatIds.set(key(format.name), Number(id));
+    });
+
     // Breaks name no room and reference nothing, so they land before the grid
     // and nothing downstream has to know about them.
     const insertBreak = db.prepare(
@@ -529,10 +549,10 @@ export function importEvent(
 
     const insertSession = db.prepare(
       `INSERT INTO sessions
-        (event_id, room_id, track_id, type, blocks_open_booking, title,
-         description, speaker, livestream_url, starts_at, ends_at,
+        (event_id, room_id, track_id, format_id, type, blocks_open_booking, title,
+         description, speaker, livestreams, starts_at, ends_at,
          created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, '', '', ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', '[]', ?, ?, ?, ?, ?)`,
     );
     const insertSessionSpeaker = db.prepare(
       'INSERT OR IGNORE INTO session_speakers (session_id, person_id, sort_order) VALUES (?, ?, ?)',
@@ -585,6 +605,18 @@ export function importEvent(
         );
       }
 
+      // Same rule as room and track: a format is never invented from a
+      // session, so a typo is a rejection naming the row rather than a
+      // thirteenth format nobody meant to define.
+      let formatId: number | null = null;
+      if (session.format) {
+        const found = formatIds.get(key(session.format));
+        if (found === undefined) {
+          throw badRequest(`${errorLabel}: no format called "${session.format}" is declared`);
+        }
+        formatId = found;
+      }
+
       const resolvedTags: number[] = [];
       for (const name of session.tags ?? []) {
         const tagId = tagIds.get(key(name));
@@ -612,6 +644,7 @@ export function importEvent(
           eventId,
           roomId,
           trackId,
+          formatId,
           sessionType,
           session.blocksOpenBooking ? 1 : 0,
           session.title,
@@ -666,6 +699,7 @@ export function importEvent(
         rooms: rooms.length,
         tracks: tracks.length,
         tags: tags.length,
+        formats: formats.length,
         breaks: breaks.length,
         sessions: planned.length,
         people: people.n,

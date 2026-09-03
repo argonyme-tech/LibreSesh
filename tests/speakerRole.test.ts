@@ -41,8 +41,7 @@ describe('speaker role', () => {
     speaker = await actorWithRole(harness, 'testconf', 'user-pw');
     const profile = await speaker
       .patch('/api/e/testconf/me/profile')
-      .send({ name: 'Ada' })
-      .expect(201);
+      .send({ name: 'Ada' }).expect(200);
     personId = profile.body.id as number;
     const { body: me } = await speaker.get('/api/me').expect(200);
     promote(me.id as number);
@@ -96,12 +95,20 @@ describe('speaker role', () => {
       .expect(403);
   });
 
-  it('a plain attendee who holds the talk still cannot edit it', async () => {
+  /**
+   * Reversed deliberately. This test used to assert that a plain attendee
+   * credited on a talk could not edit it, which made the speaker *role* the
+   * thing that granted the right — and the role is only handed out by a code
+   * an organiser has to remember to send, so most speakers never hold it and
+   * could not touch their own session. Being on the bill is the qualification
+   * now; the role still carries what it always did, which is the right to be
+   * credited by others and to place sessions where attendees cannot.
+   */
+  it('a plain attendee who holds the talk may edit it, but not move or delete it', async () => {
     const attendee = await actorWithRole(harness, 'testconf', 'user-pw');
     const profile = await attendee
       .patch('/api/e/testconf/me/profile')
-      .send({ name: 'Grace' })
-      .expect(201);
+      .send({ name: 'Grace' }).expect(200);
     const created = await admin
       .post('/api/e/testconf/sessions')
       .send({
@@ -113,10 +120,19 @@ describe('speaker role', () => {
         endsAt: at(DAY_ONE, 860),
       })
       .expect(201);
+    const id = created.body.id as number;
+
+    const edited = await attendee
+      .patch(`/api/e/testconf/sessions/${id}`)
+      .send({ description: 'What the talk is actually about.' })
+      .expect(200);
+    expect(edited.body.description).toBe('What the talk is actually about.');
+
     await attendee
-      .patch(`/api/e/testconf/sessions/${created.body.id}`)
-      .send({ description: 'nope' })
+      .patch(`/api/e/testconf/sessions/${id}`)
+      .send({ startsAt: at(DAY_ONE, 900), endsAt: at(DAY_ONE, 960) })
       .expect(403);
+    await attendee.delete(`/api/e/testconf/sessions/${id}`).expect(403);
   });
 
   it('shows up in the permission matrix defaults', async () => {

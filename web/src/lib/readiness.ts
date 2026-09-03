@@ -2,7 +2,7 @@ import type { BundleDto, PersonDto, SessionDto } from '@shared/types';
 import { dateRange } from '@shared/time';
 import { windowOn } from '@shared/trackHours';
 import { fmtMin, place } from './format';
-import { cannotEditOwn } from './people';
+import { cannotEditOwn } from './ownership';
 
 /**
  * Mímir add-on: what is still missing before the doors open.
@@ -63,10 +63,10 @@ export function readiness(bundle: BundleDto): Finding[] {
     found.push({
       key: 'speakers-cannot-edit',
       what: 'Credited people who cannot edit their own session',
-      because: `${listNames(stuck.map((p) => p.name))} ${stuck.length === 1 ? 'is' : 'are'} on the bill, but ${stuck.length === 1 ? 'their profile is not linked to a device or their role is below speaker' : 'their profiles are not linked to a device, or their roles are below speaker'}.`,
+      because: `${listNames(stuck.map((p) => p.name))} ${stuck.length === 1 ? 'is' : 'are'} on the bill and nobody holds ${stuck.length === 1 ? 'their profile' : 'their profiles'} yet.`,
       soWhat:
-        'Being on the poster grants nothing on its own. They will find out when they go to fix a typo and there is no button.',
-      where: 'Admin → People: issue a speaker code, which links the profile and raises the role in one step.',
+        'Being credited is the whole qualification — the moment they hold the profile they can edit it. Until then they will go to fix a typo and find no button.',
+      where: 'Admin → People: send a speaker code, or approve their claim when it comes in.',
     });
   }
 

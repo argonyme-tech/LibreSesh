@@ -2,10 +2,13 @@ import { useMemo } from 'react';
 import type { BreakDto, RoomDto, SessionDto, TagDto } from '@shared/types';
 import { readableInk } from '@shared/tagColors';
 import { fmtMin, place, speakerLine } from '../lib/format';
+import { StarTally } from './StarTally';
 
 export interface ListViewProps {
   rooms: RoomDto[];
   tags: TagDto[];
+  /** Mark the official programme on the card; see Calendar. */
+  showOfficialBadge: boolean;
   sessions: SessionDto[];
   /** Lunch and friends, for the days they apply to. Read-only furniture here
    *  too — it is in the list so the day reads honestly, not to be opened. */
@@ -19,15 +22,21 @@ export interface ListViewProps {
   clashingIds: Set<number>;
   timezone: string;
   day: string;
+  /** The day after this one, when the event has one. A list ends where the
+   *  day ends, and the reader who got there is almost always asking what
+   *  happens next rather than reaching for the day picker at the top. */
+  nextDay?: { date: string; label: string };
   nowMin: number | null;
   onOpen: (id: number) => void;
   onToggleStar: (session: SessionDto) => void;
+  onGoToDay?: (date: string) => void;
 }
 
 /** Chronological agenda for one day, grouped by start time (SPEC §7.2). */
 export function ListView({
   rooms,
   tags,
+  showOfficialBadge,
   sessions,
   breaks,
   contributionCounts,
@@ -36,9 +45,11 @@ export function ListView({
   clashingIds,
   timezone,
   day,
+  nextDay,
   nowMin,
   onOpen,
   onToggleStar,
+  onGoToDay,
 }: ListViewProps) {
   const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
   const tagById = useMemo(() => new Map(tags.map((t) => [t.id, t])), [tags]);
@@ -142,21 +153,6 @@ export function ListView({
                         now
                       </span>
                     )}
-                    <button
-                      type="button"
-                      aria-label={starred ? `Unstar ${session.title}` : `Star ${session.title}`}
-                      aria-pressed={starred}
-                      onClick={(e) => {
-                        // Do not let the tap fall through and open the session.
-                        e.stopPropagation();
-                        onToggleStar(session);
-                      }}
-                      className={`-m-1 shrink-0 rounded-full p-1 text-base leading-none ${
-                        starred ? 'text-amber-500 dark:text-amber-400' : 'text-stone-300 dark:text-stone-600 hover:text-amber-500'
-                      }`}
-                    >
-                      <span aria-hidden="true">{starred ? '★' : '☆'}</span>
-                    </button>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
                     {session.tagIds.map((id) => {
@@ -172,9 +168,11 @@ export function ListView({
                         </span>
                       );
                     })}
-                    {session.type === 'open' && (
-                      <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:text-emerald-300">
-                        open
+                    {/* See Calendar: the programme is what gets marked, and
+                        only when the organiser asks for it. */}
+                    {showOfficialBadge && session.type === 'official' && (
+                      <span className="rounded-full bg-stone-100 dark:bg-stone-800 px-2 py-0.5 text-xs font-medium text-stone-600 dark:text-stone-300">
+                        Official
                       </span>
                     )}
                     {clashes && (
@@ -182,29 +180,23 @@ export function ListView({
                         clashes
                       </span>
                     )}
-                    {(stars > 0 || count > 0) && (
-                      <span className="ml-auto flex items-center gap-2 text-xs">
-                        {stars > 0 && (
-                          <span
-                            className={
-                              overCapacity
-                                ? 'font-medium text-amber-700 dark:text-amber-400'
-                                : 'text-stone-400 dark:text-stone-500'
-                            }
-                            aria-label={`Starred by ${stars}${
-                              overCapacity ? ', more than the room holds' : ''
-                            }`}
-                          >
-                            <span aria-hidden="true">★</span> {stars}
-                          </span>
-                        )}
-                        {count > 0 && (
-                          <span className="text-stone-400 dark:text-stone-500">
-                            {count} contribution{count > 1 ? 's' : ''}
-                          </span>
-                        )}
-                      </span>
-                    )}
+                    {/* The card's one star, in the corner furthest from the
+                        title. It was a toggle up beside the title and a count
+                        down here, two stars saying two halves of one fact. */}
+                    <span className="ml-auto flex items-center gap-2 text-xs">
+                      {count > 0 && (
+                        <span className="text-stone-400 dark:text-stone-500">
+                          {count} contribution{count > 1 ? 's' : ''}
+                        </span>
+                      )}
+                      <StarTally
+                        starred={starred}
+                        count={stars}
+                        overCapacity={overCapacity}
+                        sessionTitle={session.title}
+                        onToggle={() => onToggleStar(session)}
+                      />
+                    </span>
                   </div>
                 </div>
               );
@@ -212,6 +204,19 @@ export function ListView({
           </div>
         </div>
         ),
+      )}
+
+      {/* The end of the day, and the way out of it. Only when there is
+          something above it: on an empty day the page already says so, and a
+          lone button under nothing reads as the whole day's content. */}
+      {nextDay && rows.length > 0 && onGoToDay && (
+        <button
+          type="button"
+          onClick={() => onGoToDay(nextDay.date)}
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-stone-300 px-3 py-3 text-sm font-semibold text-stone-600 hover:border-stone-500 hover:text-stone-900 dark:border-stone-600 dark:text-stone-300 dark:hover:border-stone-400 dark:hover:text-stone-100"
+        >
+          Next day · {nextDay.label}
+        </button>
       )}
     </div>
   );

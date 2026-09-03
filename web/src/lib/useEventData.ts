@@ -10,6 +10,7 @@ import type {
   RoomDto,
   SessionDto,
   TagDto,
+  FormatDto,
   TrackDto,
 } from '@shared/types';
 import { ApiError, api } from './api';
@@ -75,6 +76,42 @@ const byBreakTime = (breaks: BreakDto[]): BreakDto[] =>
 
 const byTagName = (tags: TagDto[]): TagDto[] =>
   tags.slice().sort((a, b) => a.name.localeCompare(b.name));
+
+/**
+ * A change frame describes the row, not whoever is reading it.
+ *
+ * The server computes `isMine` and the organiser-only facts (role, UID, last
+ * seen, counts) for the request that caused the broadcast, and the broadcast
+ * goes to every subscriber — so believing them wholesale would tell everyone
+ * watching that somebody else's profile is theirs, and would blank an
+ * organiser's People list every time anyone edited a bio. What this reader
+ * already worked out about a row it already has is kept.
+ *
+ * For a row that is new here there is nothing to keep, and one rule still
+ * holds: you have at most one profile per event, so a frame claiming a second
+ * one is yours is claiming it for its author, not for you.
+ */
+export function applyPersonChange(people: PersonDto[], incoming: PersonDto): PersonDto[] {
+  const prev = people.find((p) => p.id === incoming.id);
+  if (prev === undefined) {
+    return byPersonName(
+      upsert(people, { ...incoming, isMine: incoming.isMine && !people.some((p) => p.isMine) }),
+    );
+  }
+  // Spread is exactly the rule wanted for the organiser-only facts: the
+  // server *omits* those keys from anything it broadcasts and includes them
+  // in the reply to an organiser, so a key that is present is one this
+  // reader is entitled to and is newer than what they hold, and a key that
+  // is absent leaves what they already had untouched. Pinning them to `prev`
+  // instead — which this did at first — threw away the role the organiser
+  // had just set, and the select snapped back a moment after they used it.
+  //
+  // `isMine` cannot work that way, because it is always present and is
+  // always about the requester. A row's owner does not change under someone
+  // who is watching it; the one thing that would change it, claiming a
+  // profile at the gate, arrives as a fresh page rather than as a frame.
+  return byPersonName(upsert(people, { ...prev, ...incoming, isMine: prev.isMine }));
+}
 
 const byPersonName = (people: PersonDto[]): PersonDto[] =>
   people.slice().sort((a, b) => a.name.localeCompare(b.name));
@@ -186,6 +223,27 @@ function applyChange(state: State, change: ChangeEvent): State {
         },
       };
     }
+    case 'format.created':
+    case 'format.updated':
+      // Appended in the order the organiser made them, not sorted: the running
+      // order is the point, and the server hands them back in it.
+      return {
+        ...state,
+        bundle: { ...bundle, formats: upsert(bundle.formats, change.entity as FormatDto) },
+      };
+    case 'format.deleted': {
+      const { id } = change.entity as { id: number };
+      return {
+        ...state,
+        bundle: {
+          ...bundle,
+          formats: bundle.formats.filter((f) => f.id !== id),
+          // The server clears the column; the open tabs have to agree, or a
+          // session keeps showing a badge for a format that is gone.
+          sessions: bundle.sessions.map((s) => (s.formatId === id ? { ...s, formatId: null } : s)),
+        },
+      };
+    }
     case 'track.created':
     case 'track.updated':
       return {
@@ -225,7 +283,7 @@ function applyChange(state: State, change: ChangeEvent): State {
     case 'person.updated':
       return {
         ...state,
-        bundle: { ...bundle, people: byPersonName(upsert(bundle.people, change.entity as PersonDto)) },
+        bundle: { ...bundle, people: applyPersonChange(bundle.people, change.entity as PersonDto) },
       };
     case 'person.deleted': {
       const { id } = change.entity as { id: number };
@@ -344,6 +402,11 @@ export function useEventData(slug: string): EventData {
     navigate(`${to}${search}`, { replace: true });
   }, [canonicalSlug, slug, pathname, search, navigate]);
 
+  /** The profile this viewer holds, watched so a deletion of it can be
+   *  noticed without making the reducer impure. */
+  const mine = useRef<number | null>(null);
+  mine.current = state.bundle?.people.find((p) => p.isMine)?.id ?? null;
+
   const reload = useCallback(async () => {
     dispatch({ kind: 'loading' });
     try {
@@ -370,7 +433,17 @@ export function useEventData(slug: string): EventData {
       }
     });
     source.addEventListener('change', (ev) => {
-      dispatch({ kind: 'change', change: JSON.parse((ev as MessageEvent<string>).data) });
+      const change = JSON.parse((ev as MessageEvent<string>).data) as ChangeEvent;
+      dispatch({ kind: 'change', change });
+      // Your own profile disappearing is the one frame that means more than
+      // it says: an organiser approved your request to hold another one, or
+      // merged you into it, and where you went is not in the frame. Nothing
+      // on the wire can carry that — it is a fact about you, and the wire is
+      // read by everyone — so fetch the answer instead of guessing.
+      if (change.type === 'person.deleted') {
+        const gone = (change.entity as { id: number }).id;
+        if (mine.current === gone) void reload();
+      }
     });
     source.addEventListener('error', () => {
       hadError.current = true;

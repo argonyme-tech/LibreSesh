@@ -37,6 +37,12 @@
 
   "tags": [{ "name": "beginner" }, { "name": "hands-on", "color": "#E2A03F" }],
 
+  "formats": [
+    { "name": "Keynote" },
+    { "name": "Workshop" },
+    { "name": "Jam" }
+  ],
+
   "breaks": [
     { "label": "Lunch", "start": "12:30", "end": "13:30" },
     { "label": "Dinner", "start": "18:00", "end": "19:00", "date": "2026-09-14" }
@@ -56,6 +62,7 @@
       "room": "Main hall",
       "track": "Commons",
       "tags": ["beginner"],
+      "format": "Keynote",
       "title": "Opening keynote: what we owe each other",
       "description": "Markdown is fine here.\n\nTwo days, one question.",
       "speaker": "Ada Lovelace",
@@ -67,6 +74,7 @@
       "room": "Workshop room",
       "track": "Infrastructure",
       "tags": ["hands-on"],
+      "format": "Workshop",
       "title": "Running SQLite in anger",
       "speaker": "Grace Hopper",
       "date": "2026-09-14",
@@ -76,6 +84,7 @@
     {
       "room": "The Barn",
       "type": "open",
+      "format": "Jam",
       "title": "Open space: whatever we bring",
       "date": "2026-09-14",
       "start": "14:00",

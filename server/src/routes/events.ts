@@ -77,7 +77,8 @@ export function eventRoutes(ctx: Ctx): Router {
     res.status(201).json({ ...toEventSummary(row as EventRow), generatedPasswords: generated });
   });
 
-  /** Copy rooms and tags into a fresh event — never sessions or contributions. */
+  /** Copy rooms, tags and formats into a fresh event — never sessions or
+   *  contributions. */
   router.post('/events/:slug/clone', limit(ctx.limiter, 'write'), (req, res) => {
     const source = getEventBySlug(ctx.db, req.params.slug ?? '');
     if (!source) throw notFound('No such event');
@@ -100,8 +101,8 @@ export function eventRoutes(ctx: Ctx): Router {
           `INSERT INTO events
             (slug, name, timezone, start_date, end_date, day_start_min, day_end_min,
              week_rail_from, viewer_pw_hash, user_pw_hash, admin_pw_hash, archived,
-             user_role_label, audit_keep, default_view, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
+             user_role_label, audit_keep, default_view, show_official_badge, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
         )
         .run(
           body.newSlug,
@@ -121,6 +122,9 @@ export function eventRoutes(ctx: Ctx): Router {
           source.audit_keep,
           // As does how the copy opens: a clone is the same event again.
           source.default_view,
+          // And whether it badges its programme — the same event runs the same
+          // shape, so the same marking is right or wrong for both.
+          source.show_official_badge,
           now,
         );
       const id = Number(info.lastInsertRowid);
@@ -135,6 +139,15 @@ export function eventRoutes(ctx: Ctx): Router {
         .prepare(
           `INSERT INTO tags (event_id, name, color)
            SELECT ?, name, color FROM tags WHERE event_id = ? AND deleted_at IS NULL`,
+        )
+        .run(id, source.id);
+      // Formats are setup, like rooms and tags: the same event again runs the
+      // same kinds of session, even though none of the sessions come along.
+      ctx.db
+        .prepare(
+          `INSERT INTO session_formats (event_id, name, color, sort_order)
+           SELECT ?, name, color, sort_order
+             FROM session_formats WHERE event_id = ? AND deleted_at IS NULL`,
         )
         .run(id, source.id);
       return id;

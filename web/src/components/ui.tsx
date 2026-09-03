@@ -29,38 +29,202 @@ import { CloseIcon } from './icons';
  */
 export const controlHeightClass = 'h-[2.375rem]';
 
+/**
+ * @deprecated Use `ControlShell` + `TextInput`. This is the old skin — the
+ * input *is* the field, so anything belonging in the field renders outside its
+ * border, and at 14px it triggers the iOS focus-zoom. Kept only while Phase 2
+ * converts the call sites; `git grep inputClass` is that worklist, and an
+ * ESLint rule bans the string once the last one is gone.
+ */
 export const inputClass =
   'w-full rounded-lg border border-stone-300 bg-white dark:bg-stone-900 px-3 py-2 text-sm outline-none ' +
   'focus:border-stone-500 dark:border-stone-600 dark:text-stone-100 dark:placeholder:text-stone-500 dark:focus:border-stone-400';
+
+/**
+ * What a `Field` tells the control inside it: the id its label points at, the
+ * ids its hint and error carry (so the control can name them in
+ * `aria-describedby`), and whether it is in an invalid state.
+ *
+ * This is the fix for the app's oldest, quietest bug: at 95 of 96 call sites a
+ * `<label>` was not associated with its control at all — `Field` rendered the
+ * label as a *sibling* of `children` and passed `htmlFor` on to nobody. So
+ * clicking a label did nothing and a screen reader read the placeholder or
+ * silence. Now `Field` owns the id and hands it down; a control that consumes
+ * this context is wired up without the call site remembering to.
+ */
+interface FieldContextValue {
+  id: string;
+  describedBy?: string;
+  invalid: boolean;
+}
+const FieldContext = createContext<FieldContextValue | null>(null);
+
+/** For a control that lives inside a `Field` and wants its wiring. Null when a
+ *  control is used bare, which is allowed — the control just gets no free id. */
+export const useFieldContext = (): FieldContextValue | null => useContext(FieldContext);
 
 /**
  * A labelled control. Deliberately carries **no** outer margin: spacing is the
  * parent's job via `FormStack`/`FormRow`/`FormGrid`. An earlier version owned a
  * `mb-3`, which forced every adjacent button to hardcode a matching `mb-3` to
  * line up — and that broke the moment a field grew a `hint` and got taller.
+ *
+ * It generates its own id when `htmlFor` is not given, associates the label
+ * with it, and provides `FieldContext` so `TextInput` (and any future control)
+ * picks up `id`, `aria-invalid` and `aria-describedby` on its own. Pass `error`
+ * and the field goes invalid and renders the message under the control with
+ * `role="alert"`, the id wired into `aria-describedby` automatically.
  */
 export function Field({
   label,
   hint,
+  error,
   htmlFor,
   children,
 }: {
   label: string;
   hint?: string;
+  /** A sentence, present only when the field is wrong. Sets the invalid state
+   *  and is announced; absent is a field that is simply not-yet-filled. */
+  error?: string;
   htmlFor?: string;
   children: ReactNode;
 }) {
+  const generated = useId();
+  const id = htmlFor ?? generated;
+  const hintId = hint ? `${id}-hint` : undefined;
+  const errorId = error ? `${id}-error` : undefined;
+  const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
+
   return (
-    <div className="min-w-0">
-      <label
-        htmlFor={htmlFor}
-        className="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-300"
-      >
-        {label}
-      </label>
+    <FieldContext.Provider value={{ id, describedBy, invalid: Boolean(error) }}>
+      <div className="min-w-0">
+        <label
+          htmlFor={id}
+          className="mb-1 block text-xs font-medium text-stone-600 dark:text-stone-300"
+        >
+          {label}
+        </label>
+        {children}
+        {hint && (
+          <p id={hintId} className="mt-1 text-xs text-stone-400 dark:text-stone-500">
+            {hint}
+          </p>
+        )}
+        {error && <FieldError id={errorId}>{error}</FieldError>}
+      </div>
+    </FieldContext.Provider>
+  );
+}
+
+/** The message under a control, announced. A sibling of the hint rather than a
+ *  toast, because a field's error belongs under the field it is about. `Field`
+ *  renders it from its `error` prop; exported for the field-at-a-time editors
+ *  that own their own error state. */
+export function FieldError({ id, children }: { id?: string; children: ReactNode }) {
+  return (
+    <p id={id} role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">
       {children}
-      {hint && <p className="mt-1 text-xs text-stone-400 dark:text-stone-500">{hint}</p>}
+    </p>
+  );
+}
+
+/**
+ * The bordered, focus-ringed box that **is** the field. Owns the border, the
+ * height floor, the radius, the padding, the focus ring and the invalid state
+ * — nothing else in the app may draw a field border.
+ *
+ * The point is an inversion. Until now the `<input>` was the field, so anything
+ * that belongs *in* a field — a chosen tag, a unit like "days", a submit ↵ —
+ * had to render as a sibling outside the border, which is why selected items
+ * turned up outside the box that owns them. Here the box is the field and the
+ * input is one child of it: `flex flex-wrap` so chips and adornments sit inside
+ * the border and wrap, `min-h` rather than a fixed height so a shell holding
+ * two rows of tags can grow, and a `:focus-within` ring so focus shows on the
+ * box however many children it holds. Clicking empty space in the box focuses
+ * the input, the way a native field does.
+ *
+ * `controlHeightClass` is the floor here, matching the button primitives, so a
+ * shell and a button on one line align by construction — see its note.
+ */
+export function ControlShell({
+  invalid,
+  disabled,
+  className = '',
+  children,
+}: {
+  /** Overrides the `Field`'s invalid state; usually left to the context. */
+  invalid?: boolean;
+  disabled?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  const ctx = useFieldContext();
+  const isInvalid = invalid ?? ctx?.invalid ?? false;
+  const ref = useRef<HTMLDivElement>(null);
+
+  return (
+    <div
+      ref={ref}
+      onMouseDown={(e) => {
+        // Only a click on the box's own padding, not on a child control: a tap
+        // on a chip's remove button or the input itself must reach it.
+        if (e.target !== ref.current) return;
+        const field = ref.current?.querySelector<HTMLElement>(
+          'input, textarea, select, [contenteditable="true"]',
+        );
+        if (field) {
+          e.preventDefault();
+          field.focus();
+        }
+      }}
+      className={`flex min-h-[2.375rem] flex-wrap items-center gap-1.5 rounded-lg border bg-white px-3 py-1.5 transition-colors focus-within:ring-2 focus-within:ring-stone-500 dark:bg-stone-900 dark:focus-within:ring-stone-400 ${
+        isInvalid
+          ? 'border-red-400 dark:border-red-700'
+          : 'border-stone-300 focus-within:border-stone-500 dark:border-stone-600 dark:focus-within:border-stone-400'
+      } ${disabled ? 'opacity-60' : ''} ${className}`}
+    >
+      {children}
     </div>
+  );
+}
+
+/**
+ * The bare text input that lives inside a `ControlShell`. No border, no
+ * padding, no background of its own — the shell owns all of that. Reads
+ * `FieldContext` for its `id`, `aria-invalid` and `aria-describedby`, so a
+ * `Field` + `ControlShell` + `TextInput` is wired up with none of it written
+ * at the call site.
+ *
+ * `text-base sm:text-sm`: 16px on a phone, because iOS Safari zooms the whole
+ * viewport when a field below 16px takes focus and does not zoom back out —
+ * every text field in the app has had that bug. 14px returns above `sm`, where
+ * there is no such behaviour and the denser size reads better.
+ */
+export function TextInput({
+  className = '',
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement>) {
+  const ctx = useFieldContext();
+  return (
+    <input
+      id={props.id ?? ctx?.id}
+      aria-invalid={props['aria-invalid'] ?? (ctx?.invalid || undefined)}
+      aria-describedby={props['aria-describedby'] ?? ctx?.describedBy}
+      {...props}
+      className={`min-w-0 flex-1 bg-transparent text-base text-stone-900 outline-none placeholder:text-stone-400 disabled:cursor-not-allowed sm:text-sm dark:text-stone-100 dark:placeholder:text-stone-500 ${className}`}
+    />
+  );
+}
+
+/** Trailing (or leading) content inside a `ControlShell` — a unit like "days",
+ *  a submit ↵, an icon button. Sits inside the border, which is the whole
+ *  reason `ControlShell` exists. */
+export function ControlAdornment({ children }: { children: ReactNode }) {
+  return (
+    <span className="flex shrink-0 items-center gap-1 text-xs text-stone-500 dark:text-stone-400">
+      {children}
+    </span>
   );
 }
 
@@ -128,54 +292,75 @@ export function NumberField({
   className?: string;
   autoFocus?: boolean;
 }) {
-  const id = useId();
   const { error } = parseNumberField(value, spec);
   // A field you have not filled in yet is not a field you got wrong, so the
   // message waits until there is something in it to be wrong about.
   const shown = value.trim() === '' ? null : error;
 
+  // The proof that the Phase 1 primitives carry a real field: no id, no aria
+  // wiring and no bespoke error markup here any more — `Field` owns the id and
+  // the message, `ControlShell` owns the border and the invalid state,
+  // `TextInput` picks all of it up from context. The digits-only rule and
+  // "empty is not yet wrong" are unchanged.
+  //
+  // The suffix stays *outside* the box, beside it, not in a `ControlAdornment`.
+  // In this app the suffix is not a unit like "days" but a running sentence —
+  // "days · the rail is on for this event" — and inside a `w-32` shell it would
+  // wrap into a heap. `ControlAdornment` is for the short in-field kind (a ↵, a
+  // real unit), which arrives with the inline-create control later.
   return (
-    <Field label={label} hint={hint} htmlFor={id}>
+    <Field label={label} hint={hint} error={shown ?? undefined}>
       <div className="flex items-center gap-2">
-        <input
-          id={id}
-          inputMode="numeric"
-          autoComplete="off"
-          value={value}
-          onChange={(e) => onChange(sanitizeNumberInput(e.target.value, spec))}
-          onKeyDown={onKeyDown}
-          maxLength={maxDigits(spec)}
-          aria-invalid={shown ? true : undefined}
-          aria-describedby={shown ? `${id}-error` : undefined}
-          autoFocus={autoFocus}
-          className={`${inputClass} ${className} ${
-            shown ? 'border-red-400 focus:border-red-500 dark:border-red-700' : ''
-          }`}
-        />
-        {suffix && (
-          <span className="text-xs text-stone-500 dark:text-stone-400">{suffix}</span>
-        )}
+        <ControlShell className={className}>
+          <TextInput
+            inputMode="numeric"
+            autoComplete="off"
+            value={value}
+            onChange={(e) => onChange(sanitizeNumberInput(e.target.value, spec))}
+            onKeyDown={onKeyDown}
+            maxLength={maxDigits(spec)}
+            autoFocus={autoFocus}
+          />
+        </ControlShell>
+        {suffix && <span className="text-xs text-stone-500 dark:text-stone-400">{suffix}</span>}
       </div>
-      {shown && (
-        <p id={`${id}-error`} role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">
-          {shown}
-        </p>
-      )}
     </Field>
   );
 }
 
 /** `userLabel` is the event's own word for the middle role, e.g. "attendee". */
+/**
+ * The colour each role wears, and the pill it wears it in.
+ *
+ * Split out from `RoleBadge` so the editable tag in the People list can be the
+ * same object as the badge everywhere else. A role that is a plain select in
+ * one place and a coloured pill in another reads as two different facts; an
+ * organiser scanning the list should recognise "organiser" by colour before
+ * they have read the word.
+ */
+export const roleTagColor: Record<Role, string> = {
+  admin: 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900',
+  speaker: 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300',
+  user: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
+  viewer: 'bg-stone-200 text-stone-600 dark:bg-stone-700 dark:text-stone-300',
+};
+
+/** The pill itself, without the colour — shared with the "signed out" tag,
+ *  which is not a role and so has no entry above. The `capitalize` that used
+ *  to live here does not: "signed out" is a sentence about somebody, not a
+ *  role's name, and "Signed Out" beside a lowercase "speaker" reads as a
+ *  different kind of thing. Whoever renders a role word adds it. */
+export const roleTagShape = 'rounded-full px-2 py-0.5 text-xs font-semibold';
+
+/** What this event calls the role. `user` is the one an organiser may rename,
+ *  which is why nothing hard-codes "attendee" but this. */
+export const roleWord = (role: Role, userLabel?: string): string =>
+  role === 'user' ? (userLabel ?? 'attendee') : role;
+
 export function RoleBadge({ role, userLabel }: { role: Role; userLabel?: string }) {
-  const style = {
-    admin: 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900',
-    speaker: 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300',
-    user: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
-    viewer: 'bg-stone-200 text-stone-600 dark:bg-stone-700 dark:text-stone-300',
-  }[role];
   return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${style}`}>
-      {role === 'user' ? (userLabel ?? 'attendee') : role}
+    <span className={`${roleTagShape} ${roleTagColor[role]} capitalize`}>
+      {roleWord(role, userLabel)}
     </span>
   );
 }
@@ -211,17 +396,27 @@ export function Chip({
   );
 }
 
+/** Exported for the same reason `secondaryButtonClass` is: the landing page's
+ *  call to action is a router `<Link>`, which owns its own element.
+ *
+ *  Deliberately *not* `inline-flex`, which `secondaryButtonClass` does carry.
+ *  A `<button>` centres its label by the UA's `text-align: center`; make it a
+ *  flex container and the label becomes a flex item at `flex-start` instead,
+ *  which silently left-aligns all eight full-width PrimaryButtons — the gate's
+ *  "Enter schedule" among them. An `<a>` that wants the button's box adds
+ *  `inline-flex items-center` itself, the way `SessionDetail` already adds
+ *  `justify-center` to the one wide SecondaryButton. */
+export const primaryButtonClass =
+  'rounded-lg border border-transparent bg-stone-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-stone-700 disabled:opacity-40 ' +
+  'dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-300';
+
 export function PrimaryButton({
   children,
   className = '',
   ...rest
 }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
-    <button
-      type="button"
-      {...rest}
-      className={`rounded-lg border border-transparent bg-stone-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-stone-700 disabled:opacity-40 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-300 ${className}`}
-    >
+    <button type="button" {...rest} className={`${primaryButtonClass} ${className}`}>
       {children}
     </button>
   );
@@ -593,15 +788,19 @@ export function FieldGroup({
   children,
   className = '',
 }: {
-  title: string;
+  /** Optional: a group whose contents say what they are needs no heading, and
+   *  an empty one would still cost the space above the first field. */
+  title?: string;
   children: ReactNode;
   className?: string;
 }) {
   return (
     <section className={className}>
-      <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-500">
-        {title}
-      </h3>
+      {title && (
+        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-500">
+          {title}
+        </h3>
+      )}
       <FormStack>{children}</FormStack>
     </section>
   );
@@ -644,6 +843,84 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     </ToastContext.Provider>
   );
 }
+
+export interface ConfirmRequest {
+  title: string;
+  /** What will actually happen. Where the thing goes, and whether it can be
+   *  brought back — those are the two questions, and a browser alert could
+   *  answer neither because it cannot hold a sentence worth reading. */
+  body: ReactNode;
+  confirmLabel?: string;
+  /** Red button. Default true: nearly everything that asks is a removal. */
+  danger?: boolean;
+}
+
+const ConfirmContext = createContext<(request: ConfirmRequest) => Promise<boolean>>(() =>
+  Promise.resolve(false),
+);
+
+/**
+ * Ask before doing something that cannot be taken back, in the app's own
+ * voice rather than the browser's.
+ *
+ * `window.confirm` was doing this job and doing it badly: it renders as an
+ * alert from the *browser*, unstyled, untranslatable, one line, and it says
+ * "Delete X?" without ever saying what deleting means here — that a session
+ * goes to the bin and can be restored, while a room or a tag simply goes. It
+ * also freezes the page's JavaScript, which on a phone at a conference is
+ * indistinguishable from a hang.
+ *
+ * Shaped as a promise so it drops straight into the place a `confirm()` call
+ * used to sit, rather than turning every caller into a state machine.
+ */
+export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const [pending, setPending] = useState<{
+    request: ConfirmRequest;
+    settle: (ok: boolean) => void;
+  } | null>(null);
+
+  const ask = useCallback(
+    (request: ConfirmRequest) =>
+      new Promise<boolean>((settle) => setPending({ request, settle })),
+    [],
+  );
+
+  const close = (ok: boolean) => {
+    pending?.settle(ok);
+    setPending(null);
+  };
+
+  const danger = pending?.request.danger !== false;
+  const label = pending?.request.confirmLabel ?? 'Delete';
+
+  return (
+    <ConfirmContext.Provider value={ask}>
+      {children}
+      {pending && (
+        <Modal
+          title={pending.request.title}
+          onClose={() => close(false)}
+          onSubmit={() => close(true)}
+          footer={
+            <>
+              <SecondaryButton onClick={() => close(false)}>Cancel</SecondaryButton>
+              {danger ? (
+                <DangerButton type="submit">{label}</DangerButton>
+              ) : (
+                <PrimaryButton type="submit">{label}</PrimaryButton>
+              )}
+            </>
+          }
+        >
+          <p className="text-sm text-stone-600 dark:text-stone-300">{pending.request.body}</p>
+        </Modal>
+      )}
+    </ConfirmContext.Provider>
+  );
+}
+
+export const useConfirm = (): ((request: ConfirmRequest) => Promise<boolean>) =>
+  useContext(ConfirmContext);
 
 export function EmptyState({ children }: { children: ReactNode }) {
   return <div className="py-16 text-center text-sm text-stone-500 dark:text-stone-400">{children}</div>;

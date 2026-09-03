@@ -1,0 +1,12 @@
+-- A format says what a session is, not how long it runs.
+--
+-- Migration 014 gave `session_formats` a `default_min` the session form
+-- prefilled. It was wrong in the same way the name "type" was wrong: it made
+-- one field answer two questions. A workshop is a workshop whether it runs
+-- ninety minutes or a whole afternoon, and an organiser who picks the format
+-- to describe a session should not have the length changed underneath them as
+-- a side effect. Length belongs to the session, and only to the session.
+--
+-- Dropped rather than left unused: a nullable column nothing reads is a
+-- question the next person has to answer before they can be sure.
+ALTER TABLE session_formats DROP COLUMN default_min;

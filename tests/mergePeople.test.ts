@@ -9,6 +9,7 @@ import {
   seedRoom,
   type Agent,
   type Harness,
+  nextUsername,
 } from './helpers.js';
 
 /** B2 of the identity spec: folding duplicate people into one. */
@@ -57,7 +58,9 @@ describe('merging people', () => {
     expect(res.body.id).toBe(survivorId);
 
     const bundle = await admin.get('/api/e/testconf/bundle').expect(200);
-    expect(bundle.body.people.map((p: { id: number }) => p.id)).toEqual([survivorId]);
+    const ids = bundle.body.people.map((p: { id: number }) => p.id);
+    expect(ids).toContain(survivorId);
+    expect(ids).not.toContain(loserId);
     for (const s of bundle.body.sessions) {
       expect(s.speakers.map((p: { id: number }) => p.id)).toEqual([survivorId]);
     }
@@ -75,7 +78,7 @@ describe('merging people', () => {
     const claimed = await user
       .patch('/api/e/testconf/me/profile')
       .send({ name: 'Ada L.', bio: 'hi' })
-      .expect(201);
+      .expect(200);
 
     await admin
       .post(`/api/e/testconf/people/${survivorId}/merge`)
@@ -91,12 +94,12 @@ describe('merging people', () => {
   });
 
   it('keeps the survivor’s claim when both sides are claimed', async () => {
-    const mine = await user.patch('/api/e/testconf/me/profile').send({ name: 'Ada' }).expect(201);
+    const mine = await user.patch('/api/e/testconf/me/profile').send({ name: 'Ada' }).expect(200);
     const viewer = await actorWithRole(harness, 'testconf', 'viewer-pw');
     const theirs = await viewer
       .patch('/api/e/testconf/me/profile')
       .send({ name: 'Ada 2' })
-      .expect(201);
+      .expect(200);
 
     await admin
       .post(`/api/e/testconf/people/${mine.body.id}/merge`)
@@ -126,11 +129,11 @@ describe('merging people', () => {
   describe('a both-claimed merge re-keys the loser\u2019s work (decided 2026-08-31)', () => {
     it('moves stars, contributions, interest and authorship onto the survivor, deduping overlaps', async () => {
       const dupe = await actorWithRole(harness, 'testconf', 'user-pw');
-      await user.patch('/api/e/testconf/me/profile').send({ name: 'Ada' }).expect(201);
+      await user.patch('/api/e/testconf/me/profile').send({ name: 'Ada' }).expect(200);
       const theirs = await dupe
         .patch('/api/e/testconf/me/profile')
         .send({ name: 'Ada 2' })
-        .expect(201);
+        .expect(200);
       const mine = await user.get('/api/e/testconf/bundle').expect(200);
       const myProfileId = mine.body.people.find((p: { isMine: boolean }) => p.isMine).id as number;
       const { body: userMe } = await user.get('/api/me').expect(200);
@@ -193,7 +196,7 @@ describe('merging people', () => {
       await dupe.delete(`/api/e/testconf/contributions/${note}`).expect(401);
       await user.delete(`/api/e/testconf/contributions/${note}`).expect(204);
       // Re-entering works — the identity was signed out, not destroyed.
-      await dupe.post('/api/e/testconf/auth').send({ password: 'user-pw' }).expect(200);
+      await dupe.post('/api/e/testconf/auth').send({ password: 'user-pw', displayName: nextUsername() }).expect(200);
       const back = (await dupe.get('/api/e/testconf/bundle').expect(200)).body;
       expect(back.starredSessionIds).toEqual([]);
     });
@@ -203,16 +206,16 @@ describe('merging people', () => {
       const dupe = await actorWithRole(harness, 'testconf', 'user-pw');
       await actorWithRole({ ...harness, app: harness.app }, 'otherconf', 'user-pw');
 
-      await user.patch('/api/e/testconf/me/profile').send({ name: 'Ada' }).expect(201);
+      await user.patch('/api/e/testconf/me/profile').send({ name: 'Ada' }).expect(200);
       const theirs = await dupe
         .patch('/api/e/testconf/me/profile')
         .send({ name: 'Ada 2' })
-        .expect(201);
+        .expect(200);
       const mine = (await user.get('/api/e/testconf/bundle').expect(200)).body;
       const myProfileId = mine.people.find((p: { isMine: boolean }) => p.isMine).id as number;
 
       // The losing identity also lives at another event, with a star there.
-      await dupe.post('/api/e/otherconf/auth').send({ password: 'user-pw' }).expect(200);
+      await dupe.post('/api/e/otherconf/auth').send({ password: 'user-pw', displayName: nextUsername() }).expect(200);
       const otherAdmin = await actorWithRole(harness, 'otherconf', 'admin-pw');
       const otherRoom = (
         await otherAdmin.post('/api/e/otherconf/rooms').send({ name: 'Side room' }).expect(201)

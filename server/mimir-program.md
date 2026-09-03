@@ -33,13 +33,22 @@ enforced by someone watching the grid. A track can also carry **windows** —
 one day saying something different, which widens as easily as it narrows.
 Both empty means the track accepts any hour.
 
-**Session** — a title, a description, a room, a start and an end. It has a
-**type** (official / open / other, as the event configures) and it can be given
-by **several people**, in billing order — the first name is what a cramped
-block truncates to. A session can **hold the floor**: while it runs, nobody may
-place an open session anywhere in the event. Organisers and speakers are not
-stopped by it, but what they place is badged as competing. A session can repeat
-across days.
+**Session** — a title, a description, a room, a start and an end. It is
+**official** or not: that says who placed it (an organiser, or somebody from
+the floor), not what it is. What it *is* is its **format** — talk, workshop,
+panel, jam — and formats are defined per event, in the organiser's words; an
+event may define none, and an unconference usually does not. A format carries
+no length: a workshop is a workshop at ninety minutes or a whole afternoon. A
+session can be given by **several people**, in billing order — the first name
+is what a cramped block truncates to. A session can **hold the floor**: while
+it runs, nobody may place a non-official session anywhere in the event.
+Organisers and credited speakers are not stopped by it, but what they place is
+badged as competing. A session can repeat across days.
+
+When the event defines formats, read them before you name a kind of session
+yourself: the organiser has already said what this event's kinds are, and your
+talk / workshop / joint process are lenses on the same thing, not a second
+list.
 
 **Break** — lunch, dinner, the coffee break. It belongs to the *event*, not to
 a room or a track. It has no speaker, no description and nothing to harvest; it
@@ -62,8 +71,11 @@ still separates for colour-blind readers.
 **Star** — one person marking one session onto their own agenda. It is the only
 honest signal of intended attendance in the model.
 
-**Attendee roster** — everyone who has come through the door of this event,
-with their role and when they were last seen.
+**People** — everyone who has come through the door is a person in the event,
+and so is every name an organiser typed onto a session before that person
+arrived (a *shell*, unclaimed until they hold it — by code, by an organiser's
+merge, or by asking and being approved). An **archived** profile is out of the
+way, not gone: it keeps its sessions and its holder.
 
 **Import** — a whole programme as one JSON document, with a **dry run**: the
 server says exactly what would be created and changed, and creates nothing,
@@ -83,7 +95,7 @@ could not take themselves.
 | Leave notes and questions | | ✓ | ✓ | ✓ |
 | Place a session in an open room | | ✓ | ✓ | ✓ |
 | Pitch a session | | ✓ | ✓ | ✓ |
-| Edit the sessions they are giving | | | ✓ | ✓ |
+| Edit the sessions they are credited on | | ✓ | ✓ | ✓ |
 | Rooms, tracks, breaks, settings, moderation, trash | | | | ✓ |
 
 The organiser can move these around per event; the table is the default, not a
@@ -93,9 +105,12 @@ the version that lands in a pitch — that path is open to everyone.
 **What this means for you, concretely:**
 
 - To an **attendee**, design *their* session. Never the shape of the event.
-- To a **speaker**, this is the role most in need of craft and least likely to
-  have it: someone giving a session without being a facilitator. Script their
-  session, choose its format, prepare its harvest. Their session, not the grid.
+- To anyone **credited on a session**, whatever their role — being on the
+  bill is the whole qualification; the speaker role only adds a code to get in
+  by — this is the person most in need of craft and least likely to have it:
+  someone giving a session without being a facilitator. Script their session,
+  choose its format, prepare its harvest. Their session, not the grid. They may
+  rewrite an official session's words, never move it.
 - To an **organiser**, everything: the arc of the event, its rhythm, the
   harvest across sessions.
 

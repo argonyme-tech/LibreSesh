@@ -6,6 +6,426 @@ All notable changes to this project are documented here.
 
 ### Added
 
+- **A session can say what kind of thing it is.** The app had one word for a
+  session — `type`, meaning `official` or `open` — and that says who put it
+  up, not what it is. So nothing anywhere distinguished a five-minute
+  lightning slot from a three-hour hands-on workshop, and a reader had to
+  infer it from the description and the height of the block.
+
+  Sessions now carry a **format**: a talk, a workshop, a panel, a jam. It is
+  the first control in the session form, above the title, because it is the
+  first thing anyone asks about a session. It carries no length — what a
+  session *is* and how long it runs are two different facts, and a workshop
+  is a workshop at ninety minutes or at a whole afternoon. It shows as a
+  coloured badge at the head of the session sheet, and it is named first
+  there too: what the session is comes before who placed it.
+
+  Formats are defined per event in Manage Event → Programme, beside rooms,
+  tracks and tags, because an unconference invents them. Nothing is created
+  by default; the section offers a dozen common ones — keynote, lightning
+  talks, poster session, excursion — as one-click suggestions, and an event
+  that runs none of them can type its own and never see the list again. An
+  organiser who has defined none is told so in the session form rather than
+  shown nothing, which was indistinguishable from the feature not existing.
+  Deleting a format leaves its sessions where they are, without a kind.
+
+  Its own table rather than a reserved tag: a session wears many tags and
+  exactly one format, and a uniqueness rule the tag UI cannot express is a
+  rule that gets broken. Clones carry formats over with the rooms and tags,
+  the export carries them, and an import document declares them by name the
+  way it already declares rooms and tracks. Migrations 014 and 015.
+
+  The official/open control moved and was renamed in the same pass. It is
+  **Placement** now — a second field called Type would have been
+  indistinguishable from the format — and it sits at the top of the form
+  beside it rather than at the bottom under Extras. Official is the default
+  and the one choice that locks a session against whoever put it up; an
+  organiser who never scrolled that far made everything official without
+  ever being asked.
+
+### Fixed
+
+- **Starring a session moved its title, and a list card showed two stars.** On
+  the grid, the star and the interest count sat in the row above the title, so
+  starring a session pushed its title down a line — two identical blocks side
+  by side read differently because of something that is not about either
+  session. On a list card there were two stars for one fact: a ☆/★ toggle
+  beside the title and a separate "★ 12" at the bottom, which reads as two
+  different things about starring and leaves you working out which one is
+  yours.
+
+  Both surfaces now draw **one star and one number**, in the bottom-right
+  corner. On the grid it is out of the flow entirely, so nothing above it moves
+  when it appears — and it stays display-only, because a block's pointer
+  handling is drag-sensitive and the resize handle is directly beneath it;
+  starring from the grid is still done in the session sheet. On a list card the
+  tally *is* the control, so the star you press and the count you read are one
+  object.
+
+- **A speaker could not edit their own session.** An organiser schedules a talk
+  and types the speaker's name onto it; that person arrives at the gate as an
+  ordinary attendee — the role almost every speaker holds, since the speaker
+  role is only handed out by a code somebody has to remember to send — and the
+  session was read-only to them. Three separate rules had to agree before it
+  worked, and none of them did:
+
+  - the right to edit demanded the billing **and** the speaker role. Being
+    credited is the qualification now, whatever role the person holds, for one
+    of five co-hosts as much as for the only name, and on an official session
+    as much as an open one — the official one is precisely the session an
+    organiser typed their name onto;
+  - editing was gated on the capability to *create* sessions, so an event that
+    stops attendees adding their own — a curated conference, the ordinary case
+    — also stopped its speakers fixing a typo in the talk it had scheduled for
+    them;
+  - and every placement check asked which fields the request carried rather
+    than which had changed. The form posts the whole session on every save, so
+    a speaker correcting a description was told only organisers can move
+    official sessions, about a save that moved nothing.
+
+  What has not changed: a speaker still cannot move an official session or
+  delete it. The form now says so above the fields and disables them, rather
+  than refusing after Save. The Delete button is no longer offered to someone
+  who is billed on a session but did not create it.
+
+### Changed
+
+- **The People table no longer badges an outstanding speaker code.** A small
+  amber `code` sat beside the name of anyone whose speaker phrase had been
+  minted and never used. It is a fact about one person, read down a column of
+  everybody, and it says nothing about who they are or what they may do —
+  which is what every other cell on that row is for. Their profile page still
+  says it, where the code is minted and revoked, and says which of the three
+  states it is in rather than flagging only one.
+
+- **Archiving replaced deleting in the People list.** The row menu offered
+  both, and Delete was the wrong tool in every case it was reached for: it
+  refused outright for anybody holding their own profile — which is most of a
+  live event — and where it did go through it stripped the name off every
+  session that person was credited on, with no way back. Archiving does the
+  same tidying up and keeps all of that: the profile leaves the People list
+  and the speaker picker, including the **All** segment, and it keeps its
+  sessions, its role and its way in. Either an organiser or the person
+  themselves can take it back out.
+
+  **And entering the event takes it out by itself.** An organiser tidying up
+  at the end of a day cannot tell a profile that is finished with from one
+  whose person is back tomorrow — only that person can, and the way they say
+  it is by turning up. So the gate un-archives whoever comes through it, the
+  change is announced like any other, and neither side has to remember that a
+  filing decision was ever made. Only the gate does this: archiving signs
+  nobody out, so somebody still reading from before stays filed until they
+  next come in.
+
+  Delete is gone from the menu, and there is no longer any call in the app
+  that deletes a profile. Duplicates are still folded together with **Merge**,
+  which is what Delete was usually being used as a blunt version of.
+
+- **The People table gives its width back to the names in it.** Manage Event →
+  People drew six fixed columns on every row: name, username, UID, role, last
+  seen, and an actions column wide enough for an `Open` button and a `⋯` button
+  side by side. Two of those columns — the UID and the last seen time — answer
+  questions an organiser asks a handful of times an event, and they were
+  `hidden sm:block`, which is that admission made silently: on a phone the
+  table simply had different columns and there was no way to disagree with it
+  in either direction. What was squeezed for all this was the name, the one
+  thing every row is looked up by.
+
+  A **Columns** button beside the search box now says which columns the table
+  shows. A desktop starts with all five, as it always did; a phone starts with
+  **Name, Username, Role and the actions menu**, which is the same call the
+  breakpoint was making silently — the difference is that it is a default
+  rather than a law, and disagreeing with it sticks at both sizes. The choice
+  is remembered per browser, because it is a preference about reading a table
+  rather than a fact about the event. Ordering by a column that is switched
+  off comes home to the name, so the rows are never left in an arrangement
+  with nothing on screen to explain or undo it.
+
+  **Name and username now share what is left, equally.** They are the two
+  things a person is looked up by, and the username was in a fixed narrow
+  column while the name took every pixel that was going — `@margarethami…` is
+  not a lookup. And where the columns no longer fit, **the table scrolls
+  sideways rather than squeeze**, which is the bargain the grid already makes
+  on a phone: a table that fits 375 pixels by giving every column sixty of
+  them is not one anybody can read. The header scrolls with the rows, so a
+  column is never read under the wrong heading, and the width it scrolls to is
+  computed from the columns actually on — so a desktop, where they all fit,
+  never scrolls at all.
+
+  **Open left the row and became "Edit profile" in the menu**, which is the
+  name it deserved — it is what an organiser goes there to do. The row loses
+  nothing by it: the name and the username are now links to the same profile,
+  which is where a finger was aiming anyway. What is left in the actions column
+  is one icon-sized button under a heading that says **Edit**, drawn rather
+  than set as the text `⋯` so it keeps one optical size across font stacks
+  like the rest of the icon set. The columns between Role and the menu closed
+  up with it.
+
+- **The schedule no longer labels sessions "open", and marks nothing by
+  default.** A block outside the published programme was badged `open session`
+  on the grid and `open` in the list, which read as *open to join* — something
+  every session on a schedule is. The word meant to mark the exception
+  described the rule.
+
+  The grid and the list now say nothing about placement unless an organiser
+  asks. **Manage Event → Settings** has a switch that puts a small
+  **Official** on blocks and cards, for the event that really does mix a
+  published programme with a floor attendees book themselves. Marking the
+  programme instead of the exception is the way round that works at both ends:
+  where everything is official the badge is redundant, and on an open floor it
+  was noise. The dashed border still tells them apart, and a session's own
+  panel always says which it is.
+
+  In the session form the control is **Placement**, offering **Official** and
+  **Non-official: allow parallel sessions**, and its help text is rewritten in
+  plain words — what each one means for who can edit and move the session, and
+  why the second says what it says. Stored values are unchanged.
+
+- **A session can run longer than three hours, and for any number of minutes.**
+  The duration picker offered seven fixed choices ending at 180, and the server
+  refused anything over 480 — so a full-day excursion, an all-afternoon poster
+  hall and a hackathon were unplaceable, and the workaround was to chop one
+  thing into three blocks that lied about what was happening. The list now runs
+  to eight hours and ends in **Other…**, which takes any multiple of five up to
+  a day; a day is the real limit, because a session already has to start and
+  end on one. Editing a session whose length is not on the list opens straight
+  into that field — before, the select silently showed the first option
+  instead, so saving anything else would have quietly shortened the session to
+  15 minutes. Both dialogs that place a session share one list now, so they
+  cannot disagree about how long one may run.
+
+- **Deleting asks in the app's own voice, and says where things go.** Every
+  confirmation was a `window.confirm`: an alert drawn by the browser rather
+  than the app, one line, unstyled, and it freezes the page while it is up,
+  which on a phone in a hallway is indistinguishable from a hang. Worse, it
+  could not answer the question a person deleting something actually has.
+  "Delete X?" never said that a session goes to the bin and an organiser can
+  put it back, while a room, a tag, a track, a profile or a pitch simply
+  goes. Each dialog now says which of those two it is, and the archive
+  prompt no longer wears a red button for something that deletes nothing.
+
+- **A link no longer has to be on the web.** The rule was an allow-list of
+  two schemes, http and https, which refused a session streamed over IPFS
+  or Swarm, a magnet link, an RTMP feed from a room's own camera, and
+  everything anyone might invent next. It is a deny-list now: anything that
+  parses as a URI is a link, except the handful of schemes that run
+  something on the reader's machine rather than fetching something —
+  `javascript:`, `data:`, `vbscript:`, `blob:`, `file:` and friends.
+
+  One rule, in `shared/links.ts`, used by the stream links, profile links,
+  contribution links and the markdown in descriptions and bios, so a link
+  written in a bio and a link typed into a field cannot disagree about what
+  is allowed. It leans on the URL parser rather than matching text, which
+  is what keeps `JavaScript:` and a leading space from getting through.
+
+### Added
+
+- **A session can carry more than one stream link.** One column held one
+  link, so the main camera fitted and the room's own feed, the interpreted
+  channel or a mirror somebody set up went into the description or nowhere.
+  A session now holds up to six labelled links, in the shape profiles have
+  used for theirs, and the session sheet lists them by name. A single
+  unlabelled one still reads "Watch the livestream", as it always did.
+
+  Migration 012 moves the existing link into the list and drops the old
+  column. `SessionDto.livestreamUrl` is gone, replaced by `livestreams`.
+
+- **The end of a day's list offers the next one.** Reaching the bottom is
+  the moment a reader asks what happens tomorrow, and the answer was a day
+  picker back at the top of the page. There is a button there now, naming
+  the day it goes to. Only under a day that had something in it: on an
+  empty day the page already says so, and a lone button under nothing
+  reads as the day's entire content.
+
+- **A role is the badge everyone already knows, with a pencil in it.** In
+  the People list the role was the one thing on the row rendered as a bare
+  `<select>`, so the column an organiser scans to answer "who runs this
+  event" was four identical grey boxes whose text had to be read one at a
+  time — while the header chip, the merge dialog and the invite page all
+  showed the same fact as a coloured badge. It is that badge now, in the
+  same colours, with a small pencil inside the pill and a menu that spells
+  out what each role may do rather than listing four bare words. The colour
+  map lives in one place, so the badge and the control cannot drift apart.
+
+- **A role can be changed from the profile page.** An organiser who opened
+  a profile usually came for the reason the profile was worth opening —
+  the role is wrong — and the only place to change it was the row they had
+  just left. The role now sits under the name, organisers only, as the same
+  editable badge; a profile nobody holds shows why it has none instead.
+
+- **A profile can be archived instead of deleted.** The profiles that pile
+  up at a real event are the ones made while testing the room, a shell typed
+  twice, a walk-in who never came back — and deleting was the only tidy-up
+  there was. It cannot be undone, it strips the name off every session the
+  profile was credited on, and it refuses outright for anyone who holds their
+  own profile, which is exactly the case an organiser most wants tidied.
+
+  An archived profile keeps its sessions, its bio, its role, its speaker code
+  and whoever holds it. All it loses is its place in the lists: every segment
+  of Manage → People except the new **Archived** one drops it, and the speaker
+  picker stops offering it. Crediting by name still finds it rather than
+  making a twin.
+
+  **Whoever holds it can take it back out.** They still have their cookie and
+  their role, so an archived profile tells its holder what happened and offers
+  them the way back — no organiser needed. That is the difference from
+  deleting, and it is why an organiser can file a profile away without having
+  to be sure the person is gone for good.
+
+  The row's three action buttons became a menu behind ⋯ to make room for the
+  fourth, keeping Open in the row; the actions column got narrower doing it
+  and the name column took the space.
+
+- **Every column of the People table sorts, both ways.** One button offered
+  two of the five orders — by name, or by last seen — so "who has no
+  username yet", "who is still only a viewer" and "whose device is this
+  UID" could only be answered by reading the whole list. Each heading is
+  now the control that orders by it, with an arrow on the one in force.
+
+  A column opens the way that column is usually asked rather than always
+  ascending: last seen starts at the most recent, role starts at the
+  organisers, names start at A. The second click reverses it. Rows with
+  nothing in the column — no username, no UID, never seen — stay at the
+  bottom either way, and full name breaks every tie, so a role change
+  somewhere else in the event cannot shuffle rows that did not change.
+
+- **The profile page says whether a speaker code was ever generated.**
+  Speaker access knew only about a phrase minted in that page's own
+  lifetime, so an organiser returning the next day was offered "Generate
+  phrase" whether they had already sent one or not — and the only way to
+  find out was to mint a second, which silently invalidates the first. The
+  section now reads the code's state off the person: **code unused** for a
+  phrase still sitting in an unread message, **code used** once it has been
+  typed at the gate, and nothing when none exists, with Revoke switched off
+  rather than hidden. `PersonDto.codePending` became `codeState`, three
+  states, because the boolean could answer "are they still waiting?" but
+  never "did I ever send them one?".
+
+## [0.2.3] — 2026-09-02
+
+### Added
+
+- **Everyone who enters an event is a person there.** A `people` row used
+  to appear only when someone edited their profile, was typed onto a
+  session, or was added by an organiser — so a newcomer who had passed the
+  gate was in neither the speaker picker nor the merge dialog, and typing
+  their own name on a session bred an unclaimed twin. The gate now makes
+  the row the moment a username is claimed (migration 010 backfills every
+  existing entrant), and a person has two names with two jobs: a
+  **username**, typed at the gate, unique in the event, on posts and in
+  the header; and a **full name**, credited on sessions, free to repeat.
+  Two "Alex Chen"s can both be here; the merge tool is for two rows that
+  are one human, not for namesakes.
+
+  The username is now required the first time in — nothing like
+  `attendee_x7f2k` is generated any more — and a device re-entering an
+  event gets its own name back from the new `GET /e/:slug/gate`. Arriving
+  under the name of a profile an organiser typed onto a talk before you
+  came no longer adopts it silently: the gate asks *"There is a speaker
+  profile here called Ada Lovelace, on 2 sessions. Is that you?"* and
+  takes it only on a yes. Spec:
+  `_planning/specs/self-as-speaker-and-merge-ux.md`.
+
+- **The speaker field offers you.** Your own row is pinned to the top of
+  the picker as "· you", claimed rows show `@username` so two namesakes can
+  be told apart, and a new session or pitch by anyone but an organiser
+  starts credited to its author, one click to remove. A viewer's person is
+  visible like anyone's — they star and post — but is not on offer as a
+  speaker (`PersonDto.creditable`), and the server refuses a non-organiser
+  crediting one. Organisers may still credit anyone.
+
+- **You can ask for the profile an organiser left for you.** An organiser
+  adds *Marcel Jackisch* as a speaker before he arrives; Marcel enters as
+  `marcel`, gets a profile of his own, and the shell sits there with his
+  talks on it. Joining the two took a minted speaker phrase, an organiser
+  merging by hand, or the gate happening to offer the shell because the
+  username typed matched its full name — every route needing somebody else
+  to act first, or a coincidence.
+
+  Now the person asks. An unclaimed profile carries a "This is me" button,
+  and the request waits in a queue above the People list until an organiser
+  agrees. **It stops at asking on purpose**: a shell is usually credited on
+  sessions, and holding the profile a session credits is the right to
+  rewrite that talk, so left unguarded this would have been the cheapest
+  way into somebody else's keynote. Approving runs exactly the merge an
+  organiser would have run by hand, with the shell surviving so it keeps
+  its name and its sessions, and everyone else waiting on that profile is
+  told they were not chosen. Declining says so rather than letting the
+  request vanish. Both are audited.
+
+- **A profile page goes back where you opened it from.** Every profile sent
+  you to the schedule, so an organiser working through Manage → People had
+  to navigate back in for each person they looked at. The link now names
+  where you came from, and an organiser who arrived by deep link gets
+  "Manage → People" outright. The heading is the full name a session is
+  credited to, with the `@username` the room calls them beneath it; the
+  `ID: 00054` under the name has gone, since the profile's row id is in the
+  address bar and needed nowhere else.
+
+- **A merge dialog that shows who is who.** Merging is the only thing an
+  organiser cannot undo, and it asked for the decision through a bare
+  `<select>` of names — two people called Ada Lovelace look identical in a
+  dropdown, and one of them may be a real person with three talks and a
+  device in the room. The dialog now leads with the rows that look like the
+  same human and says why ("same name", "initials match", "same surname"),
+  then a search over name, username and UID, then everyone else; every row
+  carries the same facts the People list shows.
+
+  Picking somebody does not merge them. It shows the two side by side and
+  the sentence for *this* merge: sessions move and nothing else; or the
+  other profile's holder takes this one over; or — the case that costs the
+  most, and the one that was never spelled out — everything that person
+  did in the event moves across and their device is signed out of it.
+  Merge is also reachable from each row of the People list now, not only
+  from a profile page.
+
+- **Manage → People is one list, and hands out roles.** It was two stacked
+  lists — speaker profiles above, an attendance list of everyone who had
+  entered below — which asked an organiser to hold "profile" and "person
+  who is here" apart as separate ideas, and put the second a scroll away.
+  Now that entering an event creates a profile they are the same list: one
+  dense row per person carrying full name, `@username`, UID, one badge,
+  session count and last seen, with segments (All, Arrived, Unclaimed,
+  Organisers, Speakers) that carry counts, a search box over name,
+  username and UID, and an order toggle between name and last seen.
+
+  Each row has a **role control**: `PUT /people/:id/role` hands somebody
+  viewer, attendee, speaker or organiser, audited as `role_set`. Before
+  this the only way to change a role was to tell someone a different
+  password and ask them to enter again, which is not something you can do
+  to a person already in the room. It refuses to demote the last organiser
+  — an event nobody can administer has no way back — which is the same
+  reasoning the permission matrix uses to force admin on everywhere.
+
+  `GET /attendees` and its `AttendeeDto` are gone, replaced by three
+  organiser-only fields on the person: `lastSeenAt`, `joinedAt` and
+  `sessionCount`. The `ID: 00054` beside a name goes too — it was the
+  per-event row id, which is already in the profile URL; the UID is the
+  identifier that means anything across the audit log. Delete is offered
+  only for a profile nobody holds.
+
+### Fixed
+
+- **A change to one person no longer rewrites what everyone else sees.**
+  `person.created` / `person.updated` frames go to every subscriber, but
+  `isMine` and the organiser-only facts are computed for whoever caused
+  the change — so an organiser editing a bio told the owner the profile
+  was not theirs, and any edit blanked the role badges on another
+  organiser's People list until they reloaded. The wire frame now never
+  carries the private facts (the reply to the caller does, when they are
+  an organiser), and the client keeps what it had worked out for itself
+  about a row it already holds.
+
+### Added
+
+- **A capability for crediting other people.** `session.credit_others`
+  joins the permission matrix, open by default for attendees and speakers:
+  the app leans towards rooms where people trust each other and invite
+  co-hosts. Switched off, the speaker field is a toggle between you and
+  nobody, no free text, and the server holds you to it on sessions and
+  pitches alike — except that editing your own talk keeps the co-host an
+  organiser added. Organisers are never held to it.
+
 - **A session can be given by more than one person.** `sessions.speaker_id`
   held exactly one, which is wrong for most of what an unconference actually
   runs: a panel, a pair, a workshop with two facilitators, a talk and its
@@ -547,7 +967,30 @@ All notable changes to this project are documented here.
   duplicate, a claim on the duplicate moves to the survivor, and the duplicate
   is soft-deleted. Audited; not undoable via /trash, hence admin-only.
 
+- **A landing page at `/`.** The root said nothing about what LibreSesh is —
+  that copy lived in the About dialog, behind the "?" you cannot reach until
+  you are inside an event and past its password, so the one page a stranger is
+  guaranteed to see was the one page that explained nothing. `/` now answers
+  what this is, the licence, and what to do if you are holding an event link.
+  The list of every event moved to `/events`, which also stops a public
+  instance enumerating every event on the box to anyone who loads the root.
+
+  Its hero is markup rather than the design draft's screenshot: the app has a
+  light theme and a dark one, so a single PNG is wrong half the time, and a
+  pair goes stale the first time a card changes because nothing renders it.
+  `BoardPreview` is built from the classes `ListView` uses, and is
+  `aria-hidden` behind a real caption — the sessions in it are not real.
+
 ### Changed
+
+- **The star is an icon in the corner, not a row of text.** Opening a session
+  put "Add to my agenda" across the top of the panel, above the description and
+  the notes that are what somebody opened it for — a full-width button spelling
+  out what a hollow star already says. It is now a 36px star under the sheet's
+  close button, in the same column and the same shape as the expand and close
+  controls, with the words kept in the tooltip and the accessible label. The
+  full-page view drops it from the sticky rail and puts it in the same
+  top-right corner, so it is in one place wherever you meet a session.
 
 - **One colour control, and it is a circle.** Tags, tracks and rooms each drew
   the browser's own `<input type="color">` — a rectangle every browser paints
@@ -668,6 +1111,13 @@ All notable changes to this project are documented here.
   instance one; the README gained a section on the same distinction.
 
 ### Fixed
+
+- **Arrange is gone from the list view.** `arrange` is read by the calendar
+  grid and by nothing else, so in the list the button toggled a mode with no
+  effect — it lit up, said "Done arranging", and changed nothing under it.
+  Switching away from the grid now also turns the mode off, rather than leaving
+  it open behind a button that is no longer on screen. Editing from the list is
+  unaffected: it never went through Arrange.
 
 - **Number fields no longer accept nonsense.** Every typed number in the app
   was a `type="number"` input, which enforces `min` and `max` on the spinner
@@ -1061,6 +1511,15 @@ All notable changes to this project are documented here.
   treatment was already avoiding. The move also puts them outside the part of
   the header that folds away as you scroll into a day — Arrange in particular
   is a thing you reach for mid-scroll, and it used to fold out from under you.
+
+- **The logo means home, and home is `/`.** The logo in the schedule, agenda,
+  search and event-list headers used to be labelled "All events" and open the
+  list; it goes to the landing page now, as does the catch-all for a URL that
+  no longer resolves — most often a stale or mistyped event link, which the
+  page explaining what to do with an event link answers better than a list of
+  events that are not yours. The "back to all events" links in the error
+  states and the back links on Import and New event are about the list, not
+  about home, and still point at `/events`.
 
 
 ## [0.2.0] — 2026-08-30

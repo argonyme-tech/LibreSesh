@@ -36,6 +36,14 @@ export const CAPABILITIES = [
     defaults: ['user', 'speaker', 'admin'],
   },
   {
+    // Open by default: the app leans towards rooms where people trust each
+    // other and invite co-hosts. Off, and a person can credit only
+    // themselves — the field is a toggle between "me" and "nobody".
+    id: 'session.credit_others',
+    label: 'Credit other people as speakers on sessions and pitches',
+    defaults: ['user', 'speaker', 'admin'],
+  },
+  {
     id: 'proposal.create',
     label: 'Pitch a session to the proposal board',
     defaults: ['user', 'speaker', 'admin'],

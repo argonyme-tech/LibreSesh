@@ -5,10 +5,17 @@ import type { Db, EventRow, RoomRow, SessionRow, TrackRow } from './db.js';
 import { badRequest, conflict, forbidden, notFound } from './errors.js';
 import { durationMinutes, localDate, localMinuteOfDay } from './shared/time.js';
 import { trackWindows, windowLabel, windowOn } from './trackHours.js';
+import {
+  MAX_DURATION_MINUTES,
+  MIN_DURATION_MINUTES,
+  SNAP_MINUTES,
+} from './shared/sessionLimits.js';
 
-export const SNAP_MINUTES = 5;
-export const MIN_DURATION_MINUTES = 5;
-export const MAX_DURATION_MINUTES = 480;
+export {
+  MAX_DURATION_MINUTES,
+  MIN_DURATION_MINUTES,
+  SNAP_MINUTES,
+} from './shared/sessionLimits.js';
 
 export interface TimeWindow {
   startsAt: Date;
@@ -45,6 +52,17 @@ export function assertTagsBelong(db: Db, eventId: number, tagIds: number[]): voi
     )
     .all(eventId, ...tagIds);
   if (found.length !== new Set(tagIds).size) throw badRequest('Unknown tag');
+}
+
+/** Reject a format id from another event, or one that has been deleted. */
+export function assertFormatBelongs(db: Db, eventId: number, formatId: number | null): void {
+  if (formatId === null) return;
+  const found = db
+    .prepare<[number, number], { id: number }>(
+      'SELECT id FROM session_formats WHERE event_id = ? AND id = ? AND deleted_at IS NULL',
+    )
+    .get(eventId, formatId);
+  if (!found) throw badRequest('Unknown format');
 }
 
 /** Reject a track id from another event, or one that has been deleted. */
@@ -301,7 +319,16 @@ export function assertMayMutate(
   speaksHere = false,
 ): void {
   if (role === 'admin') return;
-  if (speaksHere && atLeast(role, 'speaker')) return;
+  // Being on the bill is the qualification, whatever role the person holds.
+  // This used to demand `atLeast(role, 'speaker')` as well, which locked a
+  // speaker out of their own talk for the ordinary reason that they came in
+  // through the gate as an attendee — the role most speakers hold, since the
+  // speaker role is only handed out by a code an organiser has to remember to
+  // send. One of five co-hosts is as credited as the only one, and an official
+  // session is exactly the case that matters: it is the one an organiser typed
+  // their name onto. What a non-organiser still may not do is *move* it; the
+  // PATCH route holds the slot separately.
+  if (speaksHere) return;
   if (!can(matrix, role, 'session.edit_own')) throw forbidden('You cannot change sessions');
   if (session.created_by !== identityId) throw forbidden('That is not your session');
   if (session.type !== 'open') throw forbidden('Only organisers can change official sessions');

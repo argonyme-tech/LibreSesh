@@ -43,7 +43,7 @@ describe('proposal pool', () => {
       interestCount: 0,
       interested: false,
     });
-    expect(res.body.createdByName).toMatch(/^attendee_/);
+    expect(res.body.createdByName).toMatch(/^tester_/);
   });
 
   it('shows up in the bundle', async () => {

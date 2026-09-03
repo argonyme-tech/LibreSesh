@@ -61,9 +61,11 @@ export const PRE_SQUASH = [
   '016_audit_retention.sql',
 ] as const;
 
-/** Ours, renumbered when their series restarted at 001. Same file, same SQL. */
+/** Ours. It kept its number in the end: upstream's own 010–016 landed two
+ *  days after the squash, so 017 is the next free one again. The map stays
+ *  because the bookkeeping row still has to be recognised as ours. */
 export const RENAMED: ReadonlyMap<string, string> = new Map([
-  ['017_proposal_phase.sql', '010_proposal_phase.sql'],
+  ['017_proposal_phase.sql', '017_proposal_phase.sql'],
 ]);
 
 /**

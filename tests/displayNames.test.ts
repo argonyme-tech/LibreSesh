@@ -6,6 +6,7 @@ import {
   seedRoom,
   type Agent,
   type Harness,
+  nextUsername,
 } from './helpers.js';
 
 /** Mint an identity and enter `slug` under a chosen name. */
@@ -61,7 +62,7 @@ describe('display names are unique per event', () => {
 
   it('lets you keep your own name when you re-enter', async () => {
     const { agent } = await enterAs(harness, 'confone', 'Ada');
-    await agent.post('/api/e/confone/auth').send({ password: 'admin-pw' }).expect(200);
+    await agent.post('/api/e/confone/auth').send({ password: 'admin-pw', displayName: nextUsername() }).expect(200);
     await agent
       .post('/api/e/confone/auth')
       .send({ password: 'admin-pw', displayName: 'Ada' })

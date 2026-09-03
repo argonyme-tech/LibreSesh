@@ -49,6 +49,18 @@ export function place(session: SessionDto, timezone: string): Placed {
 
 /** Day-tab label: "Today"/"Tomorrow"/weekday, plus a short date. `date` and
  *  `today` are already local to the event, so this is pure string work. */
+/**
+ * The day after `day` within the event's range, or null when there is none.
+ *
+ * Reaching the end of a day's list is the moment a reader asks what happens
+ * next, so the list offers it there rather than sending them back to the
+ * picker at the top of the page.
+ */
+export const dayAfter = (days: readonly string[], day: string): string | null => {
+  const at = days.indexOf(day);
+  return at === -1 ? null : (days[at + 1] ?? null);
+};
+
 export function dayLabel(date: string, today: string): { top: string; sub: string } {
   const d = new Date(`${date}T12:00:00Z`);
   const sub = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });

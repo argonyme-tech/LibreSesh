@@ -75,26 +75,16 @@ describe('readiness', () => {
       expect(keys(b)).toContain('speakers-cannot-edit');
     });
 
-    it('catches a claimed profile whose role is still below speaker', () => {
-      const b = bundle({
-        sessions: [session(1, '2026-09-01')],
-        people: [person(1, { claimed: true, role: 'user' })],
-      });
-      const f = readiness(b).find((x) => x.key === 'speakers-cannot-edit');
-      expect(f).toBeDefined();
-      expect(f!.soWhat).toContain('there is no button');
-    });
-
-    it('catches a claimed holder whose role is viewer, or gone', () => {
-      // Both are reachable: re-entering with the viewer password downgrades
-      // the role; signing out deletes the roles row and keeps the claim. The
-      // server refuses the edit in both; the first predicate said "fine".
-      for (const role of ['viewer', null] as const) {
+    it('leaves a claimed holder alone whatever their role, as the server does', () => {
+      // Upstream 486077a: being on the bill is the whole qualification. A
+      // holder who came in as an attendee, or a viewer, or whose roles row is
+      // gone, can still edit the session they are credited on.
+      for (const role of ['user', 'viewer', null] as const) {
         const b = bundle({
           sessions: [session(1, '2026-09-01')],
           people: [person(1, { claimed: true, role })],
         });
-        expect(keys(b), `role ${String(role)}`).toContain('speakers-cannot-edit');
+        expect(keys(b), `role ${String(role)}`).not.toContain('speakers-cannot-edit');
       }
     });
 

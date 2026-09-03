@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LINK_RULE, safeLink } from './shared/links.js';
 import { badRequest } from './errors.js';
 import { isValidTimezone } from './shared/time.js';
 
@@ -101,6 +102,11 @@ export const renameSchema = z.object({ displayName: displayNameSchema });
 
 export const linkPhraseSchema = z.object({ phrase: z.string().min(1).max(120) });
 
+/** Give the holder of a profile a different role at this event. */
+export const personRoleSchema = z.object({
+  role: z.enum(['viewer', 'user', 'speaker', 'admin']),
+});
+
 /** Merge duplicate people: `from` is folded into the profile in the URL. */
 export const mergePersonSchema = z.object({ from: z.number().int().positive() });
 
@@ -148,16 +154,23 @@ export const cloneEventSchema = z
   .superRefine(distinctPasswordsRefinement);
 
 /** Demo instances hand out a role on a click; there is no password to check. */
+/** Answering the gate's "is that you?": adopt the unclaimed profile that
+ *  carries your name instead of starting a fresh one. */
+const claimProfileSchema = z.boolean().optional();
+
 export const demoAuthSchema = z.object({
   role: z.enum(['viewer', 'user', 'admin']),
   displayName: displayNameSchema.optional(),
+  claimProfile: claimProfileSchema,
 });
 
 export const authSchema = z.object({
   password: z.string().min(1).max(200),
-  /** The name to go by inside this event. Optional: without one you keep the
-   *  name you already claimed here, or are seeded from your global default. */
+  /** The username to go by inside this event. Optional only for a device
+   *  that already holds one here (re-entering after a logout); a first entry
+   *  without one is refused with `name_required`. */
   displayName: displayNameSchema.optional(),
+  claimProfile: claimProfileSchema,
 });
 
 /** One day keeping different hours from its track's. */
@@ -252,21 +265,26 @@ export const tagSchema = z.object({
 });
 export const tagPatchSchema = tagSchema.partial();
 
-/** An optional http(s) URL. '' is allowed and means "not set" — that is how a
- *  livestream link is cleared. Same protocol rules as contribution links. */
-const optionalHttpUrl = z
-  .string()
-  .trim()
-  .max(2000)
-  .refine((raw) => {
-    if (raw === '') return true;
-    try {
-      const parsed = new URL(raw);
-      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-    } catch {
-      return false;
-    }
-  }, 'Only http and https links');
+/**
+ * A format — what kind of session it is. Exactly a tag's shape: a name and a
+ * colour. Deliberately no length; see migration 015.
+ */
+export const formatSchema = z.object({
+  name: trimmed(40),
+  color: colorSchema.optional(),
+});
+export const formatPatchSchema = formatSchema.partial();
+
+/** A labelled link. Profiles carry a handful; so does a session, one per
+ *  stream. Same rules as a contribution's link — see `safeLink`. */
+const linkSchema = z.object({
+  label: trimmed(60),
+  url: z
+    .string()
+    .trim()
+    .max(2000)
+    .refine((raw) => safeLink(raw) !== null, LINK_RULE),
+});
 
 /**
  * A break — lunch, dinner, coffee. Local minutes of day rather than instants,
@@ -314,11 +332,16 @@ export const sessionSchema = z.object({
     .array(z.union([z.number().int().positive(), trimmed(120)]))
     .max(12)
     .optional(),
-  livestreamUrl: optionalHttpUrl.optional(),
+  /** A session may be streamed more than once — a main camera, a room feed,
+   *  an interpreted channel. `[]` clears them. */
+  livestreams: z.array(linkSchema).max(6).optional(),
   startsAt: isoInstantSchema,
   endsAt: isoInstantSchema,
   tagIds: z.array(z.number().int().positive()).max(20).optional(),
   trackId: z.number().int().positive().nullable().optional(),
+  /** What kind of session it is. `null` clears it; absent leaves it alone on
+   *  a PATCH, the way the track does. */
+  formatId: z.number().int().positive().nullable().optional(),
 });
 export const sessionPatchSchema = sessionSchema.partial().extend({
   expectedUpdatedAt: isoInstantSchema.optional(),
@@ -336,15 +359,8 @@ export const contributionSchema = z
         ctx.addIssue({ code: 'custom', path: ['url'], message: 'Links need a URL' });
         return;
       }
-      let parsed: URL;
-      try {
-        parsed = new URL(v.url);
-      } catch {
-        ctx.addIssue({ code: 'custom', path: ['url'], message: 'That is not a valid URL' });
-        return;
-      }
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        ctx.addIssue({ code: 'custom', path: ['url'], message: 'Only http and https links' });
+      if (safeLink(v.url) === null) {
+        ctx.addIssue({ code: 'custom', path: ['url'], message: LINK_RULE });
       }
     } else if (v.url) {
       ctx.addIssue({ code: 'custom', path: ['url'], message: 'Only links may carry a URL' });
@@ -413,22 +429,6 @@ export const placeSchema = z.object({
   type: z.enum(['official', 'open']).optional(),
 });
 
-/** Profile links reuse the contribution URL rules: http(s) only. */
-const linkSchema = z.object({
-  label: trimmed(60),
-  url: z
-    .string()
-    .max(2000)
-    .refine((raw) => {
-      try {
-        const parsed = new URL(raw);
-        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-      } catch {
-        return false;
-      }
-    }, 'Only http and https links'),
-});
-
 export const personSchema = z.object({
   name: trimmed(120),
   bio: optionalTrimmed(2000).optional(),
@@ -460,6 +460,7 @@ export const settingsSchema = z
     adminPassword: passwordSchema.optional(),
     userRoleLabel: roleLabelSchema.optional(),
     auditKeep: auditKeepSchema.optional(),
+    showOfficialBadge: z.boolean().optional(),
     archived: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'Nothing to update' })

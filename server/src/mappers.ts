@@ -1,16 +1,18 @@
 import type {
   BreakDto,
+  CodeState,
   ContributionDto,
   Role,
   EventDto,
   EventSummary,
   PersonDto,
-  PersonLink,
+  LabelledLink,
   PersonRef,
   ProposalDto,
   RoomDto,
   SessionDto,
   TagDto,
+  FormatDto,
   TrackDto,
   TrackWindowDto,
 } from './shared/types.js';
@@ -24,6 +26,7 @@ import type {
   RoomRow,
   SessionRow,
   TagRow,
+  FormatRow,
   TrackRow,
 } from './db.js';
 
@@ -46,6 +49,7 @@ export const toEventDto = (e: EventRow): EventDto => ({
   dayEndMin: e.day_end_min,
   userRoleLabel: e.user_role_label,
   auditKeep: e.audit_keep,
+  showOfficialBadge: e.show_official_badge === 1,
   defaultView: e.default_view === 'cal' ? 'cal' : 'list',
 });
 
@@ -80,34 +84,61 @@ export const toBreakDto = (b: BreakRow): BreakDto => ({
 
 export const toTagDto = (t: TagRow): TagDto => ({ id: t.id, name: t.name, color: t.color });
 
+export const toFormatDto = (f: FormatRow): FormatDto => ({
+  id: f.id,
+  name: f.name,
+  color: f.color,
+});
+
 /** Links are stored as a JSON string; a malformed row must not break the page. */
-export function parseLinks(raw: string): PersonLink[] {
+export function parseLinks(raw: string): LabelledLink[] {
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(
-      (l): l is PersonLink =>
+      (l): l is LabelledLink =>
         typeof l === 'object' &&
         l !== null &&
-        typeof (l as PersonLink).label === 'string' &&
-        typeof (l as PersonLink).url === 'string',
+        typeof (l as LabelledLink).label === 'string' &&
+        typeof (l as LabelledLink).url === 'string',
     );
   } catch {
     return [];
   }
 }
 
-/** Extra columns only organisers are shown; see `PersonDto`. */
-export interface PersonRosterFacts {
+/**
+ * What the `people` row does not carry itself. The first two are public and
+ * on every DTO; the rest only organisers are shown (`disclose`), see
+ * `PersonDto`.
+ */
+export interface PersonFacts {
+  username: string | null;
+  creditable: boolean;
   role: Role | null;
   holderUid: string | null;
-  codePending: boolean;
+  codeState: CodeState;
+  lastSeenAt: string | null;
+  joinedAt: string | null;
+  sessionCount: number;
 }
+
+export const NOBODY: PersonFacts = {
+  username: null,
+  creditable: true,
+  role: null,
+  holderUid: null,
+  codeState: 'none',
+  lastSeenAt: null,
+  joinedAt: null,
+  sessionCount: 0,
+};
 
 export const toPersonDto = (
   row: PersonRow,
   viewerIdentityId: number,
-  facts?: PersonRosterFacts,
+  facts: PersonFacts,
+  disclose = false,
 ): PersonDto => ({
   id: row.id,
   name: row.name,
@@ -115,53 +146,93 @@ export const toPersonDto = (
   links: parseLinks(row.links),
   isMine: row.identity_id !== null && row.identity_id === viewerIdentityId,
   claimed: row.identity_id !== null,
-  ...(facts === undefined
-    ? {}
-    : { role: facts.role, holderUid: facts.holderUid, codePending: facts.codePending }),
+  archivedAt: row.archived_at,
+  username: facts.username,
+  creditable: facts.creditable,
+  ...(disclose
+    ? {
+        role: facts.role,
+        holderUid: facts.holderUid,
+        codeState: facts.codeState,
+        lastSeenAt: facts.lastSeenAt,
+        joinedAt: facts.joinedAt,
+        sessionCount: facts.sessionCount,
+      }
+    : {}),
   updatedAt: row.updated_at,
 });
 
 /**
- * Who holds each profile, and whether the phrase they were sent has ever been
- * used.
+ * Who holds each profile, what they have done here, and whether the phrase
+ * they were sent has ever been used. One query for the whole People list,
+ * which is why the counts are subqueries rather than a second round trip.
  *
- * `codePending` reads the code itself — a `link_codes` row for this person with
- * no `used_at`. The tempting signal, `identities.last_seen_at`, does not work:
- * the identity middleware throttles that write to once a minute, so a speaker
- * who redeems their code and starts reading straight away still looks as though
- * they never arrived.
+ * `codeState` reads the code itself — whether this person has a `link_codes`
+ * row at all, and whether it carries a `used_at`. The tempting signal for the
+ * used half, `identities.last_seen_at`, does not work: the identity middleware
+ * throttles that write to once a minute, so a speaker who redeems their code
+ * and starts reading straight away still looks as though they never arrived.
  *
- * Re-minting a code for someone who already has a device sets this again, and
- * that is right — the new phrase is outstanding until it is used.
+ * Re-minting a code for someone who already has a device drops back to
+ * `pending`, and that is right — the new phrase is outstanding until it is
+ * used. Revoking deletes the row, so the state is `none` again: an organiser
+ * is told there is nothing outstanding, not that a dead phrase is in the
+ * wild.
  */
-export function personRosterFacts(db: Db, eventId: number): Map<number, PersonRosterFacts> {
+export function personFacts(db: Db, eventId: number, onlyId?: number): Map<number, PersonFacts> {
   const rows = db
-    .prepare<[number, number], {
+    .prepare<[number, number, number, number, number], {
       id: number;
+      username: string | null;
       role: Role | null;
       holder_uid: string | null;
-      code_pending: number;
+      code_state: CodeState;
+      last_seen_at: string | null;
+      joined_at: string | null;
+      session_count: number;
     }>(
       // `link_codes.person_id` is unique where set, so this joins at most one
       // code per person.
       `SELECT p.id AS id,
+              ei.display_name AS username,
               r.role AS role,
               i.public_id AS holder_uid,
-              CASE WHEN lc.id IS NOT NULL AND lc.used_at IS NULL THEN 1 ELSE 0 END AS code_pending
+              CASE WHEN lc.id IS NULL THEN 'none'
+                   WHEN lc.used_at IS NULL THEN 'pending'
+                   ELSE 'used' END AS code_state,
+              i.last_seen_at AS last_seen_at,
+              ei.claimed_at AS joined_at,
+              (SELECT COUNT(*) FROM session_speakers ss
+                 JOIN sessions s ON s.id = ss.session_id
+                WHERE ss.person_id = p.id AND s.deleted_at IS NULL) AS session_count
          FROM people p
     LEFT JOIN identities i ON i.id = p.identity_id
+    LEFT JOIN event_identities ei ON ei.identity_id = p.identity_id AND ei.event_id = ?
     LEFT JOIN roles r ON r.identity_id = p.identity_id AND r.event_id = ?
     LEFT JOIN link_codes lc ON lc.person_id = p.id
-        WHERE p.event_id = ? AND p.deleted_at IS NULL`,
+        WHERE p.event_id = ? AND p.deleted_at IS NULL AND (? = 0 OR p.id = ?)`,
     )
-    .all(eventId, eventId);
+    .all(eventId, eventId, eventId, onlyId ?? 0, onlyId ?? 0);
   return new Map(
     rows.map((r) => [
       r.id,
-      { role: r.role, holderUid: r.holder_uid, codePending: r.code_pending === 1 },
+      {
+        username: r.username,
+        creditable: r.role !== 'viewer',
+        role: r.role,
+        holderUid: r.holder_uid,
+        codeState: r.code_state,
+        lastSeenAt: r.last_seen_at,
+        joinedAt: r.joined_at,
+        sessionCount: r.session_count,
+      },
     ]),
   );
 }
+
+/** One person's facts, for a route that answers about one row. */
+export const factsFor = (db: Db, eventId: number, personId: number): PersonFacts =>
+  personFacts(db, eventId, personId).get(personId) ?? NOBODY;
 
 export function tagIdsBySession(db: Db, sessionIds: number[]): Map<number, number[]> {
   const out = new Map<number, number[]>();
@@ -191,11 +262,12 @@ export function toSessionDto(
     roomId: row.room_id,
     trackId: row.track_id,
     type: row.type,
+    formatId: row.format_id,
     blocksOpenBooking: row.blocks_open_booking === 1,
     title: row.title,
     description: row.description,
     speakers,
-    livestreamUrl: row.livestream_url,
+    livestreams: parseLinks(row.livestreams),
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     tagIds,

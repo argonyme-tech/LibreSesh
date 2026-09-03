@@ -7,6 +7,7 @@ import type {
   RoomDto,
   Role,
   SessionDto,
+  FormatDto,
   TagDto,
 } from '@shared/types';
 import { CloseIcon, ExpandIcon } from './icons';
@@ -18,11 +19,13 @@ export interface DetailSheetProps {
   slug: string;
   rooms: RoomDto[];
   tags: TagDto[];
+  formats: FormatDto[];
   contributions: ContributionDto[] | undefined;
   role: Role;
   me: Me | null;
   timezone: string;
   canEdit: boolean;
+  canDelete: boolean;
   archived: boolean;
   /** Whether this session is on the current identity's personal agenda. */
   starred: boolean;

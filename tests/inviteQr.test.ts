@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { actorWithRole, agentFor, makeHarness, seedEvent, type Harness } from './helpers.js';
+import {
+  actorWithRole,
+  agentFor,
+  makeHarness,
+  seedEvent,
+  type Harness,
+  nextUsername,
+} from './helpers.js';
 
 /**
  * `POST /password-role` is the invite QR's one server-side piece: it says which
@@ -39,7 +46,7 @@ describe('password-role', () => {
     const attendee = await actorWithRole(harness, 'testconf', 'user-pw');
     await attendee
       .post('/api/e/testconf/password-role')
-      .send({ password: 'admin-pw' })
+      .send({ password: 'admin-pw', displayName: nextUsername() })
       .expect(403);
     const me = await attendee.get('/api/me').expect(200);
     expect(me.body.roles.testconf).toBe('user');
@@ -50,13 +57,13 @@ describe('password-role', () => {
     await stranger.get('/api/me').expect(200);
     await stranger
       .post('/api/e/testconf/password-role')
-      .send({ password: 'admin-pw' })
+      .send({ password: 'admin-pw', displayName: nextUsername() })
       .expect(401);
   });
 
   it('logs who made an invite code', async () => {
     const admin = await actorWithRole(harness, 'testconf', 'admin-pw');
-    await admin.post('/api/e/testconf/password-role').send({ password: 'user-pw' }).expect(200);
+    await admin.post('/api/e/testconf/password-role').send({ password: 'user-pw', displayName: nextUsername() }).expect(200);
     const row = harness.db
       .prepare<[], { action: string; entity: string }>(
         "SELECT action, entity FROM audit WHERE action = 'invite_qr'",

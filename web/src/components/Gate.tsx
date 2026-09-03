@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Me, Role } from '@shared/types';
 import { ApiError, api } from '../lib/api';
 import { takeInvite } from '../lib/inviteLink';
@@ -23,9 +23,54 @@ export function Gate({ slug, eventName, me, onEntered }: GateProps) {
    */
   const [invite, setInvite] = useState(takeInvite);
   const [password, setPassword] = useState(invite?.password ?? '');
-  const [name, setName] = useState(me?.displayName ?? '');
+  /**
+   * The username is typed here, every first time: nothing is generated for
+   * you and nothing carries over from another event. A device that already
+   * holds a name in *this* event (it signed out, or its role changed) gets it
+   * back from `/gate`, so re-entering is one tap.
+   */
+  const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /**
+   * The gate's "is that you?": an organiser typed this exact name onto a
+   * session before its owner arrived, and that unclaimed profile is on
+   * offer. Adopting it silently would hand a namesake someone else's talks,
+   * so it is a question with two answers, and the entry is retried with one.
+   */
+  const [namesake, setNamesake] = useState<{ name: string; sessionCount: number } | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    api
+      .gate(slug)
+      .then((g) => {
+        if (live && g.heldName) setName((current) => current || g.heldName || '');
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [slug]);
+
+  /** Every way in shares the two answers the server can give about a name. */
+  const nameProblem = (err: unknown): boolean => {
+    if (!(err instanceof ApiError)) return false;
+    if (err.code === 'name_taken') {
+      setError(err.message);
+      setSuggestion(name.trim());
+      return true;
+    }
+    if (err.code === 'profile_exists') {
+      const d = err.details ?? {};
+      setNamesake({
+        name: typeof d.name === 'string' ? d.name : name.trim(),
+        sessionCount: typeof d.sessionCount === 'number' ? d.sessionCount : 0,
+      });
+      return true;
+    }
+    return false;
+  };
   /**
    * A free variant of the name that was refused, offered as one click.
    *
@@ -76,21 +121,19 @@ export function Gate({ slug, eventName, me, onEntered }: GateProps) {
     return null;
   };
 
-  const submit = async () => {
-    if (!password.trim() || busy) return;
+  const submit = async (claimProfile?: boolean) => {
+    if (!password.trim() || !name.trim() || busy) return;
     setBusy(true);
     setError(null);
     setSuggestion(null);
+    setNamesake(null);
     try {
       // The name is claimed as part of entry: it has to be unique inside this
       // event, and the server grants no role if it is taken.
-      await api.authenticate(slug, password.trim(), name.trim() || undefined);
+      await api.authenticate(slug, password.trim(), name.trim(), claimProfile);
       onEntered();
     } catch (err) {
-      if (err instanceof ApiError && err.code === 'name_taken') {
-        setError(err.message);
-        setSuggestion(name.trim());
-      } else {
+      if (!nameProblem(err)) {
         setError(
           err instanceof ApiError && (err.status === 429 || err.status === 404)
             ? err.message
@@ -127,29 +170,33 @@ export function Gate({ slug, eventName, me, onEntered }: GateProps) {
   };
 
   /** Demo events hand out roles on a click — there is no password to type. */
-  const enterAs = async (role: Role) => {
-    if (busy) return;
+  const enterAs = async (role: Role, claimProfile?: boolean) => {
+    if (busy || !name.trim()) return;
     setBusy(true);
     setError(null);
     setSuggestion(null);
+    setNamesake(null);
     // Remembered so the retry below enters as the role they actually picked.
     setPendingRole(role);
     try {
-      await api.authenticateAsRole(slug, role, name.trim() || undefined);
+      await api.authenticateAsRole(slug, role, name.trim(), claimProfile);
       onEntered();
     } catch (err) {
-      if (err instanceof ApiError && err.code === 'name_taken') setSuggestion(name.trim());
-      setError((err as Error).message);
+      if (!nameProblem(err)) setError((err as Error).message);
       setBusy(false);
     }
   };
+
+  /** "Yes, that's me": the same entry again, taking the profile this time. */
+  const claimAndEnter = () =>
+    demo ? enterAs(pendingRole ?? 'viewer', true) : submit(true);
 
   // Per event, not per instance: a demo instance can also be hosting a real
   // conference, and that gate must still ask for a password.
   const demo = me?.demoEventSlugs?.includes(slug) === true;
   const roles: { role: Role; label: string; blurb: string }[] = [
     { role: 'viewer', label: 'Viewer', blurb: 'Read the schedule, star sessions' },
-    { role: 'user', label: 'Attendee', blurb: 'Add notes, propose open sessions' },
+    { role: 'user', label: 'Attendee', blurb: 'Add notes, propose sessions' },
     { role: 'admin', label: 'Organiser', blurb: 'Full control of the event' },
   ];
 
@@ -162,15 +209,53 @@ export function Gate({ slug, eventName, me, onEntered }: GateProps) {
    * roster full of auto-generated names.
    */
   const nameField = (
-    <Field label="You'll appear as" hint="Remembered on this device. No account needed.">
+    <Field
+      label="Username"
+      hint="What you'll be called in this event — unique here, remembered on this device. No account, no password."
+    >
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
         maxLength={40}
+        required
+        aria-required="true"
+        placeholder="e.g. ada"
         className={inputClass}
       />
     </Field>
   );
+
+  const namesakePrompt = namesake !== null && (
+    <div
+      role="group"
+      aria-label="Is that you?"
+      className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-700 dark:bg-amber-950/40"
+    >
+      <p className="text-stone-800 dark:text-stone-100">
+        There is a speaker profile here called <span className="font-semibold">{namesake.name}</span>
+        {namesake.sessionCount > 0 &&
+          `, on ${namesake.sessionCount} ${namesake.sessionCount === 1 ? 'session' : 'sessions'}`}
+        . Is that you?
+      </p>
+      <div className="mt-2 flex gap-2">
+        <PrimaryButton className="py-1.5 text-xs" onClick={() => void claimAndEnter()} disabled={busy}>
+          Yes, that’s me
+        </PrimaryButton>
+        <SecondaryButton
+          className="py-1.5 text-xs"
+          onClick={() => {
+            setNamesake(null);
+            setName('');
+          }}
+          disabled={busy}
+        >
+          No, I’ll pick another name
+        </SecondaryButton>
+      </div>
+    </div>
+  );
+
+  const nameMissing = name.trim() === '';
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-stone-100 dark:bg-stone-950 px-4 py-10">
@@ -195,7 +280,7 @@ export function Gate({ slug, eventName, me, onEntered }: GateProps) {
                   key={r.role}
                   className="flex w-full flex-col items-start gap-0.5 py-2.5 text-left"
                   onClick={() => void enterAs(r.role)}
-                  disabled={busy}
+                  disabled={busy || nameMissing}
                 >
                   <span className="text-sm font-semibold">{r.label}</span>
                   <span className="text-xs font-normal text-stone-500 dark:text-stone-400">
@@ -205,6 +290,7 @@ export function Gate({ slug, eventName, me, onEntered }: GateProps) {
               ))}
             </div>
             {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
+            {namesakePrompt}
             {suggestion !== null && (
               <button
                 type="button"
@@ -228,6 +314,7 @@ export function Gate({ slug, eventName, me, onEntered }: GateProps) {
             </p>
             {nameField}
             {error && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{error}</p>}
+            {namesakePrompt}
             {suggestion !== null && (
               <button
                 type="button"
@@ -241,7 +328,7 @@ export function Gate({ slug, eventName, me, onEntered }: GateProps) {
             <PrimaryButton
               className="mt-4 w-full py-2 text-sm"
               onClick={() => void submit()}
-              disabled={busy}
+              disabled={busy || nameMissing}
             >
               {busy ? 'Entering…' : 'Enter'}
             </PrimaryButton>
@@ -278,6 +365,7 @@ export function Gate({ slug, eventName, me, onEntered }: GateProps) {
         {error && !linkMode && (
           <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{error}</p>
         )}
+        {!linkMode && namesakePrompt}
         {suggestion !== null && !linkMode && (
           <button
             type="button"
@@ -289,7 +377,11 @@ export function Gate({ slug, eventName, me, onEntered }: GateProps) {
           </button>
         )}
 
-        <PrimaryButton className="mt-4 w-full py-2 text-sm" onClick={() => void submit()} disabled={busy}>
+        <PrimaryButton
+          className="mt-4 w-full py-2 text-sm"
+          onClick={() => void submit()}
+          disabled={busy || nameMissing}
+        >
           {busy ? 'Checking…' : 'Enter schedule'}
         </PrimaryButton>
           </>

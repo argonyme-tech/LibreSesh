@@ -28,6 +28,8 @@ export function SpeakerCombobox({
   value,
   onChange,
   max,
+  isAdmin = false,
+  onlySelf = false,
 }: {
   people: PersonDto[];
   value: SpeakerChoice[];
@@ -36,6 +38,13 @@ export function SpeakerCombobox({
    *  would give it — so the board passes 1 and the field disappears once it
    *  has that one. Sessions leave it open. */
   max?: number;
+  /** Organisers may credit anyone. Everyone else sees only the people who
+   *  may be credited (`PersonDto.creditable`) — a viewer's person is not on
+   *  offer, though a viewer still sees themselves. */
+  isAdmin?: boolean;
+  /** The matrix has `session.credit_others` off for this role: the field
+   *  offers you and nobody else, and no free text. */
+  onlySelf?: boolean;
 }) {
   // null = not searching. The input is always empty otherwise: what has been
   // chosen lives in the chips, not in the field.
@@ -44,24 +53,50 @@ export function SpeakerCombobox({
   const wrap = useRef<HTMLDivElement>(null);
 
   const open = query !== null;
+  const personOf = (choice: SpeakerChoice): PersonDto | undefined =>
+    typeof choice === 'number' ? people.find((p) => p.id === choice) : undefined;
   const nameOf = (choice: SpeakerChoice): string =>
-    typeof choice === 'number' ? (people.find((p) => p.id === choice)?.name ?? 'Unknown') : choice;
+    typeof choice === 'number' ? (personOf(choice)?.name ?? 'Unknown') : choice;
   const taken = useMemo(
     () => new Set(value.map((c) => (typeof c === 'number' ? String(c) : normalize(c)))),
     [value],
   );
 
+  /**
+   * Who is on offer: everyone an organiser may credit, otherwise the
+   * creditable and yourself. Your own row is pinned first — crediting
+   * yourself is the common case at an unconference, and the newcomer this
+   * exists for should not have to search for their own name.
+   *
+   * Archived profiles are not offered, which is most of the point of
+   * archiving: the test profiles and the walk-ins who never came back are
+   * exactly what clutters this list when you are trying to find a real
+   * person. One already on the session stays on it — this filters the
+   * suggestions, not the bill — and typing the name in full still finds
+   * them, because the server matches an archived profile rather than
+   * spawning a twin of it.
+   */
+  const offered = useMemo(() => {
+    const rows = people.filter(
+      (p) => p.archivedAt === null && (p.isMine || (!onlySelf && (isAdmin || p.creditable))),
+    );
+    return [...rows.filter((p) => p.isMine), ...rows.filter((p) => !p.isMine)];
+  }, [people, isAdmin, onlySelf]);
+
   const matches = useMemo(() => {
     const q = normalize(query ?? '');
-    return people.filter(
-      (p) => !taken.has(String(p.id)) && !taken.has(normalize(p.name)) && (q === '' || normalize(p.name).includes(q)),
+    return offered.filter(
+      (p) =>
+        !taken.has(String(p.id)) &&
+        !taken.has(normalize(p.name)) &&
+        (q === '' || normalize(p.name).includes(q) || (p.username ?? '').toLowerCase().includes(q)),
     );
-  }, [people, query, taken]);
+  }, [offered, query, taken]);
 
   // Offer creation only for a name nobody already has, and nobody on the bill.
   const q = normalize(query ?? '');
   const creatable =
-    q !== '' && !people.some((p) => normalize(p.name) === q) && !taken.has(q)
+    !onlySelf && q !== '' && !people.some((p) => normalize(p.name) === q) && !taken.has(q)
       ? (query ?? '').trim().replace(/\s+/g, ' ')
       : null;
   const rowCount = matches.length + (creatable ? 1 : 0);
@@ -101,6 +136,9 @@ export function SpeakerCombobox({
               {nameOf(choice)}
               {typeof choice === 'string' && (
                 <span className="text-stone-400 dark:text-stone-500">· new</span>
+              )}
+              {personOf(choice)?.isMine && (
+                <span className="text-stone-400 dark:text-stone-500">· you</span>
               )}
               <button
                 type="button"
@@ -142,7 +180,13 @@ export function SpeakerCombobox({
         aria-expanded={open}
         aria-autocomplete="list"
         maxLength={120}
-        placeholder={value.length === 0 ? 'Search people or type a new name' : 'Add another'}
+        placeholder={
+          onlySelf
+            ? 'Only you can be credited here'
+            : value.length === 0
+              ? 'Search people or type a new name'
+              : 'Add another'
+        }
         className={inputClass}
       />
       )}
@@ -160,11 +204,21 @@ export function SpeakerCombobox({
                 aria-selected={i === active}
                 onPointerDown={(e) => e.preventDefault()}
                 onClick={() => add(i)}
-                className={`block w-full px-3 py-2 text-left text-xs font-medium text-stone-700 dark:text-stone-200 ${
+                className={`flex w-full items-baseline gap-1.5 px-3 py-2 text-left text-xs font-medium text-stone-700 dark:text-stone-200 ${
                   i === active ? 'bg-stone-100 dark:bg-stone-800' : ''
                 }`}
               >
-                {person.name}
+                <span className="truncate">{person.name}</span>
+                {person.username !== null && person.username !== person.name && (
+                  <span className="shrink-0 font-normal text-stone-400 dark:text-stone-500">
+                    @{person.username}
+                  </span>
+                )}
+                {person.isMine && (
+                  <span className="shrink-0 font-normal text-stone-400 dark:text-stone-500">
+                    · you
+                  </span>
+                )}
               </button>
             </li>
           ))}

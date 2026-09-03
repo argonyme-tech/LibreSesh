@@ -1,7 +1,7 @@
 import type { BundleDto, PersonDto, ProposalDto, SessionDto } from '@shared/types';
 import { windowLabel, windowOn } from '@shared/trackHours';
 import { fmtMin, place } from './format';
-import { cannotEditOwn, stuckSpeakers } from './people';
+import { cannotEditOwn, stuckSpeakers } from './ownership';
 import { BREAK_BITE_MIN, LONG_BLOCK_MIN, MIN_BREAK_MIN, breakOn, overlap } from './rhythm';
 
 /**
@@ -94,8 +94,8 @@ export function notesForSession(session: SessionDto, bundle: BundleDto): Note[] 
     notes.push({
       key: 'stuck',
       what: `${stuck.map((p) => p.name).join(', ')} cannot edit this`,
-      because: 'On the bill, but the profile is not linked to a device or the role is below speaker.',
-      hint: 'A speaker code links the profile and raises the role in one step.',
+      because: 'On the bill, and nobody holds the profile yet.',
+      hint: 'A speaker code, or approving their claim, puts them in.'
     });
   }
 
@@ -184,10 +184,8 @@ export function notesForPerson(person: PersonDto, bundle: BundleDto): Note[] {
     notes.push({
       key: 'cannot-edit',
       what: `Cannot edit ${theirs.length === 1 ? 'their session' : `their ${theirs.length} sessions`}`,
-      because: !person.claimed
-        ? 'The profile is not linked to any device.'
-        : 'Linked, but the role is still below speaker.',
-      hint: 'A speaker code does both at once.',
+      because: 'Nobody holds the profile yet.',
+      hint: 'A speaker code, or approving their claim, puts them in.',
     });
   }
 

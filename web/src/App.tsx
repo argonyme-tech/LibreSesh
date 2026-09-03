@@ -1,9 +1,10 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ProposalBoard } from './components/ProposalBoard';
-import { ToastProvider } from './components/ui';
+import { ConfirmProvider, ToastProvider } from './components/ui';
 import { AdminPage } from './pages/AdminPage';
 import { AgendaPage } from './pages/AgendaPage';
 import { EventListPage } from './pages/EventListPage';
+import { LandingPage } from './pages/LandingPage';
 import { NewEventPage } from './pages/NewEventPage';
 import { ImportPage } from './pages/ImportPage';
 import { MimirPage } from './pages/MimirPage';
@@ -17,8 +18,13 @@ export function App() {
     <BrowserRouter>
       <MeProvider>
       <ToastProvider>
+        <ConfirmProvider>
         <Routes>
-          <Route path="/" element={<EventListPage />} />
+          {/* `/` says what this is; the list of every event on the instance
+              is a page you choose to open, not the front door. A public box
+              published its whole event list to anyone who loaded the root. */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/events" element={<EventListPage />} />
           <Route path="/new" element={<NewEventPage />} />
           <Route path="/import" element={<ImportPage />} />
           <Route path="/e/:slug" element={<SchedulePage />} />
@@ -38,8 +44,13 @@ export function App() {
           <Route path="/e/:slug/p/:personId" element={<ProfilePage />} />
           <Route path="/e/:slug/mimir" element={<MimirPage />} />
           <Route path="/e/:slug/admin" element={<AdminPage />} />
+          {/* Home is `/`, the same place the logo goes, and a URL that no
+              longer resolves is most often a stale or mistyped event link —
+              answered better by the page that explains what to do with an
+              event link than by a list of events that are not yours. */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </ConfirmProvider>
       </ToastProvider>
       </MeProvider>
     </BrowserRouter>

@@ -3,6 +3,15 @@
 export type Role = 'viewer' | 'user' | 'speaker' | 'admin';
 export type SessionType = 'official' | 'open';
 export type ContributionKind = 'note' | 'link' | 'question';
+/** Where a profile's speaker code stands: never minted (or revoked), minted
+ *  and still unused, or redeemed at the gate. */
+export type CodeState = 'none' | 'pending' | 'used';
+
+/** What the gate needs before anyone is in: the username this device already
+ *  holds here, if it has entered before. */
+export interface GateDto {
+  heldName: string | null;
+}
 
 export interface Me {
   id: number;
@@ -44,6 +53,7 @@ export interface ImportCounts {
   rooms: number;
   tracks: number;
   tags: number;
+  formats: number;
   breaks: number;
   sessions: number;
   /** Profiles created for speaker names nobody in this event answered to. */
@@ -91,6 +101,10 @@ export interface EventDto extends EventSummary {
   userRoleLabel: string;
   /** How many audit entries this event keeps; 0 keeps everything. */
   auditKeep: number;
+  /** Whether the grid and the list badge an official session. Off by default —
+   *  on an event where everything is official the badge says nothing, and on
+   *  an unconference it is noise. The session's own panel always says. */
+  showOfficialBadge: boolean;
   /** The view a reader who has not picked one gets. The switch still works;
    *  this is only where the schedule opens. */
   defaultView: ViewMode;
@@ -121,7 +135,23 @@ export interface TagDto {
   color: string;
 }
 
-export interface PersonLink {
+/**
+ * What kind of session this is: a talk, a workshop, a panel. Defined per event
+ * in Manage Event, so the list is whatever this event runs — the app ships
+ * suggestions (`shared/formats.ts`), not a fixed set.
+ *
+ * Deliberately not `SessionType`, which is `official | open` and says who
+ * placed the session rather than what it is.
+ */
+export interface FormatDto {
+  id: number;
+  name: string;
+  color: string;
+}
+
+/** A label and an http(s) link. Profiles have carried a few since §4;
+ *  sessions carry their streams the same way rather than in a second shape. */
+export interface LabelledLink {
   label: string;
   url: string;
 }
@@ -130,11 +160,36 @@ export interface PersonDto {
   id: number;
   name: string;
   bio: string;
-  links: PersonLink[];
+  links: LabelledLink[];
   /** True when this profile belongs to the requesting identity. */
   isMine: boolean;
   /** True when some attendee owns it, so only they and organisers may edit. */
   claimed: boolean;
+  /** The holder's username in this event — what the room calls them — or
+   *  null for a profile nobody has claimed. Public: it is on everything
+   *  they post already. */
+  username: string | null;
+  /**
+   * When an organiser tidied this profile out of the way, or null for a live
+   * one. An archived profile is not a deleted one: it keeps its sessions, its
+   * bio, its role and whoever holds it, and drops out of the People list and
+   * the speaker picker only.
+   *
+   * Public, unlike the organiser-only facts below, because the one person who
+   * most needs to know is the holder — they are the way back out, and they
+   * cannot ask for it if their own profile does not say so. It discloses
+   * nothing about who runs the event.
+   */
+  archivedAt: string | null;
+  /**
+   * Whether this person may be credited as a speaker by someone who is not
+   * an organiser: true for an unclaimed profile and for a holder with the
+   * attendee role or above, false for a viewer's — a livestream audience
+   * did not come to give a talk. One boolean, not the role, so nothing
+   * else about who runs the event is disclosed. Organisers may credit
+   * anyone.
+   */
+  creditable: boolean;
   /**
    * Organisers only — absent for everyone else, who have no business knowing
    * who runs the event. The role held by the identity that claims this
@@ -149,35 +204,50 @@ export interface PersonDto {
    */
   holderUid?: string | null;
   /**
-   * Organisers only. True when a speaker code minted for this profile has
-   * never been redeemed — the phrase is still sitting in an unread email.
-   * `claimed` cannot tell an organiser that, because minting attaches an
-   * identity at mint time and so claims the profile immediately.
+   * Organisers only. Whether a speaker code exists for this profile and, if
+   * so, whether it has been used: `pending` is a phrase still sitting in an
+   * unread email, `used` one that has been typed at the gate at least once,
+   * `none` a profile that was never sent one (or whose code was revoked).
+   *
+   * Three states rather than a `codePending` boolean because an organiser
+   * looking at a profile asks two different questions — "did I ever send
+   * this person a phrase?" and "are they still waiting to use it?" — and a
+   * boolean answers only the second. `claimed` answers neither: minting
+   * attaches an identity at mint time, so it claims the profile immediately.
    */
-  codePending?: boolean;
+  codeState?: CodeState;
+  /** Organisers only. Last request from this person's device anywhere on the
+   *  instance, minute-coarse; null for a profile nobody holds. */
+  lastSeenAt?: string | null;
+  /** Organisers only. When they first took a username here; null for a
+   *  profile nobody holds. */
+  joinedAt?: string | null;
+  /** Organisers only. Live sessions this person is credited on. */
+  sessionCount?: number;
   updatedAt: string;
 }
 
 /**
- * One row of the admin attendance list: everyone who has ever passed this
- * event's gate. There is no anonymous read — the whole event router sits
- * behind `requireRole('viewer')`, and both gate paths write a display name
- * and a role before letting anyone in — so this is the complete set of
- * people who have ever seen the event. Logout removes the role but keeps
- * the name row; the list only grows.
+ * Somebody asking for the profile an organiser left for them, waiting on an
+ * organiser to agree. Organisers see every open request; everyone else sees
+ * only their own, including one that was turned down, so a request does not
+ * simply vanish without an answer.
  */
-export interface AttendeeDto {
-  uid: string;
-  /** Their display name in this event, or their instance-wide default. */
-  name: string;
-  role: Role | null;
-  /** When they first picked a name or received a role here. */
-  joinedAt: string;
-  /** Last request from this identity anywhere on the instance, minute-coarse. */
-  lastSeenAt: string;
-  /** The speaker/host profile they hold in this event, if any. */
-  personId: number | null;
-  isMe: boolean;
+export interface ProfileClaimDto {
+  id: number;
+  /** The profile being asked for. */
+  personId: number;
+  personName: string;
+  /** Who is asking, as this event knows them. */
+  username: string;
+  /** Organisers only: the identity behind the request. */
+  requesterUid?: string;
+  /** Organisers only: the profile they hold now, which approving folds in. */
+  requesterPersonId?: number | null;
+  requestedAt: string;
+  /** Set when an organiser turned it down. */
+  declinedAt: string | null;
+  isMine: boolean;
 }
 
 export interface PersonDetailDto {
@@ -191,6 +261,10 @@ export interface SessionDto {
   /** null when the event has no tracks, or the session is not on one. */
   trackId: number | null;
   type: SessionType;
+  /** What kind of session it is, or null when the event defines no formats or
+   *  nobody picked one. Independent of `type`: an open session can be a
+   *  workshop, and an official one can be a jam. */
+  formatId: number | null;
   /** This session holds the floor: while it runs, attendees may not place an
    *  open session anywhere in the event. Official sessions only, and only an
    *  organiser can set it. Speakers and organisers are not stopped by it —
@@ -203,9 +277,12 @@ export interface SessionDto {
    * a cramped block truncates to. Empty when nobody is credited.
    */
   speakers: PersonRef[];
-  /** Watch-along link, http(s). Empty string means there is no stream, which
-   *  is the default — the UI hides the field rather than showing it blank. */
-  livestreamUrl: string;
+  /**
+   * Watch-along links, http(s). Usually empty, sometimes one, occasionally
+   * several: a main camera, a room's own feed, an interpreted channel. The
+   * UI hides the row entirely rather than showing it blank.
+   */
+  livestreams: LabelledLink[];
   /** UTC ISO-8601. */
   startsAt: string;
   endsAt: string;
@@ -308,6 +385,9 @@ export interface BundleDto {
   displayName: string;
   rooms: RoomDto[];
   tags: TagDto[];
+  /** In the organiser's running order, not alphabetical. Empty until the
+   *  organiser defines some, which is the state most events start in. */
+  formats: FormatDto[];
   /** Empty unless the organiser has defined any. */
   tracks: TrackDto[];
   /** Lunch and friends, ordered by time. Drawn behind the grid on every day
@@ -326,6 +406,9 @@ export interface BundleDto {
   contributionCounts: Record<number, number>;
   /** capability -> roles allowed to use it. Admin is always present. */
   permissions: Record<string, Role[]>;
+  /** Open requests to hold a profile: all of them for an organiser, your own
+   *  for everyone else. */
+  claims: ProfileClaimDto[];
 }
 
 /**
@@ -375,13 +458,15 @@ export interface EventExport {
     windows: TrackWindowDto[];
   }[];
   tags: { id: number; name: string; color: string }[];
+  /** What kinds of session this event runs, in the organiser's order. */
+  formats: { id: number; name: string; color: string }[];
   /** Local minutes of day; `date` null means every day of the event. */
   breaks: { id: number; label: string; startMin: number; endMin: number; date: string | null }[];
   people: {
     id: number;
     name: string;
     bio: string;
-    links: PersonLink[];
+    links: LabelledLink[];
     /** Whether someone holds this profile — never *who*. */
     claimed: boolean;
     createdAt: string;
@@ -391,6 +476,7 @@ export interface EventExport {
     id: number;
     roomId: number;
     trackId: number | null;
+    formatId: number | null;
     type: SessionType;
     title: string;
     description: string;
@@ -399,7 +485,7 @@ export interface EventExport {
      *  most sessions have exactly one. */
     speakers: string[];
     speaker: string;
-    livestreamUrl: string;
+    livestreams: LabelledLink[];
     startsAt: string;
     endsAt: string;
     tagIds: number[];
@@ -482,6 +568,9 @@ export type ChangeType =
   | 'tag.created'
   | 'tag.updated'
   | 'tag.deleted'
+  | 'format.created'
+  | 'format.updated'
+  | 'format.deleted'
   | 'track.created'
   | 'track.updated'
   | 'track.deleted'
