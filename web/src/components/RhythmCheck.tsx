@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useDismissed } from '../lib/useDismissed';
 import type { BreakDto, RoomDto, SessionDto, TrackDto } from '@shared/types';
+import { windowOn } from '@shared/trackHours';
 import { fmtMin, place } from '../lib/format';
+import { BREAK_BITE_MIN, LONG_BLOCK_MIN, MIN_BREAK_MIN, breakOn, overlap } from '../lib/rhythm';
 
 /** Mímir add-on (SPEC: design/mimir-en-libresesh.md §7): advisory rhythm
  *  checks over the published schedule. Strictly additive — a chip that is off
@@ -28,30 +30,6 @@ interface Warning {
 }
 
 const MINUTE = 60_000;
-/** Attention span hard limit (B4): a block beyond this wants a real break. */
-const MAX_BLOCK_MIN = 90;
-/** Gap below this doesn't count as a break between back-to-back sessions. */
-const MIN_BREAK_MIN = 10;
-
-/** How much of a declared break a session has to eat before it is worth
- *  saying. A minute of overlap is a rounding error in somebody's end time; a
- *  quarter of an hour is people choosing between the session and lunch. */
-const BREAK_BITE_MIN = 15;
-
-/** A break applies to a day if it is daily, or pinned to that date. */
-const breakOn = (b: BreakDto, date: string) => b.date === null || b.date === date;
-
-/** A track's hours for one day: a window pinned to that date replaces the
- *  track's own, which is the rule the schedule itself follows. */
-function trackHours(track: TrackDto, date: string): { startMin: number; endMin: number } | null {
-  const pinned = track.windows.find((w) => w.date === date);
-  if (pinned) return { startMin: pinned.startMin, endMin: pinned.endMin };
-  if (track.startMin === null || track.endMin === null) return null;
-  return { startMin: track.startMin, endMin: track.endMin };
-}
-
-const overlap = (aStart: number, aEnd: number, bStart: number, bEnd: number) =>
-  Math.max(0, Math.min(aEnd, bEnd) - Math.max(aStart, bStart));
 
 export function rhythmWarnings(
   sessions: SessionDto[],
@@ -70,11 +48,11 @@ export function rhythmWarnings(
 
   for (const s of sessions) {
     const min = Math.round((Date.parse(s.endsAt) - Date.parse(s.startsAt)) / MINUTE);
-    if (min > MAX_BLOCK_MIN) {
+    if (min > LONG_BLOCK_MIN) {
       warnings.push({
         key: `long-${s.id}`,
         what: `“${s.title}” runs ${min} min in one piece`,
-        why: `Attention holds roughly ${MAX_BLOCK_MIN} minutes; beyond that the room is still seated but no longer there.`,
+        why: `Attention holds roughly ${LONG_BLOCK_MIN} minutes; beyond that the room is still seated but no longer there.`,
         rule: 'Hard limit: ~90 min with a real cut.',
       });
     }
@@ -98,7 +76,7 @@ export function rhythmWarnings(
 
     // Outside the hours its own strand declares.
     const track = trackOf(s.trackId);
-    const hours = track ? trackHours(track, at.date) : null;
+    const hours = track ? windowOn(track, at.date) : null;
     if (track && hours && (at.startMin < hours.startMin || at.endMin > hours.endMin)) {
       warnings.push({
         key: `hours-${s.id}`,
@@ -110,7 +88,7 @@ export function rhythmWarnings(
 
     // A session that holds the floor closes open booking for everybody, for
     // its whole length. Worth saying out loud when it is long.
-    if (s.blocksOpenBooking && min > MAX_BLOCK_MIN) {
+    if (s.blocksOpenBooking && min > LONG_BLOCK_MIN) {
       warnings.push({
         key: `floor-${s.id}`,
         what: `“${s.title}” holds the floor for ${min} min`,
@@ -142,12 +120,12 @@ export function rhythmWarnings(
           (Date.parse(chain[chain.length - 1].endsAt) - Date.parse(chain[0].startsAt)) / MINUTE,
         );
         // A chain of one is already covered by the per-session check above.
-        if (chain.length > 1 && total > MAX_BLOCK_MIN) {
+        if (chain.length > 1 && total > LONG_BLOCK_MIN) {
           warnings.push({
             key: `chain-${roomId}-${chain[0].id}`,
             what: `${chain.length} back-to-back sessions in ${roomName(roomId)} make a ${total} min block`,
             why: `Each piece fits, but the room never gets a pause between them.`,
-            rule: `A pause every ~${MAX_BLOCK_MIN} min keeps the field workable.`,
+            rule: `A pause every ~${LONG_BLOCK_MIN} min keeps the field workable.`,
           });
         }
         chainStart = i;

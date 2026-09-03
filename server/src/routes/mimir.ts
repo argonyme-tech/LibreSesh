@@ -8,6 +8,7 @@ import { audit } from '../audit.js';
 import type { Ctx } from '../context.js';
 import { HttpError } from '../errors.js';
 import { limit } from '../ratelimit.js';
+import { fmtMinute } from '../shared/trackHours.js';
 import {
   parse,
   mimirCatalogSchema,
@@ -440,8 +441,6 @@ export function mimirRoutes(ctx: Ctx): Router {
     // able to act as instructions, and they must not be able to forge the
     // fence that says so.
     const safe = (t: string) => t.replace(/=/g, '═').slice(0, 160);
-    const hhmm = (m: number) =>
-      `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
     const lines = sessions.map((s) => {
       const where = roomName.get(s.room_id) ?? '?';
       const track = s.track_id !== null ? ` · ${trackName.get(s.track_id) ?? ''}` : '';
@@ -466,7 +465,7 @@ export function mimirRoutes(ctx: Ctx): Router {
               (t) =>
                 t.name +
                 (t.start_min !== null && t.end_min !== null
-                  ? ` (runs ${hhmm(t.start_min)}–${hhmm(t.end_min)})`
+                  ? ` (runs ${fmtMinute(t.start_min)}–${fmtMinute(t.end_min)})`
                   : ' (any hour)'),
             )
             .join(' · ')}`
@@ -475,7 +474,7 @@ export function mimirRoutes(ctx: Ctx): Router {
         ? `Breaks: ${breaks
             .map(
               (b) =>
-                `${safe(b.label)} ${hhmm(b.start_min)}–${hhmm(b.end_min)}${b.date ? ` on ${b.date}` : ' daily'}`,
+                `${safe(b.label)} ${fmtMinute(b.start_min)}–${fmtMinute(b.end_min)}${b.date ? ` on ${b.date}` : ' daily'}`,
             )
             .join(' · ')}`
         : 'Breaks: none set — the programme declares no meals or pauses.',

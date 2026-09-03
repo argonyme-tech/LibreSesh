@@ -90,9 +90,8 @@ export function MimirPage() {
       const b = await api.bundle(slug);
       setBundle(b);
       setStatus('ready');
-      if (b.role === 'admin') {
-        api.mimirStatus(slug).then((s) => setEngine(s.engine)).catch(() => setEngine(false));
-      }
+      // Engine status is fetched by the effect below the moment the role is
+      // known; asking here as well sent the same request twice per load.
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) setStatus('gate');
       else {
@@ -311,14 +310,19 @@ function Hub({
 }) {
   // Breaks, track hours and the event's timezone turn most of these notes from
   // an inference about the grid into arithmetic on what the organiser declared.
-  const warnings = rhythmWarnings(bundle.sessions, bundle.rooms, {
-    breaks: bundle.breaks,
-    tracks: bundle.tracks,
-    timezone: bundle.event.timezone,
-  });
+  // Both scans walk every session; the hub re-renders on every engine poll.
+  const warnings = useMemo(
+    () =>
+      rhythmWarnings(bundle.sessions, bundle.rooms, {
+        breaks: bundle.breaks,
+        tracks: bundle.tracks,
+        timezone: bundle.event.timezone,
+      }),
+    [bundle],
+  );
   // Counted here so the tile can carry the number rather than making an
   // organiser open it to find out there was nothing.
-  const todo = isAdmin ? readiness(bundle) : [];
+  const todo = useMemo(() => (isAdmin ? readiness(bundle) : []), [bundle, isAdmin]);
   return (
     <div className="space-y-8">
       <div className="rounded-2xl border border-indigo-200 dark:border-indigo-900 bg-gradient-to-br from-indigo-50 to-stone-50 dark:from-indigo-950/40 dark:to-stone-950 p-5">
@@ -1830,11 +1834,15 @@ function Readiness({ bundle }: { bundle: BundleDto }) {
 function Rhythm({ bundle }: { bundle: BundleDto }) {
   // Breaks, track hours and the event's timezone turn most of these notes from
   // an inference about the grid into arithmetic on what the organiser declared.
-  const warnings = rhythmWarnings(bundle.sessions, bundle.rooms, {
-    breaks: bundle.breaks,
-    tracks: bundle.tracks,
-    timezone: bundle.event.timezone,
-  });
+  const warnings = useMemo(
+    () =>
+      rhythmWarnings(bundle.sessions, bundle.rooms, {
+        breaks: bundle.breaks,
+        tracks: bundle.tracks,
+        timezone: bundle.event.timezone,
+      }),
+    [bundle],
+  );
   if (warnings.length === 0) {
     return <EmptyState>⏱ Nothing to flag: no block runs past ~90 min without a real pause.</EmptyState>;
   }

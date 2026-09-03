@@ -1,6 +1,8 @@
 import type { BundleDto, PersonDto, ProposalDto, SessionDto } from '@shared/types';
-import { place } from './format';
+import { windowLabel, windowOn } from '@shared/trackHours';
+import { fmtMin, place } from './format';
 import { cannotEditOwn, stuckSpeakers } from './people';
+import { BREAK_BITE_MIN, LONG_BLOCK_MIN, MIN_BREAK_MIN, breakOn, overlap } from './rhythm';
 
 /**
  * Mímir as a layer rather than a tab.
@@ -37,16 +39,8 @@ export interface Note {
 }
 
 const MINUTE = 60_000;
-const LONG_BLOCK_MIN = 90;
-const BREAK_BITE_MIN = 15;
 
 const minutes = (s: SessionDto) => Math.round((Date.parse(s.endsAt) - Date.parse(s.startsAt)) / MINUTE);
-
-const hhmm = (m: number) =>
-  `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-
-const overlap = (a1: number, a2: number, b1: number, b2: number) =>
-  Math.max(0, Math.min(a2, b2) - Math.max(a1, b1));
 
 /**
  * Beside one session — for whoever is giving it as much as for the organiser.
@@ -71,13 +65,13 @@ export function notesForSession(session: SessionDto, bundle: BundleDto): Note[] 
   }
 
   for (const b of bundle.breaks) {
-    if (b.date !== null && b.date !== at.date) continue;
+    if (!breakOn(b, at.date)) continue;
     const bite = overlap(at.startMin, at.endMin, b.startMin, b.endMin);
     if (bite >= BREAK_BITE_MIN) {
       notes.push({
         key: `break-${b.id}`,
         what: `Takes ${bite} min out of ${b.label}`,
-        because: `${b.label} runs ${hhmm(b.startMin)}–${hhmm(b.endMin)} and this runs ${hhmm(at.startMin)}–${hhmm(at.endMin)}.`,
+        because: `${b.label} runs ${fmtMin(b.startMin)}–${fmtMin(b.endMin)} and this runs ${fmtMin(at.startMin)}–${fmtMin(at.endMin)}.`,
         hint: 'Whoever comes skips the meal; whoever eats misses this.',
       });
     }
@@ -114,18 +108,16 @@ export function notesForSession(session: SessionDto, bundle: BundleDto): Note[] 
     });
   }
 
+  // The same resolution the server refuses by: a day's own window replaces
+  // the track's, and a track with no hours takes any.
   const track = bundle.tracks.find((t) => t.id === session.trackId);
-  if (track) {
-    const pinned = track.windows.find((w) => w.date === at.date);
-    const from = pinned ? pinned.startMin : track.startMin;
-    const to = pinned ? pinned.endMin : track.endMin;
-    if (from !== null && to !== null && (at.startMin < from || at.endMin > to)) {
-      notes.push({
-        key: 'hours',
-        what: `Outside ${track.name}'s hours`,
-        because: `${track.name} accepts ${hhmm(from)}–${hhmm(to)} on this day; this runs ${hhmm(at.startMin)}–${hhmm(at.endMin)}.`,
-      });
-    }
+  const hours = track ? windowOn(track, at.date) : null;
+  if (track && hours && (at.startMin < hours.startMin || at.endMin > hours.endMin)) {
+    notes.push({
+      key: 'hours',
+      what: `Outside ${track.name}'s hours`,
+      because: `${track.name} accepts ${windowLabel(hours)} on this day; this runs ${fmtMin(at.startMin)}–${fmtMin(at.endMin)}.`,
+    });
   }
 
   const stars = bundle.starCounts[session.id] ?? 0;
@@ -204,7 +196,7 @@ export function notesForPerson(person: PersonDto, bundle: BundleDto): Note[] {
   const ordered = theirs.slice().sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   for (let i = 1; i < ordered.length; i++) {
     const gap = (Date.parse(ordered[i].startsAt) - Date.parse(ordered[i - 1].endsAt)) / MINUTE;
-    if (gap < 10) {
+    if (gap < MIN_BREAK_MIN) {
       notes.push({
         key: 'back-to-back',
         what: 'Two of theirs run back to back',

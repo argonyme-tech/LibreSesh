@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type {
   BreakDto,
@@ -15,7 +15,7 @@ import { TAG_COLORS, nextTagColor, readableInk } from '@shared/tagColors';
 import { ColorPicker } from '../components/ColorPicker';
 import { windowLabel } from '@shared/trackHours';
 import { ApiError, api, type BreakWrite, type TrackWrite, type TrashDto } from '../lib/api';
-import { notesForPerson } from '../lib/mimirNotes';
+import { notesForPerson, type Note } from '../lib/mimirNotes';
 import { MimirAside } from '../components/MimirAside';
 import { fmtMin, minutesOf, relativeTime, rowId, snapMinute, uid } from '../lib/format';
 import { useEventData } from '../lib/useEventData';
@@ -94,6 +94,14 @@ export function AdminPage() {
 
   const bundle = data.bundle;
   const event = bundle?.event;
+  // Mimir add-on. Computed when the bundle changes, not on every render: the
+  // "New person" field lives in this component, so typing a name used to
+  // re-run a scan of every session for every row in the People list.
+  const personNotes = useMemo(() => {
+    const out = new Map<number, Note[]>();
+    if (bundle) for (const p of bundle.people) out.set(p.id, notesForPerson(p, bundle));
+    return out;
+  }, [bundle]);
 
   const [name, setName] = useState('');
   const [slugField, setSlugField] = useState('');
@@ -868,7 +876,7 @@ export function AdminPage() {
                       speaker code that repairs it is one click away. */}
                   <div className="order-last w-full">
                     <MimirAside
-                      notes={notesForPerson(person, bundle)}
+                      notes={personNotes.get(person.id) ?? []}
                       scope={`person-${person.id}`}
                       compact
                     />

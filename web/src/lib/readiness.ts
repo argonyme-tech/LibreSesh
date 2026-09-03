@@ -1,5 +1,7 @@
 import type { BundleDto, PersonDto, SessionDto } from '@shared/types';
-import { place } from './format';
+import { dateRange } from '@shared/time';
+import { windowOn } from '@shared/trackHours';
+import { fmtMin, place } from './format';
 import { cannotEditOwn } from './people';
 
 /**
@@ -33,28 +35,17 @@ export interface Finding {
 /** Below this, a gap in the middle of a day is a break somebody meant. */
 const HOLE_MIN = 150;
 
-const fmt = (m: number) =>
-  `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-
 const listNames = (names: string[], max = 3): string =>
   names.length <= max
     ? names.join(', ')
     : `${names.slice(0, max).join(', ')} and ${names.length - max} more`;
 
-/** Every date the event covers, inclusive, as YYYY-MM-DD. */
-function eventDays(startDate: string, endDate: string): string[] {
-  const out: string[] = [];
-  for (let t = Date.parse(startDate); t <= Date.parse(endDate); t += 86_400_000) {
-    out.push(new Date(t).toISOString().slice(0, 10));
-  }
-  return out;
-}
-
 export function readiness(bundle: BundleDto): Finding[] {
   const { event, rooms, tracks, breaks, sessions, people, proposals } = bundle;
   const found: Finding[] = [];
   const personById = new Map<number, PersonDto>(people.map((p) => [p.id, p]));
-  const days = eventDays(event.startDate, event.endDate);
+  // The schedule's own day list, so the two can never disagree on a count.
+  const days = dateRange(event.startDate, event.endDate);
 
   // 1. Somebody is credited but cannot touch their own session.
   //
@@ -136,7 +127,7 @@ export function readiness(bundle: BundleDto): Finding[] {
     let reach = spans[0].endMin;
     for (const s of spans.slice(1)) {
       if (s.startMin - reach >= HOLE_MIN) {
-        holes.push(`${date} ${fmt(reach)}–${fmt(s.startMin)}`);
+        holes.push(`${date} ${fmtMin(reach)}–${fmtMin(s.startMin)}`);
       }
       reach = Math.max(reach, s.endMin);
     }
@@ -179,11 +170,11 @@ export function readiness(bundle: BundleDto): Finding[] {
   for (const t of tracks) {
     for (const s of sessions.filter((x) => x.trackId === t.id)) {
       const at = place(s, event.timezone);
-      const pinned = t.windows.find((w) => w.date === at.date);
-      const from = pinned ? pinned.startMin : t.startMin;
-      const to = pinned ? pinned.endMin : t.endMin;
-      if (from === null || to === null) continue;
-      if (at.startMin < from || at.endMin > to) strays.push(`“${s.title}” (${t.name})`);
+      const hours = windowOn(t, at.date);
+      if (hours === null) continue;
+      if (at.startMin < hours.startMin || at.endMin > hours.endMin) {
+        strays.push(`“${s.title}” (${t.name})`);
+      }
     }
   }
   if (strays.length > 0) {
