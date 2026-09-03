@@ -1579,14 +1579,14 @@ export function AdminPage() {
                           you
                         </span>
                       )}
-                      {person.codeState === 'pending' && (
-                        <span
-                          title="A speaker code was minted for them and has never been redeemed."
-                          className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[0.65rem] font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
-                        >
-                          code
-                        </span>
-                      )}
+                      {/* No "code" badge here. An outstanding speaker code is
+                          a fact about one person, and it was being read down a
+                          column of two hundred rows where it is noise — it
+                          says nothing about who they are or what they may do,
+                          which is what the rest of the row is for. The profile
+                          page says it, in the place the code is minted and
+                          revoked, and says which of the three states it is in
+                          rather than only flagging one. */}
                     </span>
 
                     {peopleColumns.showing('username') && (

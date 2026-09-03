@@ -14,7 +14,7 @@ release commit. That whole spec
 (`_planning/specs/self-as-speaker-and-merge-ux.md`, six steps, plan at
 `_planning/plans/2026-09-02-everyone-is-a-person.md`) is code-complete as
 of 2026-09-02 and written up in CHANGELOG `[Unreleased]`; the suite stood at
-730 then and is at **843** now, lint clean, build clean. What is left of it is the browser pass under Blockers.
+730 then and is at **844** now, lint clean, build clean. What is left of it is the browser pass under Blockers.
 The breaks rework has landed — `feat/event-level-breaks` (`5e53811`) is an
 ancestor of `dev` — so its code half is done and written up in CHANGELOG
 `[Unreleased]` and ARCHITECTURE §Breaks; what is left of it is the browser

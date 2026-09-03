@@ -90,6 +90,14 @@ All notable changes to this project are documented here.
 
 ### Changed
 
+- **The People table no longer badges an outstanding speaker code.** A small
+  amber `code` sat beside the name of anyone whose speaker phrase had been
+  minted and never used. It is a fact about one person, read down a column of
+  everybody, and it says nothing about who they are or what they may do —
+  which is what every other cell on that row is for. Their profile page still
+  says it, where the code is minted and revoked, and says which of the three
+  states it is in rather than flagging only one.
+
 - **Archiving replaced deleting in the People list.** The row menu offered
   both, and Delete was the wrong tool in every case it was reached for: it
   refused outright for anybody holding their own profile — which is most of a
