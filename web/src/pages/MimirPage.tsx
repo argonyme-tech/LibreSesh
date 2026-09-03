@@ -1,10 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import type { BundleDto, ContributionDto, ProposalDto, SessionDto } from '@shared/types';
+import type {
+  AuditEntryDto,
+  BundleDto,
+  ContributionDto,
+  ProposalDto,
+  SessionDto,
+} from '@shared/types';
 import { ApiError, api } from '../lib/api';
 import { useMe } from '../lib/useMe';
 import { eventShape } from '../lib/eventShape';
 import { readiness } from '../lib/readiness';
+import { runSheet } from '../lib/runsheet';
+import { fmtMin, relativeTime } from '../lib/format';
+import { digest, readMark, writeMark } from '../lib/changes';
 import { Gate } from '../components/Gate';
 import { MimirChat, mimirChip } from '../components/MimirChat';
 import { rhythmWarnings } from '../components/RhythmCheck';
@@ -24,6 +33,8 @@ type Tool =
   | 'catalog'
   | 'rhythm'
   | 'readiness'
+  | 'runsheet'
+  | 'changes'
   | 'chat'
   | 'infographic'
   | 'sessions'
@@ -163,6 +174,8 @@ export function MimirPage() {
         {tool === 'catalog' && <Catalog slug={slug} engine={engine} onLive={goLive} />}
         {tool === 'rhythm' && <Rhythm bundle={bundle} />}
         {tool === 'readiness' && isAdmin && <Readiness bundle={bundle} />}
+        {tool === 'runsheet' && <RunSheetView bundle={bundle} />}
+        {tool === 'changes' && isAdmin && <Changes slug={slug} />}
         {tool === 'infographic' && <Infographic bundle={bundle} />}
         {tool === 'sessions' && (
           <MySessions slug={slug} bundle={bundle} isAdmin={isAdmin} engine={engine} onLive={goLive} />
@@ -345,6 +358,20 @@ function Hub({
                 : `${todo.length} thing(s) worth a look`
             }
             onClick={() => onOpen('readiness')}
+          />
+        )}
+        <Tile
+          glyph="▶"
+          title="On now, up next"
+          sub="The shift: what is running and what starts soon"
+          onClick={() => onOpen('runsheet')}
+        />
+        {isAdmin && (
+          <Tile
+            glyph="↻"
+            title="What changed"
+            sub="Since you last looked, from the event log"
+            onClick={() => onOpen('changes')}
           />
         )}
       </HubSection>
@@ -1498,6 +1525,233 @@ function MySessions({
  * ends in something only an organiser can do, and a list of jobs you cannot
  * take is worse than no list.
  */
+/**
+ * The shift, not the plan.
+ *
+ * Everything else here is about the programme as a design. This is the only
+ * view about it as it is happening, and on the day the question is not whether
+ * Thursday is balanced — it is what starts in ten minutes, in which room, and
+ * whether whoever is giving it can be reached. The grid shows the shape of a
+ * day and leaves the reader to find "now" inside it.
+ *
+ * Ticks once a minute: the numbers are minutes, so anything finer is work
+ * nobody can see.
+ */
+function RunSheetView({ bundle }: { bundle: BundleDto }) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const sheet = useMemo(() => runSheet(bundle, now), [bundle, now]);
+
+  if (sheet.offDay) {
+    return (
+      <EmptyState>
+        Today is outside this event ({bundle.event.startDate} to {bundle.event.endDate}). The run
+        sheet is for the days it runs.
+      </EmptyState>
+    );
+  }
+  if (sheet.done) {
+    return <EmptyState>Everything scheduled for today has finished.</EmptyState>;
+  }
+
+  const who = (names: string[], stuck: string[], uncredited = false) => {
+    if (uncredited)
+      return <span className="text-amber-700 dark:text-amber-400">nobody credited</span>;
+    if (names.length === 0) return null;
+    return (
+      <span>
+        {names.join(', ')}
+        {stuck.length > 0 && (
+          <span className="text-amber-700 dark:text-amber-400">
+            {' '}
+            — {stuck.join(', ')} cannot edit their own session
+          </span>
+        )}
+      </span>
+    );
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-2 text-sm text-stone-600 dark:text-stone-300">
+        <span className={mimirChip}>as of {fmtMin(sheet.nowMin)}</span>
+        {sheet.breakNow && (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+            {sheet.breakNow.label} is on
+          </span>
+        )}
+        {sheet.breakNext && (
+          <span className="text-xs">
+            {sheet.breakNext.brk.label} in {sheet.breakNext.startsIn} min
+          </span>
+        )}
+        {sheet.floorHeldMin > 0 && (
+          <span className="text-xs">
+            the floor is closed for {sheet.floorHeldMin} more min today
+          </span>
+        )}
+      </div>
+
+      <section>
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
+          Running now
+        </h3>
+        {sheet.running.length === 0 ? (
+          <p className="text-sm text-stone-500 dark:text-stone-400">Nothing is running.</p>
+        ) : (
+          <ul className="space-y-2">
+            {sheet.running.map((r) => (
+              <li
+                key={r.session.id}
+                className="rounded-xl border border-stone-200 bg-white p-3 text-sm dark:border-stone-700 dark:bg-stone-900"
+              >
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <b className="text-stone-800 dark:text-stone-100">{r.session.title}</b>
+                  <span className="text-stone-500 dark:text-stone-400">{r.roomName}</span>
+                  <span className="ml-auto text-xs text-stone-500 dark:text-stone-400">
+                    ends in {r.endsIn} min
+                  </span>
+                </div>
+                <div className="text-xs text-stone-600 dark:text-stone-300">
+                  {who(r.speakers, r.stuck)}
+                  {r.holdsFloor && <span className="ml-1">· holds the floor</span>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section>
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
+          Next two hours
+        </h3>
+        {sheet.next.length === 0 ? (
+          <p className="text-sm text-stone-500 dark:text-stone-400">
+            Nothing starts in the next two hours.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {sheet.next.map((n) => (
+              <li
+                key={n.session.id}
+                className="rounded-xl border border-stone-200 bg-white p-3 text-sm dark:border-stone-700 dark:bg-stone-900"
+              >
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="font-mono text-xs text-indigo-700 dark:text-indigo-400">
+                    +{n.startsIn} min
+                  </span>
+                  <b className="text-stone-800 dark:text-stone-100">{n.session.title}</b>
+                  <span className="text-stone-500 dark:text-stone-400">{n.roomName}</span>
+                </div>
+                <div className="text-xs text-stone-600 dark:text-stone-300">
+                  {who(n.speakers, n.stuck, n.uncredited)}
+                  {n.holdsFloor && <span className="ml-1">· will hold the floor</span>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
+/**
+ * What moved while you were not looking.
+ *
+ * A live schedule is the point of this app, and the price is that it changes
+ * under everyone with nobody told. The audit log has been writing the answer
+ * down all along — read forwards instead of backwards it is a changelog, so
+ * this needs no new table, no new endpoint and no polling.
+ *
+ * The mark is per device on purpose: "since you last looked" is a fact about a
+ * person at a screen, and keeping it on the server would make one organiser's
+ * catch-up erase another's.
+ */
+function Changes({ slug }: { slug: string }) {
+  const toast = useToast();
+  const [entries, setEntries] = useState<AuditEntryDto[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [since] = useState(() => readMark(slug));
+
+  useEffect(() => {
+    let alive = true;
+    void api
+      .audit(slug)
+      .then((page) => {
+        if (alive) setEntries(page.entries);
+      })
+      .catch((e: unknown) => {
+        if (alive) setError((e as Error).message);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [slug]);
+
+  if (error) return <EmptyState>Could not read the log: {error}</EmptyState>;
+  if (entries === null) return <Spinner />;
+
+  const { changes, mark, ignored } = digest(entries, since);
+
+  const markRead = () => {
+    if (mark !== null) writeMark(slug, mark);
+    toast.show('Marked as read — next time starts from here');
+  };
+
+  if (changes.length === 0) {
+    return (
+      <div className="space-y-3">
+        <EmptyState>
+          {since === null
+            ? 'Nothing in the log yet.'
+            : 'Nothing has changed since you last looked.'}
+        </EmptyState>
+        {ignored > 0 && (
+          <p className="text-xs text-stone-500 dark:text-stone-400">
+            {ignored} housekeeping entries skipped — sign-ins, exports and backups do not change
+            the programme.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={mimirChip}>
+          {changes.length} change{changes.length === 1 ? '' : 's'}
+          {since === null ? ' in the log' : ' since you last looked'}
+        </span>
+        <PrimaryButton onClick={markRead}>Mark as read</PrimaryButton>
+      </div>
+      <ul className="space-y-1.5">
+        {changes.map((c) => (
+          <li
+            key={c.id}
+            className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm dark:border-stone-700 dark:bg-stone-900"
+          >
+            <span className="text-stone-800 dark:text-stone-100">{c.said}</span>{' '}
+            <span className="text-xs text-stone-500 dark:text-stone-400">
+              — {c.who}, {relativeTime(c.at)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs text-stone-500 dark:text-stone-400">
+        Read from this event's own audit log. The mark is kept on this device, so marking read here
+        does not clear it for anyone else.
+        {ignored > 0 && ` ${ignored} housekeeping entries skipped.`}
+      </p>
+    </div>
+  );
+}
+
 function Readiness({ bundle }: { bundle: BundleDto }) {
   const found = useMemo(() => readiness(bundle), [bundle]);
   if (found.length === 0) {
