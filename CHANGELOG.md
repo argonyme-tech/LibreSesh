@@ -90,6 +90,29 @@ All notable changes to this project are documented here.
 
 ### Changed
 
+- **Archiving replaced deleting in the People list.** The row menu offered
+  both, and Delete was the wrong tool in every case it was reached for: it
+  refused outright for anybody holding their own profile — which is most of a
+  live event — and where it did go through it stripped the name off every
+  session that person was credited on, with no way back. Archiving does the
+  same tidying up and keeps all of that: the profile leaves the People list
+  and the speaker picker, including the **All** segment, and it keeps its
+  sessions, its role and its way in. Either an organiser or the person
+  themselves can take it back out.
+
+  **And entering the event takes it out by itself.** An organiser tidying up
+  at the end of a day cannot tell a profile that is finished with from one
+  whose person is back tomorrow — only that person can, and the way they say
+  it is by turning up. So the gate un-archives whoever comes through it, the
+  change is announced like any other, and neither side has to remember that a
+  filing decision was ever made. Only the gate does this: archiving signs
+  nobody out, so somebody still reading from before stays filed until they
+  next come in.
+
+  Delete is gone from the menu, and there is no longer any call in the app
+  that deletes a profile. Duplicates are still folded together with **Merge**,
+  which is what Delete was usually being used as a blunt version of.
+
 - **The People table gives its width back to the names in it.** Manage Event →
   People drew six fixed columns on every row: name, username, UID, role, last
   seen, and an actions column wide enough for an `Open` button and a `⋯` button

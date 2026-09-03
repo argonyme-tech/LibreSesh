@@ -217,8 +217,10 @@ export const api = {
     request<PersonDto>('POST', `/e/${encode(slug)}/people`, body),
   updatePerson: (slug: string, id: number, body: Partial<PersonWrite>) =>
     request<PersonDto>('PATCH', `/e/${encode(slug)}/people/${id}`, body),
-  deletePerson: (slug: string, id: number) =>
-    request<void>('DELETE', `/e/${encode(slug)}/people/${id}`),
+  // No `deletePerson`. Nothing in the app deletes a profile any more:
+  // archiving does the tidying up and Merge does the de-duplicating, and both
+  // keep the sessions the profile is credited on. The server route is still
+  // there for an operator with the API, but nothing in here reaches for it.
   /** Mint (or replace) a person's speaker code; the phrase is shown only once. */
   mintSpeakerCode: (slug: string, id: number) =>
     request<{ phrase: string }>('POST', `/e/${encode(slug)}/people/${id}/speaker-code`),

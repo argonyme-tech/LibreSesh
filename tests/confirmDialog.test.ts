@@ -44,10 +44,22 @@ describe('confirming something that cannot be taken back', () => {
     expect(schedule).toMatch(/It moves to the bin[\s\S]{0,120}restore|put it back/);
 
     const admin = read('pages', 'AdminPage.tsx');
-    for (const kind of ['rooms', 'tracks', 'tags', 'profiles']) {
+    for (const kind of ['rooms', 'tracks', 'tags']) {
       expect(admin, kind).toContain(`The bin does not hold ${kind}`);
     }
     expect(read('components', 'ProposalBoard.tsx')).toContain('the bin does not hold pitches');
+  });
+
+  /**
+   * Profiles were the fourth of those, and the sentence is gone because the
+   * button it warned about is: the People list archives instead, which keeps
+   * the sessions and is one click back, so there is no unrepeatable step left
+   * to warn anybody about.
+   */
+  it('no longer has a profile to warn about, because it no longer deletes one', () => {
+    const admin = read('pages', 'AdminPage.tsx');
+    expect(admin).not.toContain('The bin does not hold profiles');
+    expect(admin).not.toContain('api.deletePerson');
   });
 
   it('does not dress archiving up as a deletion', () => {

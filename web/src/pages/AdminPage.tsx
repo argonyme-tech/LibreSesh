@@ -193,13 +193,11 @@ function PersonActions({
   person,
   onMerge,
   onArchive,
-  onDelete,
 }: {
   slug: string;
   person: PersonDto;
   onMerge: () => void;
   onArchive: () => void;
-  onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const { refs, floatingStyles, context, getReferenceProps, getFloatingProps } = usePopover({
@@ -255,6 +253,13 @@ function PersonActions({
               </span>
             </button>
 
+            {/* Where Delete used to be, and doing the job Delete was reached
+                for. Delete refused outright for anyone holding their own
+                profile — which is most of a live event — and for everyone
+                else it stripped the name off every session they were credited
+                on and could not be undone. Archiving is the same tidy-up with
+                none of that: the row leaves this list and the speaker picker,
+                the sessions keep their speaker, and it is one click back. */}
             <button
               type="button"
               role="menuitem"
@@ -267,25 +272,7 @@ function PersonActions({
               <span className="text-stone-500 dark:text-stone-400">
                 {archived
                   ? 'Back into the People list and the speaker picker.'
-                  : 'Out of this list and the speaker picker. Keeps their sessions, their role and their way in — and they can take themselves back out.'}
-              </span>
-            </button>
-
-            {/* Deleting a profile somebody holds was always refused; the
-                button explaining that is gone, and the explanation now points
-                at the thing that does work. */}
-            <button
-              type="button"
-              role="menuitem"
-              disabled={person.claimed}
-              onClick={() => run(onDelete)}
-              className={`${itemClass} enabled:text-red-700 dark:enabled:text-red-400`}
-            >
-              <span className="font-semibold">Delete</span>
-              <span className={person.claimed ? 'text-stone-500 dark:text-stone-400' : ''}>
-                {person.claimed
-                  ? 'They are in this event, so their profile cannot be deleted. Archive it instead.'
-                  : 'Gone for good. Its sessions keep their slot and lose the speaker.'}
+                  : 'Out of this list and the speaker picker — including “All”. Keeps their sessions, their role and their way in, and entering again brings them back by itself.'}
               </span>
             </button>
           </div>
@@ -897,20 +884,6 @@ export function AdminPage() {
           ? `${updated.name} is back in the list`
           : `${updated.name} archived — find them under Archived`,
       );
-    } catch (err) {
-      fail(err);
-    }
-  };
-
-  const removePerson = async (person: PersonDto) => {
-    const ok = await confirm({
-      title: `Delete ${person.name}?`,
-      body: 'Their sessions keep their slot and lose the speaker. The bin does not hold profiles, so this cannot be undone — to fold a duplicate into another profile, use Merge instead.',
-    });
-    if (!ok) return;
-    try {
-      await api.deletePerson(slug, person.id);
-      data.apply({ type: 'person.deleted', entity: { id: person.id } });
     } catch (err) {
       fail(err);
     }
@@ -1691,7 +1664,6 @@ export function AdminPage() {
                         person={person}
                         onMerge={() => setMerging(person)}
                         onArchive={() => void toggleArchive(person)}
-                        onDelete={() => void removePerson(person)}
                       />
                     </span>
                   </li>

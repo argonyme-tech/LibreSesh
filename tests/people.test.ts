@@ -408,6 +408,72 @@ describe('speaker profiles', () => {
       expect((await personFrom(admin, id))?.archivedAt).not.toBeNull();
     });
 
+    /**
+     * The other half of "the holder can take it back out": they should not
+     * have to know it happened. An organiser tidying up at the end of a day
+     * cannot tell a profile that is finished with from one whose person is
+     * back tomorrow — only that person can, and the way they say it is by
+     * turning up.
+     */
+    it('takes the profile back out when its holder enters again', async () => {
+      await user.patch('/api/e/testconf/me/profile').send({ name: 'Grace' }).expect(200);
+      const mine = ((await user.get('/api/e/testconf/bundle').expect(200)).body.people as {
+        id: number;
+        isMine: boolean;
+      }[]).find((p) => p.isMine);
+      const id = mine?.id as number;
+
+      await admin.post(`/api/e/testconf/people/${id}/archive`).expect(200);
+      expect((await personFrom(admin, id))?.archivedAt).not.toBeNull();
+
+      // The same device coming back through the gate. It already holds a
+      // username here, so it need not bring one.
+      await user.post('/api/e/testconf/auth').send({ password: 'user-pw' }).expect(200);
+      expect((await personFrom(admin, id))?.archivedAt).toBeNull();
+    });
+
+    it('says who took it out, so the log is not a mystery', async () => {
+      await user.patch('/api/e/testconf/me/profile').send({ name: 'Grace' }).expect(200);
+      const mine = ((await user.get('/api/e/testconf/bundle').expect(200)).body.people as {
+        id: number;
+        isMine: boolean;
+      }[]).find((p) => p.isMine);
+      const id = mine?.id as number;
+
+      await admin.post(`/api/e/testconf/people/${id}/archive`).expect(200);
+      await user.post('/api/e/testconf/auth').send({ password: 'user-pw' }).expect(200);
+
+      const log = (await admin.get('/api/e/testconf/audit').expect(200)).body as {
+        entries: { action: string; entity: string; entityId: number }[];
+      };
+      expect(
+        log.entries.some(
+          (e) => e.action === 'unarchive' && e.entity === 'person' && e.entityId === id,
+        ),
+      ).toBe(true);
+    });
+
+    /** Entering does not stamp an unarchive on a profile that was not filed. */
+    it('says nothing when the profile was not archived', async () => {
+      await user.post('/api/e/testconf/auth').send({ password: 'user-pw' }).expect(200);
+      const log = (await admin.get('/api/e/testconf/audit').expect(200)).body as {
+        entries: { action: string }[];
+      };
+      expect(log.entries.some((e) => e.action === 'unarchive')).toBe(false);
+    });
+
+    /**
+     * Archiving does not sign anybody out, so somebody still holding a session
+     * from before stays filed until they next come in through the gate — the
+     * moment that actually means "I am here again".
+     */
+    it('leaves a filed profile filed while its holder just keeps browsing', async () => {
+      const id = await personIdFor('Ada Lovelace');
+      await admin.post(`/api/e/testconf/people/${id}/archive`).expect(200);
+      await user.get('/api/e/testconf/bundle').expect(200);
+      expect((await personFrom(admin, id))?.archivedAt).not.toBeNull();
+    });
+
     it('is idempotent in both directions', async () => {
       const id = await personIdFor('Ada Lovelace');
       const first = await admin.post(`/api/e/testconf/people/${id}/archive`).expect(200);
